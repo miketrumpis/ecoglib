@@ -1,0 +1,13 @@
+# various droppings
+*.pyc
+*~
+.DS_Store
+
+# scratch work unless specifically staged
+scripts/*.py
+
+# various figures
+*.mp4
+*.png
+*.pdf
+*.eps
