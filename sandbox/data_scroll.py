@@ -148,7 +148,6 @@ class DataScroller(HasTraits):
         # make the time dimension unit length, and put the origin at -1/2
         self.arr_img_dsource.spacing = 1./npts, 1., 1.
         self.arr_img_dsource.origin = (-0.5, 0.0, 0.0)
-        #self.arr_img_dsource.scalar_data = self.arr_img_data
         self.arr_img_dsource.scalar_data = vtk_arr
 
         # set up long scale plot and zoom plots
@@ -158,18 +157,10 @@ class DataScroller(HasTraits):
             x=self._t0, color='r', ls='-'
             )
 
-        ## self.zoom_axes = self.zoom_plot.add_subplot(111)
-        ## self._plot_timeseries(self.zoom_axes, ts_arr)
-        ## self.zoom_mark = self.zoom_axes.axvline(
-        ##     x=self._t0, color='r', ls=':'
-        ##     )
         # set up zoom window
         self.zoom_axes = self.zoom_plot.add_subplot(111)
 
         # now that all elements are set, hit some traits callbacks
-        ## self.time = 0
-        ## #self.eps = 0 # 0 radians
-        ## self.tau = 1.0
         if 'time' not in traits:
             traits['time'] = 0
         if 'tau' not in traits:
@@ -254,9 +245,7 @@ class DataScroller(HasTraits):
     @on_trait_change('time')
     def _update_time(self):
         # zoom plot limits -- same logic as update zoom interval
-        #self._update_tau()
         self.ts_mark.set_data(( [self.time, self.time], [0, 1] ))
-        #self.zoom_mark.set_data(( [self.time, self.time], [0, 1] ))
         self._plot_new_zoom()
         # array image
         if self.array_ipw:
@@ -288,12 +277,6 @@ class DataScroller(HasTraits):
             self.array_ipw.module_manager.scalar_lut_manager.data_range = lim
         # draw the figures and save the new background
         self._blit_state()
-
-    ## @on_trait_change('tau')
-    ## def _update_tau(self):
-    ##     lim = (self.time - self.tau/2, self.time + self.tau/2)
-    ##     self.zoom_axes.set_xlim(lim)
-    ##     self._blit_state(self.zoom_plot)
 
     @on_trait_change('tau')
     def _plot_new_zoom(self):
@@ -352,18 +335,6 @@ class DataScroller(HasTraits):
             canvas.restore_region(self.zoom_bkgrnd)
         ax.draw_artist(self.zoom_line)
         canvas.blit(ax.bbox)
-        
-    # call this for a full draw
-    ## def _draw_figures(self, *args):
-    ##     if not len(args):
-    ##         args = (self.zoom_plot, self.ts_plot)
-    ##     for plot in args:
-    ##         if plot.canvas:
-    ##             if plot is self.ts_plot:
-    ##                 self._blit_state()
-    ##             else:
-    ##                 plot.canvas.draw()
-
 
     ## animation
     def __set_time(self, *args):
