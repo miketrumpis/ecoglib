@@ -1,37 +1,25 @@
-## from pyface.qt import QtGui, QtCore
 import numpy as np
-import matplotlib
+
+# std lib
 from threading import Thread
 from time import sleep, time
 import random
 
-# We want matplotlib to use a QT backend
-matplotlib.use('QtAgg')
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-from matplotlib.mlab import prctile
-from matplotlib.colors import Normalize
-from matplotlib import cm
 
-from traitsui.qt4.editor import Editor
-#from traitsui.qt4.basic_editor_factory import BasicEditorFactory
-from traitsui.basic_editor_factory import BasicEditorFactory
+# ETS Traits
+from traits.api import \
+     HasTraits, Instance, on_trait_change, Float, Button, Range, Int 
+from traitsui.api import Item, View, VGroup, HGroup, RangeEditor
 
-from traits.api \
-    import HasTraits, HasPrivateTraits, Instance, Enum, Dict, Constant, Str, \
-    List, on_trait_change, Float, File, Array, Button, Range, Property, \
-    cached_property, Event, Bool, Color, Int, String, Any, Tuple
-    
-from traitsui.api \
-  import Item, Group, View, VGroup, HGroup, HSplit, \
-  EnumEditor, CheckListEditor, ListEditor, message, ButtonEditor, RangeEditor
-
+# Mayavi/TVTK
 from mayavi import mlab
-from mayavi.core.api import PipelineBase, Source
+from mayavi.core.api import PipelineBase
 from mayavi.core.ui.api import SceneEditor, MlabSceneModel
 from tvtk.pyface.scene import Scene
 from tvtk.api import tvtk
 from mayavi.sources.api import ArraySource
+
+import plot_modules as pm
 
 
 #### Utility for quick range finding XXX: way too liberal of a bound!
@@ -77,283 +65,6 @@ def safe_slice(x, start, num, fill=np.nan):
         sx = x[start:start+num, ...]
     return sx
 
-#### Matplotlib to Traits Panel Integration ####
-  
-class _MPLFigureEditor(Editor):
-
-   scrollable  = True
-
-   def init(self, parent):
-       self.control = self._create_canvas(parent)
-       self.set_tooltip()
-
-   def update_editor(self):
-       pass
-
-   def _create_canvas(self, parent):
-       """ Create the MPL canvas. """
-       # matplotlib commands to create a canvas
-       mpl_canvas = FigureCanvas(self.value.fig)
-       return mpl_canvas
-
-class MPLFigureEditor(BasicEditorFactory):
-
-   klass = _MPLFigureEditor
-
-#### Simple Figure Wrapper ####
-
-class BlitPlot(HasTraits):
-
-    xlim = Tuple
-    ylim = Tuple
-
-    def __init__(self, figure=None, figsize=(6,4), axes=None, **traits):
-        self.fig = figure or Figure(figsize=figsize)
-        if axes:
-            self.fig.add_axes(axes)
-            self.ax = axes
-        else:
-            self.ax = self.fig.add_subplot(111)
-
-        xlim = traits.pop('xlim', self.ax.get_xlim())
-        ylim = traits.pop('ylim', self.ax.get_ylim())
-        self.static_artists = []
-        self.dynamic_artists = []
-        self._bkgrnd = None
-        traits = dict(xlim=xlim, ylim=ylim)
-        super(BlitPlot, self).__init__(**traits)
-
-    def add_static_artist(self, a):
-        self.static_artists.append(a)
-
-    def add_dynamic_artist(self, a):
-        self.dynamic_artists.append(a)
-
-    @on_trait_change('xlim')
-    def set_xlim(self, *xlim):
-        if not xlim:
-            xlim = self.xlim
-        else:
-            self.trait_setq(xlim=xlim)
-        self.ax.set_xlim(xlim)
-        self.draw()
-
-    @on_trait_change('ylim')
-    def set_ylim(self, *ylim):
-        if not ylim:
-            ylim = self.ylim
-        else:
-            self.trait_setq(ylim=ylim)
-        self.ax.set_ylim(ylim)
-        self.draw()
-
-    # this is a full drawing -- it saves the new background (dynamic artists
-    # are set invisible before saving), and then draws the dynamic artists
-    # back in
-    def draw(self):
-        if self.fig.canvas is None:
-            return
-        for artist in self.dynamic_artists:
-            artist.set_visible(False)
-        self.fig.canvas.draw()
-        self._bkgrnd = self.fig.canvas.copy_from_bbox(self.ax.bbox)
-        for artist in self.dynamic_artists:
-            artist.set_visible(True)
-        self.fig.canvas.draw()
-
-    # this method only pushes out the old background, and renders the
-    # dynamic artists (which have presumably changed)
-    def draw_dynamic(self):
-        if self._bkgrnd is not None:
-            self.fig.canvas.restore_region(self._bkgrnd)
-        for artist in self.dynamic_artists:
-            self.ax.draw_artist(artist)
-        self.fig.canvas.blit(self.ax.bbox)
-
-class LongNarrowPlot(BlitPlot):
-    n_yticks = Int(2)
-    @on_trait_change('ylim')
-    def set_ylim(self, *ylim):
-        if not ylim:
-            ylim = self.ylim
-        else:
-            self.trait_setq(ylim=ylim)
-        y_ticks = np.linspace(ylim[0], ylim[1], self.n_yticks)
-        super(LongNarrowPlot, self).set_ylim(*ylim)
-    
-class StandardPlot(object):
-    """A long-and-narrow BlitPlot that plots a simple times series line
-    Prototype only! 
-    """
-
-    # this signature should be pretty generic
-    def create_fn_image(self, x, t=None, **line_props):
-        print 'CREATING STANDARD PLOT'
-        # in this case, just a plot
-        if t is None:
-            t = np.arange(len(x))
-        line = self.ax.plot(t, x, **line_props)[0]
-        return line
-
-class ColorCodedPlot(object):
-    """A long-and-narrow BlitPlot whose image is a 
-    color-coded time series lines --
-    Prototype only! 
-    """
-
-    # expects two attributes to have been set: 'cx' and 'cx_limits'
-    def create_fn_image(self, x, t=None, **line_props):
-        print 'CREATING COLOR CODED PLOT'
-        if t is None:
-            t = np.arange(len(x))
-        if not hasattr(self, 'cx'):
-            raise RuntimeError(
-                'Object should have been instantiated with color code'
-                )
-        cx = self.cx
-        if not self.cx_limits:
-            # try 95% confidence, so that hi/lo clipping is more likely
-            #eps = stochastic_limits(cx, conf=95.0)
-            eps = np.abs(cx).max()
-            limits = (-eps, eps)
-        else:
-            limits = self.cx_limits
-        #self.norm = pp.normalize(vmin=limits[0], vmax=limits[1])
-        norm = Normalize(vmin=limits[0], vmax=limits[1])
-        cmap = line_props.pop('cmap', cm.jet)
-        #colors = cmap( norm(cx) )
-        pc = self.ax.scatter(
-            t, x, 14.0, c=cx, norm=norm, cmap=cmap, **line_props
-            )
-        return pc
-        
-class StaticFunctionPlot(LongNarrowPlot):
-    """
-    Plain vanilla x(t) plot, with a marker for the current time.
-    """
-    time = Float
-    
-    def __init__(
-            self, t, x,
-            t0=None, line_props=dict(),
-            **bplot_kws
-            ):
-        # just do BlitPlot with defaults -- this gives us a figure and axes
-        bplot_kws['xlim'] = (t[0], t[-1])
-        super(StaticFunctionPlot, self).__init__()
-        self.trait_set(**bplot_kws)
-        if t0 is None:
-            t0 = t[0]
-        ts_line = self.create_fn_image(x, t=t, **line_props)
-        self.add_static_artist(ts_line)
-        self.time_mark = self.ax.axvline(x=t0, color='r', ls='-')
-        self.add_dynamic_artist(self.time_mark)
-
-    @on_trait_change('time')
-    def move_bar(self, *time):
-        if time:
-            time = time[0]
-            self.trait_setq(time=time)
-        else:
-            time = self.time
-        self.time_mark.set_data(( [time, time], [0, 1] ))
-        self.draw_dynamic()
-
-class ScrollingFunctionPlot(LongNarrowPlot):
-    """
-    Plain vanilla x(t) plot, but only over a given interval
-    """
-
-    def __init__(self, x, line_props=dict(), **bplot_kws):
-        self.winsize = len(x)
-        bplot_kws['xlim'] = (-1, self.winsize)
-        super(ScrollingFunctionPlot, self).__init__()
-        self.trait_set(**bplot_kws)
-        self.ax.xaxis.set_visible(False)
-        self.zoom_element = self.create_fn_image(x, **line_props)
-        self.add_dynamic_artist(self.zoom_element)
-        t0 = np.floor(self.winsize/2.)
-        self.time_mark = self.ax.axvline(x=t0, color='r', ls=':')
-        self.add_static_artist(self.time_mark)
-
-    def set_window(self, x):
-        winsize = len(x)
-        if winsize == self.winsize:
-            t, old_x = self.zoom_element.get_data()
-            self.zoom_element.set_data(t, x)
-            self.draw_dynamic()
-            return
-        t = np.arange(winsize)
-        self.zoom_element.set_data(t, x)
-        t0 = np.round(winsize/2.)
-        self.time_mark.set_data([t0, t0], [0, 1])
-        self.winsize = winsize
-        self.xlim = (-1, self.winsize)
-
-class StaticTimeSeriesPlot(StaticFunctionPlot, StandardPlot):
-    # do defaults for both classes
-    pass
-    
-class StaticColorCodedPlot(StaticFunctionPlot, ColorCodedPlot):
-    """
-    x(t) plot, but points are color-coded by a co-function c(t)
-    """
-
-    def __init__(
-            self, t, x, cx, t0=None, cx_limits=(), 
-            line_props=dict(), **bplot_kws
-            ):
-        self.cx = cx
-        if not cx_limits:
-            #eps = stochastic_limits(cx, conf=95.)
-            eps = np.abs(cx).max()
-            cx_limits = (-eps, eps)
-        self.cx_limits = cx_limits
-        super(StaticColorCodedPlot, self).__init__(
-            t, x, t0=t0, line_props=line_props, **bplot_kws
-            )
-
-class ScrollingTimeSeriesPlot(ScrollingFunctionPlot, StandardPlot):
-    # do defaults for both classes
-    pass
-        
-class ScrollingColorCodedPlot(ScrollingFunctionPlot, ColorCodedPlot):
-
-    def __init__(self, x, cx, cx_limits, line_props=dict(), **bplot_kws):
-        # make sure to set the color code first
-        self.cx = cx
-        # cx_limits *must* be provided, since it is unreliable to estimate
-        # them from the short window of cx provided here
-        self.cx_limits = cx_limits
-        super(ScrollingColorCodedPlot, self).__init__(
-            x, line_props=line_props, **bplot_kws
-            )
-
-    # the signature of set_window changes now
-    def set_window(self, x, cx):
-        winsize = len(x)
-        norm = self.zoom_element.norm
-        cmap = self.zoom_element.cmap
-        if winsize == self.winsize:
-            old_offset = self.zoom_element.get_offsets()
-            # possibility that the previous set of points included
-            # NaNs, in which case the offset data itself was truncated --
-            # thus make a new pseudo-time axis if necessary
-            if old_offset.shape[0] != winsize:
-                t = np.arange(winsize)
-            else:
-                t = old_offset[:,0]
-            self.zoom_element.set_offsets( np.c_[t, x] )
-            self.zoom_element.set_color( cmap( norm(cx) ) )
-            self.draw_dynamic()
-            return
-        t = np.arange(winsize)
-        self.zoom_element.set_offsets( np.c_[t, x] )
-        self.zoom_element.set_color( cmap( norm(cx) ) )
-        t0 = np.round(winsize/2.)
-        self.time_mark.set_data([t0, t0], [0, 1])
-        self.winsize = winsize
-        self.xlim = (-1, self.winsize)
     
 #### Data Scrolling App ####
 #### (out of order) ####
@@ -386,8 +97,8 @@ class ScrollingColorCodedPlot(ScrollingFunctionPlot, ColorCodedPlot):
 class DataScroller(HasTraits):
 
     ## these may need to be more specialized for handling 1D/2D timeseries
-    zoom_plot = Instance(ScrollingTimeSeriesPlot)
-    ts_plot = Instance(StaticTimeSeriesPlot)
+    zoom_plot = Instance(pm.ScrollingTimeSeriesPlot)
+    ts_plot = Instance(pm.StaticTimeSeriesPlot)
 
     ## array scene, image, and data (Mayavi components)
     array_scene = Instance(MlabSceneModel, ())
@@ -409,7 +120,7 @@ class DataScroller(HasTraits):
     eps = Range(
         low=0.0, high=1.0, value=0.5,
         editor=RangeEditor(
-            format='%1.1f', low_label='tight', high_label='wide'
+            format='%1.2f', low_label='tight', high_label='wide'
             )
         )
     
@@ -475,14 +186,14 @@ class DataScroller(HasTraits):
         self.trait_setq(eps=i_eps)
 
     def construct_ts_plot(self, t, figsize, eps, t0, **lprops):
-        return StaticTimeSeriesPlot(
+        return pm.StaticTimeSeriesPlot(
             t, self.ts_arr, figsize=figsize, ylim=(-eps, eps), t0=t0,
             line_props=lprops
             )
 
     def construct_zoom_plot(self, figsize, eps, **lprops):
         x = self.zoom_data()
-        return ScrollingTimeSeriesPlot(
+        return pm.ScrollingTimeSeriesPlot(
             x, figsize=figsize, ylim=(-eps, eps)
             )
 
@@ -522,12 +233,14 @@ class DataScroller(HasTraits):
         self.ts_plot.fig.canvas.mpl_connect(
             'motion_notify_event', self._scroll_handler
             )
+        print 'events connected'
 
     def _scroll_handler(self, ev):
         if not ev.inaxes:
             return
         if ev.name == 'button_press_event':
             self._scrolling = True
+            self._scroll_handler(ev)
         elif ev.name == 'button_release_event':
             self._scrolling = False
         elif self._scrolling and ev.name == 'motion_notify_event':
@@ -633,13 +346,13 @@ class DataScroller(HasTraits):
                     height=200, width=200, show_label=False
                     ),
                 Item(
-                    'zoom_plot', editor=MPLFigureEditor(),
+                    'zoom_plot', editor=pm.MPLFigureEditor(),
                     show_label=False, width=500, height=200, resizable=True
                     )
                 ),
             HGroup(
                 Item(
-                    'ts_plot', editor=MPLFigureEditor(),
+                    'ts_plot', editor=pm.MPLFigureEditor(),
                     show_label=False, width=700, height=100, resizable=True
                     ),
                 Item('fps', label='FPS'),
@@ -659,8 +372,8 @@ class DataScroller(HasTraits):
 
 class ColorCodedDataScroller(DataScroller):
 
-    zoom_plot = Instance(ScrollingColorCodedPlot)
-    ts_plot = Instance(StaticColorCodedPlot)
+    zoom_plot = Instance(pm.ScrollingColorCodedPlot)
+    ts_plot = Instance(pm.StaticColorCodedPlot)
 
     def __init__(self, d_array, ts_array, cx_array, nrow, ncol, Fs, **traits):
         self.cx_arr = cx_array
@@ -673,7 +386,7 @@ class ColorCodedDataScroller(DataScroller):
         t = t[::dfac]
         ts_arr = self.ts_arr[::dfac]
         cx_arr = self.cx_arr[::dfac]
-        return StaticColorCodedPlot(
+        return pm.StaticColorCodedPlot(
             t, ts_arr, cx_arr,
             figsize=figsize, ylim=(-eps, eps), t0=t0,
             line_props=lprops
@@ -682,7 +395,7 @@ class ColorCodedDataScroller(DataScroller):
     def construct_zoom_plot(self, figsize, eps, **lprops):
         x, cx = self.zoom_data()
         cx_lim = self.ts_plot.cx_limits # ooh! hacky
-        return ScrollingColorCodedPlot(
+        return pm.ScrollingColorCodedPlot(
             x, cx, cx_lim, 
             figsize=figsize, ylim=(-eps, eps), line_props=lprops
             )
@@ -698,5 +411,17 @@ class ColorCodedDataScroller(DataScroller):
 
     
 if __name__ == "__main__":
-    pass
-   
+    import sys
+    nrow = 10; ncol = 15; n_pts = 1000
+    d = np.random.randn(nrow*ncol, n_pts)
+    d_mx = d.max(axis=0)
+    if len(sys.argv) < 2:
+        dscroll = DataScroller(d, d_mx, nrow, ncol, 1.0)
+        dscroll.configure_traits()
+    else:
+        # if ANY args, do color coded test
+        cx = np.random.randn(len(d_mx))
+        dscroll = ColorCodedDataScroller(
+            d, d_mx, cx, nrow, ncol, 1.0
+            )
+        dscroll.configure_traits()
