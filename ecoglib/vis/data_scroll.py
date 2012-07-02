@@ -138,8 +138,39 @@ class DataScroller(HasTraits):
     count = Button()
     counter = Instance(Thread)
 
-    def __init__(self, d_array, ts_array, nrow, ncol, Fs, **traits):
-        npts = d_array.shape[1]
+    def __init__(self, d_array, ts_array, rowcol=(), Fs=1.0, **traits):
+        """
+        Display a channel array in a 3-plot format:
+
+        * array image in native array geometry
+        * long-scale time series navigator plot
+        * short-scale time series zoomed plot
+
+        Parameters
+        ----------
+
+        d_array: ndarray, 2D or 3D
+          the array recording, in either (n_chan, n_time) or
+          (n_row, n_col, n_time) format
+
+        ts_array: ndarray, 1D
+          a (currently single) timeseries description of the recording
+
+        rowcol: tuple
+          the array geometry, if it cannot be inferred from d_array
+
+        Fs: float
+          sampling rate
+
+        traits: dict
+          other keyword parameters
+        
+        """
+        npts = d_array.shape[-1]
+        if len(d_array.shape) < 3:
+            nrow, ncol = rowcol
+        else:
+            nrow, ncol = d_array.shape[:2]
         self._tf = float(npts-1) / Fs
         self.Fs = Fs
         # XXX: should set max_amp -- could stochastically sample to
@@ -238,7 +269,7 @@ class DataScroller(HasTraits):
     def _scroll_handler(self, ev):
         if not ev.inaxes:
             return
-        if ev.name == 'button_press_event':
+        if not self._scrolling and ev.name == 'button_press_event':
             self._scrolling = True
             self._scroll_handler(ev)
         elif ev.name == 'button_release_event':
@@ -375,10 +406,47 @@ class ColorCodedDataScroller(DataScroller):
     zoom_plot = Instance(pm.ScrollingColorCodedPlot)
     ts_plot = Instance(pm.StaticColorCodedPlot)
 
-    def __init__(self, d_array, ts_array, cx_array, nrow, ncol, Fs, **traits):
+    def __init__(
+            self, d_array, ts_array, cx_array, 
+            rowcol=(), Fs=1.0, **traits
+            ):
+        """
+        Display a channel array in a 3-plot format:
+
+        * array image in native array geometry
+        * long-scale time series navigator color-coded plot
+        * short-scale time series zoomed, color-coded plot
+
+        The timeseries plots are structured as points located at
+        (time, amplitude) points, but color-coded based on values in
+        the co-function cx_array.
+
+        Parameters
+        ----------
+
+        d_array: ndarray, 2D or 3D
+          the array recording, in either (n_chan, n_time) or
+          (n_row, n_col, n_time) format
+
+        ts_array: ndarray, 1D
+          a (currently single) timeseries description of the recording
+
+        cx_array: ndarray, 1D
+          a secondary timeseries which color-codes the ts_array plots
+
+        rowcol: tuple
+          the array geometry, if it cannot be inferred from d_array
+
+        Fs: float
+          sampling rate
+
+        traits: dict
+          other keyword parameters
+        
+        """
         self.cx_arr = cx_array
         DataScroller.__init__(
-            self, d_array, ts_array, nrow, ncol, Fs, **traits
+            self, d_array, ts_array, rowcol=rowcol, Fs=Fs, **traits
             )
 
     def construct_ts_plot(self, t, figsize, eps, t0, **lprops):
@@ -416,12 +484,12 @@ if __name__ == "__main__":
     d = np.random.randn(nrow*ncol, n_pts)
     d_mx = d.max(axis=0)
     if len(sys.argv) < 2:
-        dscroll = DataScroller(d, d_mx, nrow, ncol, 1.0)
+        dscroll = DataScroller(d, d_mx, rowcol=(nrow, ncol), Fs=1.0)
         dscroll.configure_traits()
     else:
         # if ANY args, do color coded test
         cx = np.random.randn(len(d_mx))
         dscroll = ColorCodedDataScroller(
-            d, d_mx, cx, nrow, ncol, 1.0
+            d, d_mx, cx, rowcol=(nrow, ncol), Fs=1.0
             )
         dscroll.configure_traits()
