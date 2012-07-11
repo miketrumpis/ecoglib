@@ -19,21 +19,25 @@ from matplotlib import cm
 #### Matplotlib to Traits Panel Integration ####
   
 class _MPLFigureEditor(Editor):
+    """
+    This class provides a QT canvas to all MPL figures when drawn
+    under the TraitsUI framework.
+    """
 
-   scrollable  = True
+    scrollable  = True
 
-   def init(self, parent):
-       self.control = self._create_canvas(parent)
-       self.set_tooltip()
+    def init(self, parent):
+        self.control = self._create_canvas(parent)
+        self.set_tooltip()
 
-   def update_editor(self):
-       pass
+    def update_editor(self):
+        pass
 
-   def _create_canvas(self, parent):
-       """ Create the MPL canvas. """
-       # matplotlib commands to create a canvas
-       mpl_canvas = FigureCanvas(self.value.fig)
-       return mpl_canvas
+    def _create_canvas(self, parent):
+        """ Create the MPL canvas. """
+        # matplotlib commands to create a canvas
+        mpl_canvas = FigureCanvas(self.value.fig)
+        return mpl_canvas
 
 class MPLFigureEditor(BasicEditorFactory):
 
@@ -42,6 +46,11 @@ class MPLFigureEditor(BasicEditorFactory):
 #### Simple Figure Wrapper ####
 
 class BlitPlot(HasTraits):
+    """
+    Provides a generic MPL plot that has static and dynamic components.
+    Dynamic parts (MPL "actors") can be re-rendered quickly without
+    having to re-render the entire figure.
+    """
 
     xlim = Tuple
     ylim = Tuple
@@ -90,6 +99,9 @@ class BlitPlot(HasTraits):
     # are set invisible before saving), and then draws the dynamic artists
     # back in
     def draw(self):
+        """
+        Draw full figure from scratch.
+        """
         if self.fig.canvas is None:
             return
         for artist in self.dynamic_artists:
@@ -103,6 +115,9 @@ class BlitPlot(HasTraits):
     # this method only pushes out the old background, and renders the
     # dynamic artists (which have presumably changed)
     def draw_dynamic(self):
+        """
+        Draw only dynamic actors, then restore the background.
+        """
         if self._bkgrnd is not None:
             self.fig.canvas.restore_region(self._bkgrnd)
         for artist in self.dynamic_artists:
@@ -110,6 +125,9 @@ class BlitPlot(HasTraits):
         self.fig.canvas.blit(self.ax.bbox)
 
 class LongNarrowPlot(BlitPlot):
+    """
+    A BlitPlot with less tick clutter on the y-axis.
+    """
     n_yticks = Int(2)
     @on_trait_change('ylim')
     def set_ylim(self, *ylim):
@@ -121,10 +139,13 @@ class LongNarrowPlot(BlitPlot):
         super(LongNarrowPlot, self).set_ylim(*ylim)
     
 class StandardPlot(object):
-    """A long-and-narrow BlitPlot that plots a simple times series line
-    Prototype only! 
+    """
+    A mixin type that plots a simple times series line.
     """
 
+    # Caution: mixin-only. Supposes the attribute
+    # * ax, an MPL Axes
+    
     # this signature should be pretty generic
     def create_fn_image(self, x, t=None, **line_props):
         print 'CREATING STANDARD PLOT'
@@ -135,12 +156,15 @@ class StandardPlot(object):
         return line
 
 class ColorCodedPlot(object):
-    """A long-and-narrow BlitPlot whose image is a 
-    color-coded time series lines --
-    Prototype only! 
+    """
+    A mixin-type whose image is a color-coded time series lines
     """
 
-    # expects two attributes to have been set: 'cx' and 'cx_limits'
+    # Caution: mixin-only. Supposes the attributes
+    # * ax, an MPL Axes
+    # * cx, a color-coding function
+    # * cx_limits, the (possibly clipped) dynamic range of "cx"
+
     def create_fn_image(self, x, t=None, **line_props):
         print 'CREATING COLOR CODED PLOT'
         if t is None:
@@ -200,10 +224,20 @@ class StaticFunctionPlot(LongNarrowPlot):
 
 class ScrollingFunctionPlot(LongNarrowPlot):
     """
-    Plain vanilla x(t) plot, but only over a given interval
+    Plain vanilla x(t) plot, but only over a given interval. A time
+    marker is placed at the current time, which by default is the
+    center of the window.
     """
 
     def __init__(self, x, line_props=dict(), **bplot_kws):
+        """
+        Parameters
+        ----------
+
+        x: ndarray
+          x is a restriction of some function over an initial interval
+
+        """
         self.winsize = len(x)
         bplot_kws['xlim'] = (-1, self.winsize)
         super(ScrollingFunctionPlot, self).__init__()
@@ -215,7 +249,12 @@ class ScrollingFunctionPlot(LongNarrowPlot):
         self.time_mark = self.ax.axvline(x=t0, color='r', ls=':')
         self.add_static_artist(self.time_mark)
 
-    def set_window(self, x):
+    def set_window(self, x, tc=None):
+        """
+        Update the interval of the function (x is restriction to 
+        the new interval). If given, "tc" is the current time defining
+        the interval.
+        """
         winsize = len(x)
         if winsize == self.winsize:
             t, old_x = self.zoom_element.get_data()
@@ -224,18 +263,23 @@ class ScrollingFunctionPlot(LongNarrowPlot):
             return
         t = np.arange(winsize)
         self.zoom_element.set_data(t, x)
-        t0 = np.round(winsize/2.)
-        self.time_mark.set_data([t0, t0], [0, 1])
+        if tc is None:
+            tc = np.round(winsize/2.)
+        self.time_mark.set_data([tc, tc], [0, 1])
         self.winsize = winsize
+        # setting xlim triggers draw
         self.xlim = (-1, self.winsize)
 
 class StaticTimeSeriesPlot(StaticFunctionPlot, StandardPlot):
+    """
+    A static plot of a simple 1D timeseries graph.
+    """
     # do defaults for both classes
     pass
     
 class StaticColorCodedPlot(StaticFunctionPlot, ColorCodedPlot):
     """
-    x(t) plot, but points are color-coded by a co-function c(t)
+    A static plot, but points are color-coded by a co-function c(t)
     """
 
     def __init__(
@@ -253,11 +297,16 @@ class StaticColorCodedPlot(StaticFunctionPlot, ColorCodedPlot):
             )
 
 class ScrollingTimeSeriesPlot(ScrollingFunctionPlot, StandardPlot):
+    """
+    A scrolling plot of a simple 1D time series graph.
+    """
     # do defaults for both classes
     pass
         
 class ScrollingColorCodedPlot(ScrollingFunctionPlot, ColorCodedPlot):
-
+    """
+    A scrolling plot, but points are color-coded by a co-function c(t)
+    """
     def __init__(self, x, cx, cx_limits, line_props=dict(), **bplot_kws):
         # make sure to set the color code first
         self.cx = cx
@@ -268,7 +317,7 @@ class ScrollingColorCodedPlot(ScrollingFunctionPlot, ColorCodedPlot):
             x, line_props=line_props, **bplot_kws
             )
 
-    # the signature of set_window changes now
+    # the signature of set_window changes now (XXX: dangerous?)
     def set_window(self, x, cx):
         winsize = len(x)
         norm = self.zoom_element.norm
