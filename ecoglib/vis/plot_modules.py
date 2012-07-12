@@ -1,7 +1,8 @@
 import numpy as np
 
 # ETS
-from traits.api import HasTraits, on_trait_change, Float, Int, Tuple
+from traits.api import \
+     HasTraits, on_trait_change, Float, Int, Tuple, Range, Button
 from traitsui.qt4.editor import Editor
 from traitsui.basic_editor_factory import BasicEditorFactory
 
@@ -15,8 +16,14 @@ from matplotlib.figure import Figure
 from matplotlib.colors import Normalize
 from matplotlib import cm
 
+# XXX: an incomplete decorator for the listen/set pattern of traits callbacks
+## def set_or_listen(attr):
 
-#### Matplotlib to Traits Panel Integration ####
+##     @on_trait_change(attr)
+##     def
+
+##############################################################################
+########## Matplotlib to Traits Panel Integration ############################
   
 class _MPLFigureEditor(Editor):
     """
@@ -43,7 +50,8 @@ class MPLFigureEditor(BasicEditorFactory):
 
    klass = _MPLFigureEditor
 
-#### Simple Figure Wrapper ####
+##############################################################################
+########## Simple Figure Wrapper #############################################
 
 class BlitPlot(HasTraits):
     """
@@ -137,64 +145,20 @@ class LongNarrowPlot(BlitPlot):
             self.trait_setq(ylim=ylim)
         y_ticks = np.linspace(ylim[0], ylim[1], self.n_yticks)
         super(LongNarrowPlot, self).set_ylim(*ylim)
-    
-class StandardPlot(object):
-    """
-    A mixin type that plots a simple times series line.
-    """
 
-    # Caution: mixin-only. Supposes the attribute
-    # * ax, an MPL Axes
-    
-    # this signature should be pretty generic
-    def create_fn_image(self, x, t=None, **line_props):
-        print 'CREATING STANDARD PLOT'
-        # in this case, just a plot
-        if t is None:
-            t = np.arange(len(x))
-        line = self.ax.plot(t, x, **line_props)[0]
-        return line
-
-class ColorCodedPlot(object):
-    """
-    A mixin-type whose image is a color-coded time series lines
-    """
-
-    # Caution: mixin-only. Supposes the attributes
-    # * ax, an MPL Axes
-    # * cx, a color-coding function
-    # * cx_limits, the (possibly clipped) dynamic range of "cx"
-
-    def create_fn_image(self, x, t=None, **line_props):
-        print 'CREATING COLOR CODED PLOT'
-        if t is None:
-            t = np.arange(len(x))
-        if not hasattr(self, 'cx'):
-            raise RuntimeError(
-                'Object should have been instantiated with color code'
-                )
-        cx = self.cx
-        if not self.cx_limits:
-            # try 95% confidence, so that hi/lo clipping is more likely
-            #eps = stochastic_limits(cx, conf=95.0)
-            eps = np.abs(cx).max()
-            limits = (-eps, eps)
-        else:
-            limits = self.cx_limits
-        #self.norm = pp.normalize(vmin=limits[0], vmax=limits[1])
-        norm = Normalize(vmin=limits[0], vmax=limits[1])
-        cmap = line_props.pop('cmap', cm.jet)
-        #colors = cmap( norm(cx) )
-        pc = self.ax.scatter(
-            t, x, 14.0, c=cx, norm=norm, cmap=cmap, **line_props
-            )
-        return pc
+##############################################################################
+########## Classes To Define Plot Functionality ##############################
         
 class StaticFunctionPlot(LongNarrowPlot):
     """
     Plain vanilla x(t) plot, with a marker for the current time.
     """
     time = Float
+
+    # Caution: mixin-only. Supposes the method
+    # * create_fn_image() which produces a particular plot
+    #
+    # This method is provided by the ProtoPlot types (e.g. StandardPlot)
     
     def __init__(
             self, t, x,
@@ -222,12 +186,102 @@ class StaticFunctionPlot(LongNarrowPlot):
         self.time_mark.set_data(( [time, time], [0, 1] ))
         self.draw_dynamic()
 
+class PagedFunctionPlot(StaticFunctionPlot):
+    """
+    Same behavior as a static plot, but the plot window flips between
+    "pages" of set duration.
+    """
+
+    #page_length = Int(10000) # default 10000 point window
+    page_length = Float(100) # units are arbitrary, as long as they match
+                             # the time axis
+
+    _mx_page = Int
+    _page = Range(low=0, high='_mx_page', value=0)
+    _overlap = Float(0.15)
+    
+    next_page = Button()
+    prev_page = Button()
+
+    def __init__(self, t, x, **traits):
+        super(PagedFunctionPlot, self).__init__(t, x, **traits)
+        self._init_pages(t)
+
+    def _init_pages(self, t):
+        # set up the number of pages and the associated limits
+        # each page is staggered at (1-overlap) * page_length points
+        plen = (1-self._overlap)*self.page_length
+        full_window = float( t[-1] - t[0] )
+        self._mx_page = int( full_window / plen )
+        self._time_insensitive = False
+        self.change_page(self._page)
+
+    @on_trait_change('_page')
+    def change_page(self, *page):
+        if page:
+            page = page[0]
+            self.trait_setq(_page=page)
+        else:
+            page = self._page
+
+        # the page length is set, but the page stride is
+        # (1-overlap) * page_length
+        stride = (1-self._overlap)*self.page_length
+        x_start = page * stride
+        x_stop = x_start + self.page_length
+        # this will triger a redraw
+        self.xlim = (x_start, x_stop)
+        # if a page was switched while the current time is somewhere
+        # outside the current interval, then enter a mode where subsequent
+        # time updates won't change the page back. This will last until
+        # the current time comes back into the current page
+        if self.time < x_start or self.time > x_stop:
+            self._time_insensitive = True
+
+    def _next_page_fired(self):
+        self._page = min(self._mx_page, self._page+1)
+
+    def _prev_page_fired(self):
+        self._page = max(0, self._page-1)
+
+    def page_from_time(self, time):
+        stride = (1-self._overlap)*self.page_length
+        # (n+1)*stride > time > n*stride
+        n = int(time/stride)
+        return n
+
+    @on_trait_change('time')
+    def move_bar(self, *time):
+        if time:
+            time = time[0]
+            self.trait_setq(time=time)
+        else:
+            time = self.time
+        too_lo = self.time < self.xlim[0]
+        too_hi = self.time > self.xlim[1]
+        within = not too_lo and not too_hi
+        if not within:
+            if self._time_insensitive:
+                return
+            self._page = self.page_from_time(time)
+        else:
+            # if time is within the interval then we can always
+            # be sensitive to it
+            self._time_insensitive = False
+        super(PagedFunctionPlot, self).move_bar(time)
+
+        
 class ScrollingFunctionPlot(LongNarrowPlot):
     """
     Plain vanilla x(t) plot, but only over a given interval. A time
     marker is placed at the current time, which by default is the
     center of the window.
     """
+
+    # Caution: mixin-only. Supposes the method
+    # * create_fn_image() which produces a particular plot
+    #
+    # This method is provided by the ProtoPlot types (e.g. StandardPlot)
 
     def __init__(self, x, line_props=dict(), **bplot_kws):
         """
@@ -270,6 +324,73 @@ class ScrollingFunctionPlot(LongNarrowPlot):
         # setting xlim triggers draw
         self.xlim = (-1, self.winsize)
 
+##############################################################################
+########## Classes To Define Plot Styles #####################################
+
+class ProtoPlot(object):
+    """
+    An abstract prototype of the Plot types
+    """
+
+    def create_fn_image(self, *args, **kwargs):
+        raise NotImpelentedError('Abstract class: does not plot')
+        
+class StandardPlot(ProtoPlot):
+    """
+    A mixin type that plots a simple times series line.
+    """
+
+    # Caution: mixin-only. Supposes the attribute
+    # * ax, an MPL Axes
+    
+    # this signature should be pretty generic
+    def create_fn_image(self, x, t=None, **line_props):
+        print 'CREATING STANDARD PLOT'
+        # in this case, just a plot
+        if t is None:
+            t = np.arange(len(x))
+        line = self.ax.plot(t, x, **line_props)[0]
+        return line
+
+class ColorCodedPlot(ProtoPlot):
+    """
+    A mixin-type whose image is a color-coded time series lines
+    """
+
+    # Caution: mixin-only. Supposes the attributes
+    # * ax, an MPL Axes
+    # * cx, a color-coding function
+    # * cx_limits, the (possibly clipped) dynamic range of "cx"
+
+    def create_fn_image(self, x, t=None, **line_props):
+        print 'CREATING COLOR CODED PLOT'
+        if t is None:
+            t = np.arange(len(x))
+        if not hasattr(self, 'cx'):
+            raise RuntimeError(
+                'Object should have been instantiated with color code'
+                )
+        cx = self.cx
+        if not self.cx_limits:
+            # try 95% confidence, so that hi/lo clipping is more likely
+            #eps = stochastic_limits(cx, conf=95.0)
+            eps = np.abs(cx).max()
+            limits = (-eps, eps)
+        else:
+            limits = self.cx_limits
+        #self.norm = pp.normalize(vmin=limits[0], vmax=limits[1])
+        norm = Normalize(vmin=limits[0], vmax=limits[1])
+        cmap = line_props.pop('cmap', cm.jet)
+        #colors = cmap( norm(cx) )
+        line_props['edgecolors'] = 'none'
+        pc = self.ax.scatter(
+            t, x, 14.0, c=cx, norm=norm, cmap=cmap, **line_props
+            )
+        return pc
+
+##############################################################################
+########## Classes Implementing Function and Style Combinations ##############
+
 class StaticTimeSeriesPlot(StaticFunctionPlot, StandardPlot):
     """
     A static plot of a simple 1D timeseries graph.
@@ -293,6 +414,31 @@ class StaticColorCodedPlot(StaticFunctionPlot, ColorCodedPlot):
             cx_limits = (-eps, eps)
         self.cx_limits = cx_limits
         super(StaticColorCodedPlot, self).__init__(
+            t, x, t0=t0, line_props=line_props, **bplot_kws
+            )
+
+class PagedTimeSeriesPlot(PagedFunctionPlot, StandardPlot):
+    """
+    A static plot that is flipped between pages.
+    """
+    # defaults for both classes
+    pass
+
+class PagedColorCodedPlot(PagedFunctionPlot, ColorCodedPlot):
+    """
+    A static color-coded plot that is flipped between intervals
+    """
+    def __init__(
+            self, t, x, cx, t0=None, cx_limits=(), 
+            line_props=dict(), **bplot_kws
+            ):
+        self.cx = cx
+        if not cx_limits:
+            #eps = stochastic_limits(cx, conf=95.)
+            eps = np.abs(cx).max()
+            cx_limits = (-eps, eps)
+        self.cx_limits = cx_limits
+        super(PagedColorCodedPlot, self).__init__(
             t, x, t0=t0, line_props=line_props, **bplot_kws
             )
 

@@ -59,8 +59,8 @@ def safe_slice(x, start, num, fill=np.nan):
             # fill the rest with x
             sx[-start:, ...] = x[:(num + start), ...]
         else:
-            sx[:(num-start), ...] = x[start:, ...]
-            sx[(num-start):, ...] = fill
+            sx[:(lx-start), ...] = x[start:, ...]
+            sx[(lx-start):, ...] = fill
     else:
         sx = x[start:start+num, ...]
     return sx
@@ -98,7 +98,7 @@ class DataScroller(HasTraits):
 
     ## these may need to be more specialized for handling 1D/2D timeseries
     zoom_plot = Instance(pm.ScrollingTimeSeriesPlot)
-    ts_plot = Instance(pm.StaticTimeSeriesPlot)
+    ts_plot = Instance(pm.PagedTimeSeriesPlot)
 
     ## array scene, image, and data (Mayavi components)
     array_scene = Instance(MlabSceneModel, ())
@@ -217,7 +217,7 @@ class DataScroller(HasTraits):
         self.trait_setq(eps=i_eps)
 
     def construct_ts_plot(self, t, figsize, eps, t0, **lprops):
-        return pm.StaticTimeSeriesPlot(
+        return pm.PagedTimeSeriesPlot(
             t, self.ts_arr, figsize=figsize, ylim=(-eps, eps), t0=t0,
             line_props=lprops
             )
@@ -336,6 +336,9 @@ class DataScroller(HasTraits):
     def _count(self):
         while not self._quit_counting:
             t = self.time + 1.0/self.Fs
+            if t > self._tf:
+                self._quit_counting = True
+                return
             self.trait_setq(time=t)
             self.ts_plot.move_bar(t)
             t1 = time()
@@ -404,7 +407,7 @@ class DataScroller(HasTraits):
 class ColorCodedDataScroller(DataScroller):
 
     zoom_plot = Instance(pm.ScrollingColorCodedPlot)
-    ts_plot = Instance(pm.StaticColorCodedPlot)
+    ts_plot = Instance(pm.PagedColorCodedPlot)
 
     def __init__(
             self, d_array, ts_array, cx_array, 
@@ -450,11 +453,11 @@ class ColorCodedDataScroller(DataScroller):
             )
 
     def construct_ts_plot(self, t, figsize, eps, t0, **lprops):
-        dfac = 1
+        dfac = 10
         t = t[::dfac]
         ts_arr = self.ts_arr[::dfac]
         cx_arr = self.cx_arr[::dfac]
-        return pm.StaticColorCodedPlot(
+        return pm.PagedColorCodedPlot(
             t, ts_arr, cx_arr,
             figsize=figsize, ylim=(-eps, eps), t0=t0,
             line_props=lprops
