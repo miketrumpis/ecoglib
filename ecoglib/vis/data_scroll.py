@@ -312,11 +312,11 @@ class DataScroller(HasTraits):
         self.zoom_plot.set_window(*x)
     
     ## animation
-    def __set_time(self, *args):
-        if not args:
-            return self.time
-        t = args[0]
-        self.time = t
+    ## def __set_time(self, *args):
+    ##     if not args:
+    ##         return self.time
+    ##     t = args[0]
+    ##     self.time = t
     
     ## def _count_fired(self):
     ##     if self.counter and self.counter.isAlive():
@@ -339,6 +339,8 @@ class DataScroller(HasTraits):
             if t > self._tf:
                 self._quit_counting = True
                 return
+            # set trait without dispatch in order to wait for
+            # _update_time() to complete
             self.trait_setq(time=t)
             self.ts_plot.move_bar(t)
             t1 = time()
