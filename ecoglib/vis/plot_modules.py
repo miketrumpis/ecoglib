@@ -24,7 +24,7 @@ from matplotlib import cm
 
 ##############################################################################
 ########## Matplotlib to Traits Panel Integration ############################
-  
+
 class _MPLFigureEditor(Editor):
     """
     This class provides a QT canvas to all MPL figures when drawn
@@ -76,6 +76,8 @@ class BlitPlot(HasTraits):
         self.static_artists = []
         self.dynamic_artists = []
         self._bkgrnd = None
+        self._old_size = self.ax.bbox.size
+        self._mpl_connections = []
         traits = dict(xlim=xlim, ylim=ylim)
         super(BlitPlot, self).__init__(**traits)
 
@@ -119,6 +121,7 @@ class BlitPlot(HasTraits):
         for artist in self.dynamic_artists:
             artist.set_visible(True)
         self.fig.canvas.draw()
+        self._old_size = (self.fig.canvas.width(), self.fig.canvas.height())
 
     # this method only pushes out the old background, and renders the
     # dynamic artists (which have presumably changed)
@@ -126,11 +129,49 @@ class BlitPlot(HasTraits):
         """
         Draw only dynamic actors, then restore the background.
         """
+        # detect a resize
+        new_size = (self.fig.canvas.width(), self.fig.canvas.height())
+        if new_size != self._old_size:
+            print 'redrawing'
+            self.draw()
+            return
         if self._bkgrnd is not None:
             self.fig.canvas.restore_region(self._bkgrnd)
         for artist in self.dynamic_artists:
             self.ax.draw_artist(artist)
         self.fig.canvas.blit(self.ax.bbox)
+
+    def connect_live_interaction(self, *extra_connections):
+        """
+        Make callback connections with the figure's canvas. The
+        argument extra_connections is a sequence of (event-name, handler)
+        pairs that can be provided externally
+        """
+        canvas = self.fig.canvas
+        if canvas is None:
+            print 'Canvas not present, no connections made'
+            return
+        if self._mpl_connections:
+            print 'Connections already present,'\
+              'may want to consider disconnecting them first'
+        #standard mpl connection pattern
+        connections = (('resize_event', self._resize_handler),) + \
+          extra_connections
+        print connections
+        for event, handler in connections:
+            self._mpl_connections.append( canvas.mpl_connect(event, handler) )
+
+    def disconnect_live_interaction(self):
+        canvas = self.fig.canvas
+        if canvas is None:
+            print 'Canvas not present'
+        else:
+            for id in self._mpl_connections:
+                canvas.mpl_disconnect(id)
+        self._mpl_connections = []
+
+    def _resize_handler(self, ev):
+        print ev.name
 
 class LongNarrowPlot(BlitPlot):
     """
@@ -148,7 +189,7 @@ class LongNarrowPlot(BlitPlot):
 
 ##############################################################################
 ########## Classes To Define Plot Functionality ##############################
-        
+
 class StaticFunctionPlot(LongNarrowPlot):
     """
     Plain vanilla x(t) plot, with a marker for the current time.
@@ -159,7 +200,7 @@ class StaticFunctionPlot(LongNarrowPlot):
     # * create_fn_image() which produces a particular plot
     #
     # This method is provided by the ProtoPlot types (e.g. StandardPlot)
-    
+
     def __init__(
             self, t, x,
             t0=None, line_props=dict(),
@@ -186,6 +227,31 @@ class StaticFunctionPlot(LongNarrowPlot):
         self.time_mark.set_data(( [time, time], [0, 1] ))
         self.draw_dynamic()
 
+    def connect_live_interaction(self, *extra_connections):
+        # connect a sequence of callbacks to
+        # click -> enable scrolling
+        # drag -> scroll time bar (if scrolling)
+        # release click -> disable scrolling
+        connections = (
+            ('button_press_event', self._scroll_handler),
+            ('button_release_event', self._scroll_handler),
+            ('motion_notify_event', self._scroll_handler),
+            )
+        connections = connections + extra_connections
+        self._scrolling = False
+        super(StaticFunctionPlot, self).connect_live_interaction(*connections)
+
+    def _scroll_handler(self, ev):
+        if not ev.inaxes or ev.button != 1:
+            return
+        if not self._scrolling and ev.name == 'button_press_event':
+            self._scrolling = True
+            self.time = ev.xdata
+        elif ev.name == 'button_release_event':
+            self._scrolling = False
+        elif self._scrolling and ev.name == 'motion_notify_event':
+            self.time = ev.xdata
+
 class PagedFunctionPlot(StaticFunctionPlot):
     """
     Same behavior as a static plot, but the plot window flips between
@@ -199,7 +265,7 @@ class PagedFunctionPlot(StaticFunctionPlot):
     _mx_page = Int
     _page = Range(low=0, high='_mx_page', value=0)
     _overlap = Float(0.15)
-    
+
     next_page = Button()
     prev_page = Button()
 
@@ -270,7 +336,31 @@ class PagedFunctionPlot(StaticFunctionPlot):
             self._time_insensitive = False
         super(PagedFunctionPlot, self).move_bar(time)
 
-        
+    def connect_live_interaction(self, *extra_connections):
+        # connect a right-mouse-button triggered paging
+        connections = (
+            ('button_press_event', self._page_handler),
+            )
+        connections = connections + extra_connections
+        super(PagedFunctionPlot, self).connect_live_interaction(*connections)
+
+
+    def _page_handler(self, ev):
+        ## if ev.canvas != self.ts_plot.fig.canvas:
+        ##     print 'not in canvas'
+        ##     # ignore
+        ##     return
+        if ev.button != 3 or not ev.inaxes:
+            return
+        x = ev.xdata
+        print ev.xdata
+        x_lo, x_hi = self.xlim
+        if np.abs(x - x_lo) < np.abs(x - x_hi):
+            self.prev_page = True
+        else:
+            self.next_page = True
+
+
 class ScrollingFunctionPlot(LongNarrowPlot):
     """
     Plain vanilla x(t) plot, but only over a given interval. A time
@@ -305,7 +395,7 @@ class ScrollingFunctionPlot(LongNarrowPlot):
 
     def set_window(self, x, tc=None):
         """
-        Update the interval of the function (x is restriction to 
+        Update the interval of the function (x is restriction to
         the new interval). If given, "tc" is the current time defining
         the interval.
         """
@@ -334,7 +424,7 @@ class ProtoPlot(object):
 
     def create_fn_image(self, *args, **kwargs):
         raise NotImpelentedError('Abstract class: does not plot')
-        
+
 class StandardPlot(ProtoPlot):
     """
     A mixin type that plots a simple times series line.
@@ -342,7 +432,7 @@ class StandardPlot(ProtoPlot):
 
     # Caution: mixin-only. Supposes the attribute
     # * ax, an MPL Axes
-    
+
     # this signature should be pretty generic
     def create_fn_image(self, x, t=None, **line_props):
         print 'CREATING STANDARD PLOT'
@@ -397,14 +487,14 @@ class StaticTimeSeriesPlot(StaticFunctionPlot, StandardPlot):
     """
     # do defaults for both classes
     pass
-    
+
 class StaticColorCodedPlot(StaticFunctionPlot, ColorCodedPlot):
     """
     A static plot, but points are color-coded by a co-function c(t)
     """
 
     def __init__(
-            self, t, x, cx, t0=None, cx_limits=(), 
+            self, t, x, cx, t0=None, cx_limits=(),
             line_props=dict(), **bplot_kws
             ):
         self.cx = cx
@@ -429,7 +519,7 @@ class PagedColorCodedPlot(PagedFunctionPlot, ColorCodedPlot):
     A static color-coded plot that is flipped between intervals
     """
     def __init__(
-            self, t, x, cx, t0=None, cx_limits=(), 
+            self, t, x, cx, t0=None, cx_limits=(),
             line_props=dict(), **bplot_kws
             ):
         self.cx = cx
@@ -448,7 +538,7 @@ class ScrollingTimeSeriesPlot(ScrollingFunctionPlot, StandardPlot):
     """
     # do defaults for both classes
     pass
-        
+
 class ScrollingColorCodedPlot(ScrollingFunctionPlot, ColorCodedPlot):
     """
     A scrolling plot, but points are color-coded by a co-function c(t)

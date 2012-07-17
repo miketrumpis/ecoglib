@@ -5,7 +5,7 @@ from time import sleep, time
 import ecoglib.vis.plot_modules as pm
 
 from traits.api import \
-     HasTraits, Range, Float, on_trait_change, Instance, Button
+     HasTraits, Range, Float, on_trait_change, Instance, Button, Int
 from traitsui.api import \
      RangeEditor, View, HGroup, VGroup, Item
 
@@ -17,7 +17,8 @@ from tvtk.api import tvtk
 from mayavi.sources.api import VTKDataSource
 
 class ScatterScroller(HasTraits):
-    ts_plot = Instance(pm.StaticTimeSeriesPlot)
+    #ts_plot = Instance(pm.StaticTimeSeriesPlot)
+    ts_plot = Instance(pm.PagedTimeSeriesPlot)
 
     scatter = Instance(MlabSceneModel, ())
 
@@ -30,6 +31,7 @@ class ScatterScroller(HasTraits):
     trail_src = Instance(VTKDataSource)
     trail_pts = Instance(PipelineBase)
     trail_line = Instance(PipelineBase)
+    _trail_length = Int(200)
 
     _t0 = Float(0.0)
     _tf = Float
@@ -52,8 +54,7 @@ class ScatterScroller(HasTraits):
         super(ScatterScroller, self).__init__(**traits)
         self._tf = len(self.ts_array)/self.Fs
         self.ts_plot # trigger default
-        self.sync_trait('time', self.ts_plot, mutual=False)
-        #self.trails = deque( list(), 200 )
+        self.sync_trait('time', self.ts_plot, mutual=True)
 
     def _ts_plot_default(self):
         figsize = (6, .25)
@@ -62,8 +63,8 @@ class ScatterScroller(HasTraits):
         d_range = (self.ts_array.min(), self.ts_array.max())
         mid = (d_range[1] + d_range[0])/2.0
         extent = (d_range[1] - d_range[0]) * 1.05
-        return pm.StaticTimeSeriesPlot(
-            t, self.ts_array, figsize=figsize, t0=0,
+        return pm.PagedTimeSeriesPlot(
+            t, self.ts_array, figsize=figsize, t0=0, page_length=50.0,
             ylim=(mid-extent/2, mid+extent/2), linewidth=1
             )
 
@@ -83,22 +84,34 @@ class ScatterScroller(HasTraits):
         n = round(self.time*self.Fs)
         t_point = s_array[n][:,None]
         x, y, z = t_point
+        # The scalar value used makes a light green in the Greens colormap.
+        # This value will be the maximal value for the scalars representing
+        # the trailing lines
+        init_scl = np.array([0.6])
         self.inst_src = mlab.pipeline.scalar_scatter(
-            x, y, z, np.array([1]), figure=fig
+            x, y, z, init_scl, figure=fig
             )
         # quick and dirty scale
         bb = np.array(self.scatter_src.data.bounds)
         relative_scale = np.power(np.prod(bb[1::2] - bb[0::2]), 1/3.0)
         scale = 2e-2 * relative_scale
+        ## self.inst_pt = mlab.pipeline.glyph(
+        ##     self.inst_src, mode='sphere', color=(0,1,0),
+        ##     scale_mode='none', scale_factor=scale
+        ##     )
         self.inst_pt = mlab.pipeline.glyph(
-            self.inst_src, mode='sphere', color=(0,1,0),
-            scale_mode='none', scale_factor=scale
+            self.inst_src, mode='sphere', colormap='Greens',
+            scale_mode='none', scale_factor=scale, vmin=0.0, vmax=1.0
             )
 
         # copy the same for "trail" scatter
+        # XXX: Could replace using a more light-weight point source.
         self.trail_src = mlab.pipeline.line_source(
-            x, y, z, figure=fig
+            x, y, z, init_scl, figure=fig
             )
+        ## self.trail_src = mlab.pipeline.line_source(
+        ##     x, y, z, figure=fig
+        ##     )
         self.trail_pts = mlab.pipeline.glyph(
             self.trail_src, mode='sphere', color=(0.7, 0.2, 0.2),
             scale_mode='none', scale_factor=scale*0.4
@@ -108,19 +121,39 @@ class ScatterScroller(HasTraits):
         # and indeed use the same points for trail tube
         s = mlab.pipeline.stripper(self.trail_pts)
         t = mlab.pipeline.tube(s, tube_radius=scale*0.25)
+        ## self.trail_line = mlab.pipeline.surface(
+        ##     t, color=(0.2, 0.7, 0.4), opacity = 0.3
+        ##     )
         self.trail_line = mlab.pipeline.surface(
-            t, color=(0.2, 0.7, 0.4), opacity = 0.3
+            t, colormap='Greens', opacity=0.3, vmin=0.0, vmax=1.0
             )
-
 
     @on_trait_change('time')
     def _update_time(self):
         n = round(self.time*self.Fs)
+        n = max( min( len(self.scatter_array)-1, n ), 0 )
         t_point = self.scatter_array[n][None,:]
-        self.inst_src.mlab_source.points = t_point
-        trail_points = self.scatter_array[max(0,n-200):n+1]
-        #self.trail_src.mlab_source.points = trail_points
-        self.trail_src.mlab_source.reset(points = trail_points)
+        #self.inst_src.mlab_source.points = t_point
+        t_len = self._trail_length
+        self.inst_src.mlab_source.set(points = t_point)
+        trail_points = self.scatter_array[max(0,n+1-t_len):n+1]
+        update_dict = dict(points = trail_points)
+        if len(self.trail_src.mlab_source.scalars) < t_len or n < t_len:
+            #if n < t_len:
+            # XXX: referencing "maximum scalar"
+            scalars = np.sqrt(np.linspace(0, 1.0, t_len))[-(n+1):]
+            scalars *= 0.6 # maximum
+            #print len(scalars), len(trail_points)
+            update_dict['scalars'] = scalars
+        #this is a safe and more slow update of the underlying VTK source
+        self.trail_src.mlab_source.reset(**update_dict)
+        #self.trail_src.mlab_source.reset(points = trail_points)
+
+
+        ## else:
+        ##     # this is faster and potentially bad update -- also try trail_src.set()
+        ##     self.trail_src.mlab_source.dataset.set(points = trail_points)
+        ##     self.trail_src.mlab_source.dataset.update()
 
     def configure_traits(self, *args, **kwargs):
         super(ScatterScroller, self).configure_traits(*args, **kwargs)
@@ -131,36 +164,10 @@ class ScatterScroller(HasTraits):
         self._post_canvas_hook()
 
     def _post_canvas_hook(self):
-        self._connect_mpl_events()
+        #self._connect_mpl_events()
+        self.ts_plot.connect_live_interaction()
         self.ts_plot.fig.tight_layout()
         self.ts_plot.draw()
-
-    def _connect_mpl_events(self):
-        # connect a sequence of callbacks to
-        # click -> enable scrolling
-        # drag -> scroll time bar (if scrolling)
-        # unclick -> disable scrolling
-        self.ts_plot.fig.canvas.mpl_connect(
-            'button_press_event', self._scroll_handler
-            )
-        self.ts_plot.fig.canvas.mpl_connect(
-            'button_release_event', self._scroll_handler
-            )
-        self.ts_plot.fig.canvas.mpl_connect(
-            'motion_notify_event', self._scroll_handler
-            )
-        print 'events connected'
-
-    def _scroll_handler(self, ev):
-        if not ev.inaxes:
-            return
-        if not self._scrolling and ev.name == 'button_press_event':
-            self._scrolling = True
-            self._scroll_handler(ev)
-        elif ev.name == 'button_release_event':
-            self._scrolling = False
-        elif self._scrolling and ev.name == 'motion_notify_event':
-            self.time = ev.xdata
 
     def _count_fired(self):
         if self.counter and self.counter.isAlive():
@@ -171,8 +178,13 @@ class ScatterScroller(HasTraits):
             self.counter.start()
 
     def _count(self):
+        n = 100
         while not self._quit_counting:
+        #while n:
             t = self.time + 1.0/self.Fs
+            if t > self._tf:
+                self._quit_counting = True
+                return
             self.trait_setq(time=t)
             self.ts_plot.move_bar(t)
             t1 = time()
@@ -181,6 +193,7 @@ class ScatterScroller(HasTraits):
             s_time = max(0., 1/self.fps - t2 + t1)
             print 'time to draw:', (t2-t1), 'sleep time:', s_time
             sleep(s_time)
+            n -= 1
 
     view = View(
         VGroup(
@@ -208,40 +221,18 @@ class ScatterScroller(HasTraits):
         )
             
 if __name__ == '__main__':
-    ## # copied from test_plot3() in Mayavi
-    ## n_mer, n_long = 6, 11
-    ## pi = np.pi
-    ## dphi = pi/1000.0
-    ## phi = np.arange(0.0, 2*pi + 0.5*dphi, dphi)
-    ## mu = phi*n_mer
-    ## x = np.cos(mu)*(1+np.cos(n_long*mu/n_mer)*0.5)
-    ## y = np.sin(mu)*(1+np.cos(n_long*mu/n_mer)*0.5)
-    ## z = np.sin(n_long*mu/n_mer)*0.5
+    # copied from test_plot3() in Mayavi
+    n_mer, n_long = 6, 11
+    pi = np.pi
+    dphi = pi/1000.0
+    phi = np.arange(0.0, 2*pi + 0.5*dphi, dphi)
+    mu = phi*n_mer
+    x = np.cos(mu)*(1+np.cos(n_long*mu/n_mer)*0.5)
+    y = np.sin(mu)*(1+np.cos(n_long*mu/n_mer)*0.5)
+    z = np.sin(n_long*mu/n_mer)*0.5
     
-    ## ts = x**2 + y**2 + z**2
-    ## sct = np.c_[x, y, z]
-    ## scroller = ScatterScroller(sct, ts)
-    ## scroller.configure_traits()
-
-    # try something real
-    import scipy.io as sio
-    m = sio.loadmat('../../mlab/diffgeo_new_ecog.mat')
-    G = m['G'][0,0]
-    V = G['EigenVecs']
-    del G, m
-    ix, iy, iz = (3,4,5)
-    sct = np.c_[V[:,ix], V[:,iy], V[:,iz]]
-
-    n_good_pts = 93000
-
-    m = sio.loadmat('../../data/2010-05-19_test_41_filtered.mat')
-    d = m.pop('data')
-    Fs = float(m['Fs'][0,0])
-    nrow = int(m['numRow'][0,0])
-    ncol = int(m['numCol'][0,0])
-    del m
-    pruned_pts = range(0, 17430) + range(22910,93000)
-    d = d[:nrow*ncol,pruned_pts] # make contiguous
-    
-    scroller = ScatterScroller(sct, d.mean(axis=0), Fs=Fs)
+    ts = x**2 + y**2 + z**2
+    sct = np.c_[x, y, z]
+    scroller = ScatterScroller(sct, ts)
     scroller.configure_traits()
+

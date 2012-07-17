@@ -237,7 +237,7 @@ class DataScroller(HasTraits):
         self._post_canvas_hook()
 
     def _post_canvas_hook(self):
-        self._connect_mpl_events()
+        self.ts_plot.connect_live_interaction()
         self.ts_plot.fig.tight_layout()
         self.ts_plot.draw()
         self.zoom_plot.fig.tight_layout()
@@ -249,33 +249,6 @@ class DataScroller(HasTraits):
         n_zoom_pts = int(np.round(self.tau*self.Fs))
         zoom_start = int(np.round(self.Fs*(self.time - self.tau/2)))
         return safe_slice(d, zoom_start, n_zoom_pts)
-
-    def _connect_mpl_events(self):
-        # connect a sequence of callbacks to
-        # click -> enable scrolling
-        # drag -> scroll time bar (if scrolling)
-        # unclick -> disable scrolling
-        self.ts_plot.fig.canvas.mpl_connect(
-            'button_press_event', self._scroll_handler
-            )
-        self.ts_plot.fig.canvas.mpl_connect(
-            'button_release_event', self._scroll_handler
-            )
-        self.ts_plot.fig.canvas.mpl_connect(
-            'motion_notify_event', self._scroll_handler
-            )
-        print 'events connected'
-
-    def _scroll_handler(self, ev):
-        if not ev.inaxes:
-            return
-        if not self._scrolling and ev.name == 'button_press_event':
-            self._scrolling = True
-            self._scroll_handler(ev)
-        elif ev.name == 'button_release_event':
-            self._scrolling = False
-        elif self._scrolling and ev.name == 'motion_notify_event':
-            self.time = ev.xdata
         
     @on_trait_change('time')
     def _update_time(self):
