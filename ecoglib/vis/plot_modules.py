@@ -132,7 +132,6 @@ class BlitPlot(HasTraits):
         # detect a resize
         new_size = (self.fig.canvas.width(), self.fig.canvas.height())
         if new_size != self._old_size:
-            print 'redrawing'
             self.draw()
             return
         if self._bkgrnd is not None:
@@ -157,7 +156,6 @@ class BlitPlot(HasTraits):
         #standard mpl connection pattern
         connections = (('resize_event', self._resize_handler),) + \
           extra_connections
-        print connections
         for event, handler in connections:
             self._mpl_connections.append( canvas.mpl_connect(event, handler) )
 
@@ -346,14 +344,9 @@ class PagedFunctionPlot(StaticFunctionPlot):
 
 
     def _page_handler(self, ev):
-        ## if ev.canvas != self.ts_plot.fig.canvas:
-        ##     print 'not in canvas'
-        ##     # ignore
-        ##     return
         if ev.button != 3 or not ev.inaxes:
             return
         x = ev.xdata
-        print ev.xdata
         x_lo, x_hi = self.xlim
         if np.abs(x - x_lo) < np.abs(x - x_hi):
             self.prev_page = True
