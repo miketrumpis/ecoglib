@@ -17,8 +17,8 @@ from tvtk.api import tvtk
 from mayavi.sources.api import VTKDataSource
 
 class ScatterScroller(HasTraits):
-    #ts_plot = Instance(pm.StaticTimeSeriesPlot)
     ts_plot = Instance(pm.PagedTimeSeriesPlot)
+    ts_page_len = Float(50.0)
 
     scatter = Instance(MlabSceneModel, ())
 
@@ -64,7 +64,8 @@ class ScatterScroller(HasTraits):
         mid = (d_range[1] + d_range[0])/2.0
         extent = (d_range[1] - d_range[0]) * 1.05
         return pm.PagedTimeSeriesPlot(
-            t, self.ts_array, figsize=figsize, t0=0, page_length=50.0,
+            t, self.ts_array, figsize=figsize, t0=0,
+            page_length=self.ts_page_len,
             ylim=(mid-extent/2, mid+extent/2), linewidth=1
             )
 
@@ -217,9 +218,9 @@ class ScatterScroller(HasTraits):
             ),
         resizable=True,
         title='Scatter Scroller'
-        
+
         )
-            
+
 if __name__ == '__main__':
     # copied from test_plot3() in Mayavi
     n_mer, n_long = 6, 11
@@ -230,7 +231,7 @@ if __name__ == '__main__':
     x = np.cos(mu)*(1+np.cos(n_long*mu/n_mer)*0.5)
     y = np.sin(mu)*(1+np.cos(n_long*mu/n_mer)*0.5)
     z = np.sin(n_long*mu/n_mer)*0.5
-    
+
     ts = x**2 + y**2 + z**2
     sct = np.c_[x, y, z]
     scroller = ScatterScroller(sct, ts)
