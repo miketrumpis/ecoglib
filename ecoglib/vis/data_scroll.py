@@ -8,7 +8,7 @@ import random
 
 # ETS Traits
 from traits.api import \
-     HasTraits, Instance, on_trait_change, Float, Button, Range, Int 
+     HasTraits, Instance, on_trait_change, Float, Button, Range, Int
 from traitsui.api import Item, View, VGroup, HGroup, RangeEditor
 
 # Mayavi/TVTK
@@ -34,7 +34,7 @@ def stochastic_limits(x, n_samps=100, conf=98.0):
     # unbiased estimator??
     e_abs = np.abs(r_samps).mean()
     # Pr{ |X| > t } <= E{|X|}/t = 1 - conf/100
-    # so find the threshold for which there is only a 
+    # so find the threshold for which there is only a
     # (100-conf)% chance that |X| is greater
     return e_abs/(1.0-conf/100.0)
 
@@ -65,7 +65,7 @@ def safe_slice(x, start, num, fill=np.nan):
         sx = x[start:start+num, ...]
     return sx
 
-    
+
 #### Data Scrolling App ####
 #### (out of order) ####
 ## class ClockRunner(Thread):
@@ -83,7 +83,7 @@ def safe_slice(x, start, num, fill=np.nan):
 ##         self.incr = incr
 ##         self.abort = False
 ##         Thread.__init__(self, **thread_kws)
-    
+
 ##     def run(self):
 ##         while not self.abort:
 ##             self.time += self.incr
@@ -99,7 +99,8 @@ class DataScroller(HasTraits):
     ## these may need to be more specialized for handling 1D/2D timeseries
     zoom_plot = Instance(pm.ScrollingTimeSeriesPlot)
     ts_plot = Instance(pm.PagedTimeSeriesPlot)
-
+    ts_page_len = Float(50.)
+    
     ## array scene, image, and data (Mayavi components)
     array_scene = Instance(MlabSceneModel, ())
 
@@ -107,7 +108,7 @@ class DataScroller(HasTraits):
     arr_img_dsource = Instance(ArraySource, (), transpose_input_array=False)
 
     array_ipw = Instance(PipelineBase)
-    
+
     ## view controls
 
     # interval for zoom plot (units sec)
@@ -123,7 +124,7 @@ class DataScroller(HasTraits):
             format='%1.2f', low_label='tight', high_label='wide'
             )
         )
-    
+
     ## scroller (auto tuned)
     _t0 = Float(0.0)
     _tf = Float
@@ -164,7 +165,7 @@ class DataScroller(HasTraits):
 
         traits: dict
           other keyword parameters
-        
+
         """
         npts = d_array.shape[-1]
         if len(d_array.shape) < 3:
@@ -177,7 +178,7 @@ class DataScroller(HasTraits):
         # estimate mean and variance
         #self.max_amp = stochastic_limits(ts_array)
         self.max_amp = ts_array.max()
-        
+
         self.ts_arr = ts_array
 
         # Reshape the data as (ncol, nrow, ntime) to keep it contiguous...
@@ -206,7 +207,7 @@ class DataScroller(HasTraits):
         self.ts_plot = self.construct_ts_plot(
             t, figsize, eps, time, linewidth=1
             )
-        self.sync_trait('time', self.ts_plot, mutual=False)
+        self.sync_trait('time', self.ts_plot, mutual=True)
 
         # configure the zoomed plot
         figsize=(4,2)
@@ -219,6 +220,7 @@ class DataScroller(HasTraits):
     def construct_ts_plot(self, t, figsize, eps, t0, **lprops):
         return pm.PagedTimeSeriesPlot(
             t, self.ts_arr, figsize=figsize, ylim=(-eps, eps), t0=t0,
+            page_length=self.ts_page_len,
             line_props=lprops
             )
 
@@ -249,7 +251,7 @@ class DataScroller(HasTraits):
         n_zoom_pts = int(np.round(self.tau*self.Fs))
         zoom_start = int(np.round(self.Fs*(self.time - self.tau/2)))
         return safe_slice(d, zoom_start, n_zoom_pts)
-        
+
     @on_trait_change('time')
     def _update_time(self):
         # 1) long ts_plot should be automatically linked to 'time'
@@ -262,10 +264,10 @@ class DataScroller(HasTraits):
         # 3) VTK ImagePlaneWidget needs to be resliced
         if self.array_ipw:
             self.array_ipw.ipw.slice_index = int( np.round(self.time*self.Fs) )
-        
+
     def __map_eps(self, eps):
         return self.max_amp*((np.sin(np.pi*(self.eps-1/2.0))+1)/2.0)**2
-        
+
     @on_trait_change('eps')
     def _update_eps(self):
         max_amp = 1.0
@@ -283,14 +285,14 @@ class DataScroller(HasTraits):
         if type(x) != tuple:
             x = (x,)
         self.zoom_plot.set_window(*x)
-    
+
     ## animation
     ## def __set_time(self, *args):
     ##     if not args:
     ##         return self.time
     ##     t = args[0]
     ##     self.time = t
-    
+
     ## def _count_fired(self):
     ##     if self.counter and self.counter.isAlive():
     ##         self.counter.abort = True
@@ -322,9 +324,9 @@ class DataScroller(HasTraits):
             s_time = max(0., 1/self.fps - t2 + t1)
             print 'time to draw:', (t2-t1), 'sleep time:', s_time
             sleep(s_time)
-            
+
     ## mayavi components
-    
+
     @on_trait_change('array_scene.activated')
     def _display_image(self):
         scene = self.array_scene
@@ -345,8 +347,8 @@ class DataScroller(HasTraits):
         scene.scene.background = (0, 0, 0)
 
         self.array_ipw = ipw
-        
-                
+
+
     view = View(
         VGroup(
             HGroup(
@@ -385,7 +387,7 @@ class ColorCodedDataScroller(DataScroller):
     ts_plot = Instance(pm.PagedColorCodedPlot)
 
     def __init__(
-            self, d_array, ts_array, cx_array, 
+            self, d_array, ts_array, cx_array,
             rowcol=(), Fs=1.0, **traits
             ):
         """
@@ -420,7 +422,7 @@ class ColorCodedDataScroller(DataScroller):
 
         traits: dict
           other keyword parameters
-        
+
         """
         self.cx_arr = cx_array
         DataScroller.__init__(
@@ -435,14 +437,15 @@ class ColorCodedDataScroller(DataScroller):
         return pm.PagedColorCodedPlot(
             t, ts_arr, cx_arr,
             figsize=figsize, ylim=(-eps, eps), t0=t0,
+            page_length=self.ts_page_len,
             line_props=lprops
             )
-    
+
     def construct_zoom_plot(self, figsize, eps, **lprops):
         x, cx = self.zoom_data()
         cx_lim = self.ts_plot.cx_limits # ooh! hacky
         return pm.ScrollingColorCodedPlot(
-            x, cx, cx_lim, 
+            x, cx, cx_lim,
             figsize=figsize, ylim=(-eps, eps), line_props=lprops
             )
 
@@ -455,7 +458,7 @@ class ColorCodedDataScroller(DataScroller):
         cx = safe_slice(self.cx_arr, zoom_start, n_zoom_pts, fill=0)
         return x, cx
 
-    
+
 if __name__ == "__main__":
     import sys
     nrow = 10; ncol = 15; n_pts = 1000
