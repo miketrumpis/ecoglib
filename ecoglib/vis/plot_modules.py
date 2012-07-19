@@ -471,6 +471,15 @@ class ColorCodedPlot(ProtoPlot):
             )
         return pc
 
+class ColorSegmentedPlot(ProtoPlot):
+    """
+    A mixin-type whose timeseries image is segmented into k classes
+    """
+    # e.g. for a line-plot, can do this by sequentially
+    # filling out-of-class pts with nan, and line plotting in-class
+    # points with the appropriate color
+    pass
+
 ##############################################################################
 ########## Classes Implementing Function and Style Combinations ##############
 
@@ -493,8 +502,9 @@ class StaticColorCodedPlot(StaticFunctionPlot, ColorCodedPlot):
         self.cx = cx
         if not cx_limits:
             #eps = stochastic_limits(cx, conf=95.)
-            eps = np.abs(cx).max()
-            cx_limits = (-eps, eps)
+            mx = np.abs(cx).max()
+            mn = np.abs(cx).min()
+            cx_limits = (mn, mx)
         self.cx_limits = cx_limits
         super(StaticColorCodedPlot, self).__init__(
             t, x, t0=t0, line_props=line_props, **bplot_kws
@@ -518,8 +528,9 @@ class PagedColorCodedPlot(PagedFunctionPlot, ColorCodedPlot):
         self.cx = cx
         if not cx_limits:
             #eps = stochastic_limits(cx, conf=95.)
-            eps = np.abs(cx).max()
-            cx_limits = (-eps, eps)
+            mx = np.abs(cx).max()
+            mn = np.abs(cx).min()
+            cx_limits = (mn, mx)
         self.cx_limits = cx_limits
         super(PagedColorCodedPlot, self).__init__(
             t, x, t0=t0, line_props=line_props, **bplot_kws
