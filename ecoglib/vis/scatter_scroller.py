@@ -1,11 +1,9 @@
 import numpy as np
-from threading import Thread
-from time import sleep, time
 
 import ecoglib.vis.plot_modules as pm
 
 from traits.api import \
-     HasTraits, Range, Float, on_trait_change, Instance, Button, Int
+     HasTraits, Range, Float, on_trait_change, Instance, Button, Int, Any
 from traitsui.api import \
      RangeEditor, View, HGroup, VGroup, Item
 
@@ -15,6 +13,9 @@ from mayavi.core.ui.api import SceneEditor, MlabSceneModel
 from tvtk.pyface.scene import Scene
 from tvtk.api import tvtk
 from mayavi.sources.api import VTKDataSource
+
+# Pyface Timer
+from pyface.timer.api import Timer
 
 class ScatterScroller(HasTraits):
     ts_plot = Instance(pm.PagedTimeSeriesPlot)
@@ -44,7 +45,7 @@ class ScatterScroller(HasTraits):
     ## Animation control
     fps = Float(20.0)
     count = Button()
-    counter = Instance(Thread)
+    t_counter = Any()
 
     def __init__(self, scatter_array, ts_array, Fs=1.0, **traits):
         self.scatter_array = scatter_array
@@ -171,30 +172,17 @@ class ScatterScroller(HasTraits):
         self.ts_plot.draw()
 
     def _count_fired(self):
-        if self.counter and self.counter.isAlive():
-            self._quit_counting = True
+        if self.t_counter is not None and self.t_counter.IsRunning():
+            self.t_counter.Stop()
         else:
-            self._quit_counting = False
-            self.counter = Thread(target=self._count)
-            self.counter.start()
+            self.t_counter = Timer(1000.0/self.fps, self._count)
 
     def _count(self):
-        n = 100
-        while not self._quit_counting:
-        #while n:
-            t = self.time + 1.0/self.Fs
-            if t > self._tf:
-                self._quit_counting = True
-                return
-            self.trait_setq(time=t)
-            self.ts_plot.move_bar(t)
-            t1 = time()
-            self._update_time()
-            t2 = time()
-            s_time = max(0., 1/self.fps - t2 + t1)
-            print 'time to draw:', (t2-t1), 'sleep time:', s_time
-            sleep(s_time)
-            n -= 1
+        t = self.time + 1.0/self.Fs
+        if t > self._tf:
+            self.t_counter.Stop()
+            return
+        self.time = t
 
     view = View(
         VGroup(
