@@ -1,8 +1,6 @@
 import numpy as np
 
 # std lib
-from threading import Thread
-from time import sleep, time
 import random
 
 
@@ -71,7 +69,7 @@ def safe_slice(x, start, num, fill=np.nan):
 class DataScroller(HasTraits):
 
     ## these may need to be more specialized for handling 1D/2D timeseries
-    
+
     zoom_plot = Instance(pm.ScrollingTimeSeriesPlot)
     ts_plot = Instance(pm.PagedTimeSeriesPlot)
     ts_page_len = Float(50.)
@@ -335,7 +333,8 @@ class ColorCodedDataScroller(DataScroller):
 
     def __init__(
             self, d_array, ts_array, cx_array,
-            rowcol=(), Fs=1.0, **traits
+            rowcol=(), Fs=1.0, downsamp=10,
+            **traits
             ):
         """
         Display a channel array in a 3-plot format:
@@ -367,17 +366,23 @@ class ColorCodedDataScroller(DataScroller):
         Fs: float
           sampling rate
 
+        downsamp: int (Default 10)
+          Downsample factor for the large-scale color coded plot (updates
+          to page and scale limits can be quite slow with many color-coded
+          points).
+
         traits: dict
           other keyword parameters
 
         """
         self.cx_arr = cx_array
+        self._dfac = downsamp
         DataScroller.__init__(
             self, d_array, ts_array, rowcol=rowcol, Fs=Fs, **traits
             )
 
     def construct_ts_plot(self, t, figsize, eps, t0, **lprops):
-        dfac = 10
+        dfac = self._dfac
         t = t[::dfac]
         ts_arr = self.ts_arr[::dfac]
         cx_arr = self.cx_arr[::dfac]
