@@ -117,10 +117,12 @@ class BlitPlot(HasTraits):
         for artist in self.dynamic_artists:
             artist.set_visible(False)
         self.fig.canvas.draw()
+        #self.fig.canvas.draw_idle() # thread-safe??
         self._bkgrnd = self.fig.canvas.copy_from_bbox(self.ax.bbox)
         for artist in self.dynamic_artists:
             artist.set_visible(True)
         self.fig.canvas.draw()
+        #self.fig.canvas.draw_idle() # thread-safe??
         self._old_size = (self.fig.canvas.width(), self.fig.canvas.height())
 
     # this method only pushes out the old background, and renders the

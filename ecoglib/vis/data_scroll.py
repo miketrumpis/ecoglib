@@ -8,7 +8,7 @@ import random
 
 # ETS Traits
 from traits.api import \
-     HasTraits, Instance, on_trait_change, Float, Button, Range, Int
+     HasTraits, Instance, on_trait_change, Float, Button, Range, Int, Any
 from traitsui.api import Item, View, VGroup, HGroup, RangeEditor
 
 # Mayavi/TVTK
@@ -18,6 +18,9 @@ from mayavi.core.ui.api import SceneEditor, MlabSceneModel
 from tvtk.pyface.scene import Scene
 from tvtk.api import tvtk
 from mayavi.sources.api import ArraySource
+
+# Pyface Timer
+from pyface.timer.api import Timer
 
 import plot_modules as pm
 
@@ -65,48 +68,18 @@ def safe_slice(x, start, num, fill=np.nan):
         sx = x[start:start+num, ...]
     return sx
 
-
-#### Data Scrolling App ####
-#### (out of order) ####
-## class ClockRunner(Thread):
-
-##     def __init__(self, set_time, rate, incr, **thread_kws):
-##         # pretty hacky.. but since the "time" attribute of the
-##         # DataScroller looks like just a float in this context,
-##         # we'll use a method that gets and sets the time
-##         # -- set_time() returns the current time
-##         # -- set_time(t) sets the current time
-##         self.set_time = set_time
-##         self.time = set_time()
-##         self.stop_time = self.time + 10*incr ### throw away later
-##         self.rate = rate # fps -- so sleep 1/rate between each update
-##         self.incr = incr
-##         self.abort = False
-##         Thread.__init__(self, **thread_kws)
-
-##     def run(self):
-##         while not self.abort:
-##             self.time += self.incr
-##             self.set_time(self.time)
-##             print 'would set to:', self.time
-##             sleep(1.0/self.rate)
-##             if self.time >= self.stop_time:
-##                 abort = True
-##         return
-
 class DataScroller(HasTraits):
 
     ## these may need to be more specialized for handling 1D/2D timeseries
+    
     zoom_plot = Instance(pm.ScrollingTimeSeriesPlot)
     ts_plot = Instance(pm.PagedTimeSeriesPlot)
     ts_page_len = Float(50.)
-    
+
     ## array scene, image, and data (Mayavi components)
+
     array_scene = Instance(MlabSceneModel, ())
-
-    #arr_img_data = Array()
     arr_img_dsource = Instance(ArraySource, (), transpose_input_array=False)
-
     array_ipw = Instance(PipelineBase)
 
     ## view controls
@@ -137,7 +110,7 @@ class DataScroller(HasTraits):
     ## Animation control
     fps = Float(20.0)
     count = Button()
-    counter = Instance(Thread)
+    t_counter = Any()
 
     def __init__(self, d_array, ts_array, rowcol=(), Fs=1.0, **traits):
         """
@@ -286,44 +259,18 @@ class DataScroller(HasTraits):
             x = (x,)
         self.zoom_plot.set_window(*x)
 
-    ## animation
-    ## def __set_time(self, *args):
-    ##     if not args:
-    ##         return self.time
-    ##     t = args[0]
-    ##     self.time = t
-
-    ## def _count_fired(self):
-    ##     if self.counter and self.counter.isAlive():
-    ##         self.counter.abort = True
-    ##     else:
-    ##         self.counter = ClockRunner(self.__set_time, self.fps, 1.0/self.Fs)
-    ##         self.counter.start()
-
     def _count_fired(self):
-        if self.counter and self.counter.isAlive():
-            self._quit_counting = True
+        if self.t_counter is not None and self.t_counter.IsRunning():
+            self.t_counter.Stop()
         else:
-            self._quit_counting = False
-            self.counter = Thread(target=self._count)
-            self.counter.start()
+            self.t_counter = Timer(1000.0/self.fps, self._count)
 
     def _count(self):
-        while not self._quit_counting:
-            t = self.time + 1.0/self.Fs
-            if t > self._tf:
-                self._quit_counting = True
-                return
-            # set trait without dispatch in order to wait for
-            # _update_time() to complete
-            self.trait_setq(time=t)
-            self.ts_plot.move_bar(t)
-            t1 = time()
-            self._update_time()
-            t2 = time()
-            s_time = max(0., 1/self.fps - t2 + t1)
-            print 'time to draw:', (t2-t1), 'sleep time:', s_time
-            sleep(s_time)
+        t = self.time + 1.0/self.Fs
+        if t > self._tf:
+            self.t_counter.Stop()
+            return
+        self.time = t
 
     ## mayavi components
 
@@ -461,16 +408,19 @@ class ColorCodedDataScroller(DataScroller):
 
 if __name__ == "__main__":
     import sys
+    from pyface.qt import QtGui
     nrow = 10; ncol = 15; n_pts = 1000
     d = np.random.randn(nrow*ncol, n_pts)
     d_mx = d.max(axis=0)
     if len(sys.argv) < 2:
         dscroll = DataScroller(d, d_mx, rowcol=(nrow, ncol), Fs=1.0)
-        dscroll.configure_traits()
+        dscroll.edit_traits()
     else:
         # if ANY args, do color coded test
         cx = np.random.randn(len(d_mx))
         dscroll = ColorCodedDataScroller(
             d, d_mx, cx, rowcol=(nrow, ncol), Fs=1.0
             )
-        dscroll.configure_traits()
+        dscroll.edit_traits()
+    app = QtGui.QApplication.instance()
+    app.exec_()
