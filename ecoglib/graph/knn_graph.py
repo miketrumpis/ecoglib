@@ -19,7 +19,7 @@ def gauss_affinity(d_sq, sig_sq):
     return np.exp(-d_sq/(2*sig_sq))
 
 
-def knn_graph(neighbors, dists=None, scale=1.0, auto_scale=0):
+def knn_graph(neighbors, dists=None, scale=1.0, auto_scale=0, mutual=False):
     """
     Build a sparse adjacency matrix of a k-nearest neighbor graph.
     By common definition, this graph includes all vertices
@@ -64,7 +64,8 @@ def knn_graph(neighbors, dists=None, scale=1.0, auto_scale=0):
     n_vert = neighbors.shape[0]
     if auto_scale:
         scale = np.empty(n_vert)
-    if dists is None:
+    connectivity = (dists is None)
+    if connectivity:
         for i, i_nb in enumerate(neighbors):
             Nk.update( ( (i,j) for j in i_nb ) )
             Nk.update( ( (j,i) for j in i_nb ) )
@@ -75,10 +76,22 @@ def knn_graph(neighbors, dists=None, scale=1.0, auto_scale=0):
             if auto_scale:
                 scale[i] = i_dist[auto_scale]
 
-    ## Nk_sym = set( ( (i,j,d) for (i,j,d) in Nk if (j,i,d) in Nk ) )
-    ## Nk = Nk_sym
+    if mutual:
+        # Prune the kNN set to include pairs of vertices that
+        # are mutually k-nearest. Note that this does not change
+        # the auto-tuned characteristic distance for each point.
+        # This should exhibit the property of small clusters
+        # and outlier points having relatively weak connectivity,
+        # since their surviving edge-connected neighbors may be
+        # significantly closer than the ith neighbor that defines
+        # the characteristic distance.
+        if connectivity:
+            Nk_sym = set( ( (i,j) for (i,j) in Nk if (j,i) in Nk ) )
+        else:
+            Nk_sym = set( ( (i,j,w) for (i,j,w) in Nk if (j,i,w) in Nk ) )
+        Nk = Nk_sym
 
-    if dists is None:
+    if connectivity:
         csr_ind = np.array( [ [i,j] for i,j in Nk ] )
         csr_dat = np.ones(len(Nk))
     else:
