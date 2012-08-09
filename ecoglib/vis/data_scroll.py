@@ -79,6 +79,12 @@ class DataScroller(HasTraits):
     array_scene = Instance(MlabSceneModel, ())
     arr_img_dsource = Instance(ArraySource, (), transpose_input_array=False)
     array_ipw = Instance(PipelineBase)
+    arr_eps = Range(
+        low=0.0, high=1.0, value=0.75,
+        editor=RangeEditor(
+            format='%1.2f', low_label='tight', high_label='wide'
+            )
+        )
 
     ## view controls
 
@@ -148,7 +154,10 @@ class DataScroller(HasTraits):
         # XXX: should set max_amp -- could stochastically sample to
         # estimate mean and variance
         #self.max_amp = stochastic_limits(ts_array)
-        self.max_amp = ts_array.max()
+        self.max_ts_amp = ts_array.max()
+        self.min_ts_amp = ts_array.min()
+        self.max_arr_amp = d_array.max()
+        self.min_arr_amp = d_array.min()
 
         self.ts_arr = ts_array
 
@@ -173,32 +182,32 @@ class DataScroller(HasTraits):
         # configure the ts_plot
         n = self.ts_arr.shape[-1]
         t = np.linspace(self._t0, self._tf, n)
-        eps = self.__map_eps(i_eps)
+        lim = self.__map_eps(i_eps, (self.min_ts_amp, self.max_ts_amp))
         figsize=(6,.25)
         self.ts_plot = self.construct_ts_plot(
-            t, figsize, eps, time, linewidth=1
+            t, figsize, lim, time, linewidth=1
             )
         self.sync_trait('time', self.ts_plot, mutual=True)
 
         # configure the zoomed plot
         figsize=(4,2)
-        self.zoom_plot = self.construct_zoom_plot(figsize, eps)
+        self.zoom_plot = self.construct_zoom_plot(figsize, lim)
 
         self.trait_setq(tau=tau)
         self.trait_setq(time=time)
         self.trait_setq(eps=i_eps)
 
-    def construct_ts_plot(self, t, figsize, eps, t0, **lprops):
+    def construct_ts_plot(self, t, figsize, lim, t0, **lprops):
         return pm.PagedTimeSeriesPlot(
-            t, self.ts_arr, figsize=figsize, ylim=(-eps, eps), t0=t0,
+            t, self.ts_arr, figsize=figsize, ylim=lim, t0=t0,
             page_length=self.ts_page_len,
             line_props=lprops
             )
 
-    def construct_zoom_plot(self, figsize, eps, **lprops):
+    def construct_zoom_plot(self, figsize, lim, **lprops):
         x = self.zoom_data()
         return pm.ScrollingTimeSeriesPlot(
-            x, figsize=figsize, ylim=(-eps, eps)
+            x, figsize=figsize, ylim=lim
             )
 
     def configure_traits(self, *args, **kwargs):
@@ -236,16 +245,24 @@ class DataScroller(HasTraits):
         if self.array_ipw:
             self.array_ipw.ipw.slice_index = int( np.round(self.time*self.Fs) )
 
-    def __map_eps(self, eps):
-        return self.max_amp*((np.sin(np.pi*(self.eps-1/2.0))+1)/2.0)**2
+    def __map_eps(self, eps, limits):
+        p = ((np.sin(np.pi*(eps-1/2.0))+1)/2.0)**2
+        mn, mx = limits
+        half_width = (mx - mn)*p / 2.0
+        md = (mx + mn)/2.0
+        return (md - half_width, md + half_width)
 
     @on_trait_change('eps')
     def _update_eps(self):
-        max_amp = 1.0
-        true_eps = self.__map_eps(self.eps)
-        lim = (-true_eps, true_eps)
+        lim = self.__map_eps(self.eps, (self.min_ts_amp, self.max_ts_amp))
         self.ts_plot.ylim = lim
         self.zoom_plot.ylim = lim
+
+    @on_trait_change('arr_eps')
+    def _update_arr_eps(self):
+        lim = self.__map_eps(
+            self.arr_eps, (self.min_arr_amp, self.max_arr_amp)
+            )
         if self.array_ipw:
             self.array_ipw.module_manager.scalar_lut_manager.data_range = lim
 
@@ -275,12 +292,14 @@ class DataScroller(HasTraits):
     @on_trait_change('array_scene.activated')
     def _display_image(self):
         scene = self.array_scene
-        eps = self.__map_eps(self.eps)
+        lim = self.__map_eps(
+            self.arr_eps, (self.min_arr_amp, self.max_arr_amp)
+            )
         ipw = mlab.pipeline.image_plane_widget(
             self.arr_img_dsource,
             plane_orientation='x_axes',
             figure=scene.mayavi_scene,
-            vmin=-eps, vmax=eps
+            vmin=lim[0], vmax=lim[1]
             )
 
         ipw.ipw.slice_position = np.round(self.time * self.Fs)
@@ -319,7 +338,10 @@ class DataScroller(HasTraits):
                     Item('tau', label='Zoom Interval'),
                     Item('eps', label='Amplitude Interval')
                     ),
-                Item('time', label='Time Slice', style='custom')
+                VGroup(
+                    Item('arr_eps', label='Array Color'),
+                    Item('time', label='Time Slice', style='custom')
+                    )
                 )
             ),
         resizable=True,
@@ -381,24 +403,24 @@ class ColorCodedDataScroller(DataScroller):
             self, d_array, ts_array, rowcol=rowcol, Fs=Fs, **traits
             )
 
-    def construct_ts_plot(self, t, figsize, eps, t0, **lprops):
+    def construct_ts_plot(self, t, figsize, lim, t0, **lprops):
         dfac = self._dfac
         t = t[::dfac]
         ts_arr = self.ts_arr[::dfac]
         cx_arr = self.cx_arr[::dfac]
         return pm.PagedColorCodedPlot(
             t, ts_arr, cx_arr,
-            figsize=figsize, ylim=(-eps, eps), t0=t0,
+            figsize=figsize, ylim=lim, t0=t0,
             page_length=self.ts_page_len,
             line_props=lprops
             )
 
-    def construct_zoom_plot(self, figsize, eps, **lprops):
+    def construct_zoom_plot(self, figsize, lim, **lprops):
         x, cx = self.zoom_data()
         cx_lim = self.ts_plot.cx_limits # ooh! hacky
         return pm.ScrollingColorCodedPlot(
             x, cx, cx_lim,
-            figsize=figsize, ylim=(-eps, eps), line_props=lprops
+            figsize=figsize, ylim=lim, line_props=lprops
             )
 
     def zoom_data(self):

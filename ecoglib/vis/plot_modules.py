@@ -459,8 +459,9 @@ class ColorCodedPlot(ProtoPlot):
         if not self.cx_limits:
             # try 95% confidence, so that hi/lo clipping is more likely
             #eps = stochastic_limits(cx, conf=95.0)
-            eps = np.abs(cx).max()
-            limits = (-eps, eps)
+            mx = cx.max()
+            mn = cx.min()
+            limits = (mn, mx)
         else:
             limits = self.cx_limits
         #self.norm = pp.normalize(vmin=limits[0], vmax=limits[1])
@@ -504,8 +505,8 @@ class StaticColorCodedPlot(StaticFunctionPlot, ColorCodedPlot):
         self.cx = cx
         if not cx_limits:
             #eps = stochastic_limits(cx, conf=95.)
-            mx = np.abs(cx).max()
-            mn = np.abs(cx).min()
+            mx = cx.max()
+            mn = cx.min()
             cx_limits = (mn, mx)
         self.cx_limits = cx_limits
         super(StaticColorCodedPlot, self).__init__(
@@ -530,8 +531,8 @@ class PagedColorCodedPlot(PagedFunctionPlot, ColorCodedPlot):
         self.cx = cx
         if not cx_limits:
             #eps = stochastic_limits(cx, conf=95.)
-            mx = np.abs(cx).max()
-            mn = np.abs(cx).min()
+            mx = cx.max()
+            mn = cx.min()
             cx_limits = (mn, mx)
         self.cx_limits = cx_limits
         super(PagedColorCodedPlot, self).__init__(
