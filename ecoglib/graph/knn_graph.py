@@ -70,6 +70,11 @@ def knn_graph(neighbors, dists=None, scale=1.0, auto_scale=0, mutual=False):
             Nk.update( ( (i,j) for j in i_nb ) )
             Nk.update( ( (j,i) for j in i_nb ) )
     else:
+        # XXX: here's a small bug introduced by approximate kNN methods:
+        # if the (i, j) pair or the (j, i) pair is already present
+        # in the edge set, it still might have a slightly different
+        # weight than the current point!! So we can end up with up to
+        # two edges for each true edge.
         for i, (i_nb, i_dist) in enumerate(zip(neighbors, dists)):
             Nk.update( ( (i, j, w) for j, w, in zip(i_nb, i_dist) ) )
             Nk.update( ( (j, i, w) for j, w, in zip(i_nb, i_dist) ) )
