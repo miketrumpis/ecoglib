@@ -7,7 +7,8 @@ from knn_graph import gauss_affinity
 def knn_graph(
         np.ndarray[np.int32_t, ndim=2] neighbors,
         np.ndarray[np.float64_t, ndim=2] dists=None,
-        scale=1.0, auto_scale=0, mutual=False):
+        scale=1.0, auto_scale=0, mutual=False
+        ):
 
     cdef int n_vert = neighbors.shape[0]
     cdef int n_nb = neighbors.shape[1]
@@ -30,8 +31,6 @@ def knn_graph(
       np.empty( (neighbors.size,), 'i' )
     cdef np.ndarray[np.int32_t, ndim=1] l_idx = \
       np.empty( (neighbors.size,), 'i' )
-
-
 
     # form upper and lower index sets and weights
 
@@ -95,14 +94,25 @@ def knn_graph(
         (n_vert, n_vert), dtype='d'
         )
 
-    Wl_dbl = Wl_mask.multiply(W_upper.T)
-    Wu_dbl = Wu_mask.multiply(W_lower.T)
+    if mutual:
+        # find the intersection (in the lower triangle) of the two
+        # connectivity maps, then mask out the lower triangle edge
+        # weights and symmetrize the weights.
+        W_mask = Wl_mask.multiply(Wu_mask.T)
+        W = W_mask.multiply(W_lower)
+        W = W + W.T
+    else:
+        # add the upper and lower triangles, plus the transposes
+        # of these triangles. Then subtract out the edge weights
+        # that are double-counted
+        Wl_dbl = Wl_mask.multiply(W_upper.T)
+        Wu_dbl = Wu_mask.multiply(W_lower.T)
 
-    W = W_lower + W_upper
-    W = W + W_lower.T
-    W = W + W_upper.T
-    W = W - Wl_dbl
-    W = W - Wu_dbl
+        W = W_lower + W_upper
+        W = W + W_lower.T
+        W = W + W_upper.T
+        W = W - Wl_dbl
+        W = W - Wu_dbl
     if diag:
         W_diag = sparse.csr_matrix(
             (np.ones(n_vert), np.arange(n_vert), np.arange(n_vert+1)),
