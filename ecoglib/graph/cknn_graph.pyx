@@ -9,6 +9,45 @@ def knn_graph(
         np.ndarray[np.float64_t, ndim=2] dists=None,
         scale=1.0, auto_scale=0, mutual=False
         ):
+    """
+    Build a sparse adjacency matrix of a k-nearest neighbor graph.
+    By common definition, this graph includes all vertices
+
+    { (i,j) : i \in N_k(j) OR j \in N_k(i) }
+
+    To construct the mutual k-nearest neighbor graph, see the
+    "mutual" parameter below.
+
+    Self-loops are not restricted, and will be encoded in the graph
+    if the first column of neighbors is identical to the index order.
+
+    Parameters
+    ----------
+
+    neighbors: ndarray (n_vertices, k)
+      The vertices are ordered by index, and the values of each
+      row indicate the index of k-nearest neighboring vertices.
+
+    dists: ndarray (n_vertices, k)
+      The optional distances to the k-nearest neighbors of each vertex.
+      If given, the graph is weighted. Otherwise, it is a connectivity
+      graph (binary edge weights).
+
+    scale: float (Default 1.0)
+      The characteristic distance scale used in the Gaussian affinity
+      kernel. Alternatively use auto_scale for adaptive scale.
+
+    auto_scale: int (Default 0)
+      If distances are given, then automatically tune the characteristic
+      distance scale between vertices based on their respective ith
+      nearest neighbors. The given value of auto_scale is used as "i".
+
+    mutual: boolean (Default False)
+      Construct a mutual k-nearest neighbors graph, which includes
+      all vertices (i,j) such that i is a neighbor of j AND j is
+      a neighbor of i.
+
+    """
 
     cdef int n_vert = neighbors.shape[0]
     cdef int n_nb = neighbors.shape[1]
