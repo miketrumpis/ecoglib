@@ -2,8 +2,15 @@
 *.pyc
 *~
 .DS_Store
+*.c
+*.cpp
+*.so
+
+# build dir
+build/
 
 # scratch work unless specifically staged
+scripts/
 scripts/*.py
 
 # various figures
