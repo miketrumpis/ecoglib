@@ -19,7 +19,7 @@ from pyface.timer.api import Timer
 
 class ScatterScroller(HasTraits):
     ts_plot = Instance(pm.PagedTimeSeriesPlot)
-    ts_page_len = Float(50.0)
+    ts_page_length = Float(50.0)
 
     scatter = Instance(MlabSceneModel, ())
 
@@ -66,7 +66,7 @@ class ScatterScroller(HasTraits):
         extent = (d_range[1] - d_range[0]) * 1.05
         return pm.PagedTimeSeriesPlot(
             t, self.ts_array, figsize=figsize, t0=0,
-            page_length=self.ts_page_len,
+            page_length=self.ts_page_length,
             ylim=(mid-extent/2, mid+extent/2), linewidth=1
             )
 
