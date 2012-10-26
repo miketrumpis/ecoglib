@@ -82,10 +82,14 @@ class BlitPlot(HasTraits):
         super(BlitPlot, self).__init__(**traits)
 
     def add_static_artist(self, a):
-        self.static_artists.append(a)
+        if not np.iterable(a):
+            a = (a,)
+        self.static_artists.extend(a)
 
     def add_dynamic_artist(self, a):
-        self.dynamic_artists.append(a)
+        if not np.iterable(a):
+            a = (a,)
+        self.dynamic_artists.extend(a)
 
     @on_trait_change('xlim')
     def set_xlim(self, *xlim):
@@ -159,7 +163,8 @@ class BlitPlot(HasTraits):
         connections = (('resize_event', self._resize_handler),) + \
           extra_connections
         for event, handler in connections:
-            self._mpl_connections.append( canvas.mpl_connect(event, handler) )
+            id = canvas.mpl_connect(event, handler)
+            self._mpl_connections.append( id )
 
     def disconnect_live_interaction(self):
         canvas = self.fig.canvas
@@ -208,7 +213,9 @@ class StaticFunctionPlot(LongNarrowPlot):
             ):
         # just do BlitPlot with defaults -- this gives us a figure and axes
         bplot_kws['xlim'] = (t[0], t[-1])
-        super(StaticFunctionPlot, self).__init__()
+        figure = bplot_kws.pop('figure', None)
+        super(StaticFunctionPlot, self).__init__(figure=figure)
+        # XXX: why setting traits after construction?
         self.trait_set(**bplot_kws)
         if t0 is None:
             t0 = t[0]
@@ -242,6 +249,7 @@ class StaticFunctionPlot(LongNarrowPlot):
         super(StaticFunctionPlot, self).connect_live_interaction(*connections)
 
     def _scroll_handler(self, ev):
+        # XXX: debug
         if not ev.inaxes or ev.button != 1:
             return
         if not self._scrolling and ev.name == 'button_press_event':
@@ -388,6 +396,9 @@ class ScrollingFunctionPlot(LongNarrowPlot):
         self.time_mark = self.ax.axvline(x=t0, color='r', ls=':')
         self.add_static_artist(self.time_mark)
 
+    # XXX: should reconsider resetting the data in this plot at every
+    # step -- would be more self-contained to just move the x-limits,
+    # or somehow handle the transition within this object
     def set_window(self, x, tc=None):
         """
         Update the interval of the function (x is restriction to
@@ -474,14 +485,47 @@ class ColorCodedPlot(ProtoPlot):
             )
         return pc
 
-class ColorSegmentedPlot(ProtoPlot):
+class ClassSegmentedPlot(ProtoPlot):
     """
     A mixin-type whose timeseries image is segmented into k classes
     """
-    # e.g. for a line-plot, can do this by sequentially
-    # filling out-of-class pts with nan, and line plotting in-class
-    # points with the appropriate color
-    pass
+    # e.g. for a line-plot, can
+    # Caution: mixin-only. Supposes the attributes
+    # * ax, an MPL Axes
+    # * labels, a segmentation map
+    # * n_classes -- total number of classes (included potentially
+    #                outside this plot)
+
+    def create_fn_image(self, x, t=None, labels=None, **line_props):
+        # Caution! Returns a sequence of separate lines for each data
+        # segment
+        cmap = line_props.pop('cmap', cm.jet)
+        if t is None:
+            t = np.arange(len(x))
+        if not hasattr(self, 'labels'):
+            raise RuntimeError(
+                'Object should have been instantiated with color code'
+                )
+        if labels is None:
+            labels = self.labels
+        colors = cmap(np.linspace(0, 1, self.n_classes))
+        # for each class sequentially fill out-of-class pts with nan,
+        # and line plot in-class points with the appropriate color
+        seg_line = np.empty_like(x)
+        seg_lines = []
+        unique_labels = np.unique(labels)
+        for seg in unique_labels:
+            # -1 codes for out of bounds
+            if seg < 0:
+                continue
+            #for seg, color in zip(xrange(mx_label+1), colors):
+            seg_line.fill(np.nan)
+            idx = np.where(labels==seg)[0]
+            np.put(seg_line, idx, np.take(x, idx))
+            color = colors[seg]
+            line = self.ax.plot(t, seg_line, c=color, **line_props)
+            seg_lines.extend(line)
+        return seg_lines
 
 ##############################################################################
 ########## Classes Implementing Function and Style Combinations ##############
@@ -513,6 +557,23 @@ class StaticColorCodedPlot(StaticFunctionPlot, ColorCodedPlot):
             t, x, t0=t0, line_props=line_props, **bplot_kws
             )
 
+class StaticSegmentedPlot(StaticFunctionPlot, ClassSegmentedPlot):
+    """
+    A static plot, but the line plot is colored by k different classes.
+    This is distinct from a ColorCodedPlot in that there are only
+    a low number of discrete classes.
+    """
+
+    def __init__(
+            self, t, x, labels, t0=None, line_props=dict(), **bplot_kws
+            ):
+        self.labels = labels
+        unique_labels = np.unique(labels)
+        self.n_classes = len( unique_labels >= 0 )
+        super(StaticSegmentedPlot, self).__init__(
+            t, x, t0=t0, line_props=line_props, **bplot_kws
+            )
+
 class PagedTimeSeriesPlot(PagedFunctionPlot, StandardPlot):
     """
     A static plot that is flipped between pages.
@@ -536,6 +597,20 @@ class PagedColorCodedPlot(PagedFunctionPlot, ColorCodedPlot):
             cx_limits = (mn, mx)
         self.cx_limits = cx_limits
         super(PagedColorCodedPlot, self).__init__(
+            t, x, t0=t0, line_props=line_props, **bplot_kws
+            )
+
+class PagedClassSegmentedPlot(PagedFunctionPlot, ClassSegmentedPlot):
+    """
+    A static class-colored plot that is flipped between intervals
+    """
+    def __init__(
+            self, t, x, labels, t0=None, line_props=dict(), **bplot_kws
+            ):
+        self.labels = labels
+        unique_labels = np.unique(labels)
+        self.n_classes = len( unique_labels >= 0 )
+        super(PagedClassSegmentedPlot, self).__init__(
             t, x, t0=t0, line_props=line_props, **bplot_kws
             )
 
@@ -585,3 +660,35 @@ class ScrollingColorCodedPlot(ScrollingFunctionPlot, ColorCodedPlot):
         self.time_mark.set_data([t0, t0], [0, 1])
         self.winsize = winsize
         self.xlim = (-1, self.winsize)
+
+class ScrollingClassSegmentedPlot(ScrollingFunctionPlot, ClassSegmentedPlot):
+    """
+    A scrolling plot, but points are color-coded by class.
+    """
+
+    def __init__(self, x, labels, n_classes, line_props=dict(), **bplot_kws):
+        # make sure to set the class code first
+        self.labels = labels
+        self.n_classes = n_classes
+        # hold onto these
+        self._lprops = line_props
+        super(ScrollingClassSegmentedPlot, self).__init__(
+            x, line_props=line_props, **bplot_kws
+            )
+
+    def set_window(self, x, labels):
+        winsize = len(x)
+        # want to flush previous lines and re-generate class coded lines
+        while self.dynamic_artists:
+            line = self.dynamic_artists.pop()
+            line.remove()
+        self.zoom_element = self.create_fn_image(
+            x, labels=labels, **self._lprops
+            )
+        self.add_dynamic_artist(self.zoom_element)
+        t0 = np.round(winsize/2.)
+        self.time_mark.set_data([t0, t0], [0, 1])
+        self.winsize = winsize
+        self.xlim = (-1, self.winsize)
+        self.draw_dynamic()
+
