@@ -47,11 +47,15 @@ class ScatterScroller(HasTraits):
     count = Button()
     t_counter = Any()
 
-    def __init__(self, scatter_array, ts_array, Fs=1.0, **traits):
+    def __init__(self,
+                 scatter_array, ts_array, Fs=1.0,
+                 trailing=0.5, **traits
+                 ):
         self.scatter_array = scatter_array
         self.ts_array = ts_array
         self.Fs = Fs
         self._scrolling = False
+        traits['_trail_length'] = np.round(self.trailing * self.Fs)
         super(ScatterScroller, self).__init__(**traits)
         self._tf = len(self.ts_array)/self.Fs
         self.ts_plot # trigger default
@@ -158,12 +162,14 @@ class ScatterScroller(HasTraits):
         ##     self.trail_src.mlab_source.dataset.update()
 
     def configure_traits(self, *args, **kwargs):
-        super(ScatterScroller, self).configure_traits(*args, **kwargs)
+        ui = super(ScatterScroller, self).configure_traits(*args, **kwargs)
         self._post_canvas_hook()
+        return ui
 
     def edit_traits(self, *args, **kwargs):
-        super(ScatterScroller, self).edit_traits(*args, **kwargs)
+        ui = super(ScatterScroller, self).edit_traits(*args, **kwargs)
         self._post_canvas_hook()
+        return ui
 
     def _post_canvas_hook(self):
         #self._connect_mpl_events()
@@ -186,23 +192,19 @@ class ScatterScroller(HasTraits):
 
     view = View(
         VGroup(
-            HGroup(
-                Item(
-                    'scatter', editor=SceneEditor(scene_class=Scene),
-                    height=600, width=600, show_label=False
-                    ),
-                Item(
-                    'ts_plot', editor=pm.MPLFigureEditor(),
-                    show_label=False, width=600, height=200, resizable=True
-                    )
+            Item(
+                'scatter', editor=SceneEditor(scene_class=Scene),
+                height=600, width=600, show_label=False, resizable=True
+                ),
+            Item(
+                'ts_plot', editor=pm.MPLFigureEditor(),
+                show_label=False, width=600, height=200, resizable=True
                 ),
             HGroup(
                 Item('time', label='Time Slice', style='custom'),
-                VGroup(
-                    Item('fps', label='FPS'),
-                    Item('count', label='Run Clock')
-                    )
-                )
+                Item('fps', label='FPS'),
+                ),
+            Item('count', label='Run Clock')
             ),
         resizable=True,
         title='Scatter Scroller'

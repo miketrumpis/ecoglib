@@ -211,12 +211,14 @@ class DataScroller(HasTraits):
             )
 
     def configure_traits(self, *args, **kwargs):
-        super(DataScroller, self).configure_traits(*args, **kwargs)
+        ui = super(DataScroller, self).configure_traits(*args, **kwargs)
         self._post_canvas_hook()
+        return ui
 
     def edit_traits(self, *args, **kwargs):
-        super(DataScroller, self).edit_traits(*args, **kwargs)
+        ui = super(DataScroller, self).edit_traits(*args, **kwargs)
         self._post_canvas_hook()
+        return ui
 
     def _post_canvas_hook(self):
         self.ts_plot.connect_live_interaction()
