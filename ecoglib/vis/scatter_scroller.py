@@ -23,6 +23,11 @@ class ScatterScroller(HasTraits):
 
     scatter = Instance(MlabSceneModel, ())
 
+    # Set this relative to the sampling period of the time series
+    # -- e.g. if there is one scatter space point per 25 samples,
+    #    then set scatter_time_scale = 25
+    scatter_time_scale = Float(1.0)
+
     scatter_src = Instance(VTKDataSource)
     scatter_pts = Instance(PipelineBase)
 
@@ -47,16 +52,18 @@ class ScatterScroller(HasTraits):
     count = Button()
     t_counter = Any()
 
-    def __init__(self,
-                 scatter_array, ts_array, Fs=1.0,
-                 trailing=0.5, **traits
-                 ):
+    def __init__(
+            self, scatter_array, ts_array, Fs=1.0,
+            trailing=0.5, **traits
+            ):
         self.scatter_array = scatter_array
         self.ts_array = ts_array
         self.Fs = Fs
         self._scrolling = False
-        traits['_trail_length'] = np.round(self.trailing * self.Fs)
         super(ScatterScroller, self).__init__(**traits)
+        self._trail_length = int(
+            np.round(trailing * self.Fs / self.scatter_time_scale)
+            )
         self._tf = len(self.ts_array)/self.Fs
         self.ts_plot # trigger default
         self.sync_trait('time', self.ts_plot, mutual=True)
@@ -75,17 +82,26 @@ class ScatterScroller(HasTraits):
             )
 
     @on_trait_change('scatter.activated')
-    def _setup_scatters(self):
+    def _setup_scatters(self, scl_fn=None):
         fig = self.scatter.mayavi_scene
         s_array = self.scatter_array
         x, y, z = s_array.T
-        self.scatter_src = mlab.pipeline.scalar_scatter(
-            x, y, z, np.ones_like(x), figure=fig
-            )
-        self.scatter_pts = mlab.pipeline.glyph(
-            self.scatter_src, mode='2dvertex', color=(0,0,1)
-            )
-        self.scatter_pts.actor.property.opacity = 0.25
+        if scl_fn is None:
+            self.scatter_src = mlab.pipeline.scalar_scatter(
+                x, y, z, np.ones_like(x), figure=fig
+                )
+            self.scatter_pts = mlab.pipeline.glyph(
+                self.scatter_src, mode='2dvertex', color=(0,0,1)
+                )
+        else:
+            self.scatter_src = mlab.pipeline.scalar_scatter(
+                x, y, z, scl_fn, figure=fig
+                )
+            self.scatter_pts = mlab.pipeline.glyph(
+                self.scatter_src, mode='2dvertex'
+                )
+
+        self.scatter_pts.actor.property.opacity = 0.5
 
         n = round(self.time*self.Fs)
         t_point = s_array[n][:,None]
@@ -101,10 +117,6 @@ class ScatterScroller(HasTraits):
         bb = np.array(self.scatter_src.data.bounds)
         relative_scale = np.power(np.prod(bb[1::2] - bb[0::2]), 1/3.0)
         scale = 2e-2 * relative_scale
-        ## self.inst_pt = mlab.pipeline.glyph(
-        ##     self.inst_src, mode='sphere', color=(0,1,0),
-        ##     scale_mode='none', scale_factor=scale
-        ##     )
         self.inst_pt = mlab.pipeline.glyph(
             self.inst_src, mode='sphere', colormap='Greens',
             scale_mode='none', scale_factor=scale, vmin=0.0, vmax=1.0
@@ -115,9 +127,6 @@ class ScatterScroller(HasTraits):
         self.trail_src = mlab.pipeline.line_source(
             x, y, z, init_scl, figure=fig
             )
-        ## self.trail_src = mlab.pipeline.line_source(
-        ##     x, y, z, figure=fig
-        ##     )
         self.trail_pts = mlab.pipeline.glyph(
             self.trail_src, mode='sphere', color=(0.7, 0.2, 0.2),
             scale_mode='none', scale_factor=scale*0.4
@@ -127,16 +136,13 @@ class ScatterScroller(HasTraits):
         # and indeed use the same points for trail tube
         s = mlab.pipeline.stripper(self.trail_pts)
         t = mlab.pipeline.tube(s, tube_radius=scale*0.25)
-        ## self.trail_line = mlab.pipeline.surface(
-        ##     t, color=(0.2, 0.7, 0.4), opacity = 0.3
-        ##     )
         self.trail_line = mlab.pipeline.surface(
             t, colormap='Greens', opacity=0.3, vmin=0.0, vmax=1.0
             )
 
     @on_trait_change('time')
     def _update_time(self):
-        n = round(self.time*self.Fs)
+        n = round(self.time*self.Fs/self.scatter_time_scale)
         n = max( min( len(self.scatter_array)-1, n ), 0 )
         t_point = self.scatter_array[n][None,:]
         #self.inst_src.mlab_source.points = t_point
@@ -210,6 +216,43 @@ class ScatterScroller(HasTraits):
         title='Scatter Scroller'
 
         )
+
+class ClassCodedScatterScroller(ScatterScroller):
+    ts_plot = Instance(pm.PagedClassSegmentedPlot)
+
+    def __init__(
+            self, scatter_array, ts_array, labels,
+            Fs=1.0, trailing=0.5, **traits
+            ):
+        self.labels = labels
+        super(ClassCodedScatterScroller, self).__init__(
+            scatter_array, ts_array, Fs=Fs, trailing=trailing, **traits
+            )
+
+    def _ts_plot_default(self):
+        figsize = (6, .25)
+        n = len(self.ts_array)
+        t = np.linspace(self._t0, self._tf, n)
+        d_range = (self.ts_array.min(), self.ts_array.max())
+        mid = (d_range[1] + d_range[0])/2.0
+        extent = (d_range[1] - d_range[0]) * 1.05
+        if self.scatter_time_scale > 1:
+            ts_labels = np.repeat(
+                self.labels, np.round(self.scatter_time_scale)
+                )
+        else:
+            ts_labels = self.labels
+        return pm.PagedClassSegmentedPlot(
+            t, self.ts_array, ts_labels, figsize=figsize, t0=0,
+            page_length=self.ts_page_length,
+            ylim=(mid-extent/2, mid+extent/2), linewidth=1
+            )
+
+    @on_trait_change('scatter.activated')
+    def _setup_scatters(self):
+        super(ClassCodedScatterScroller, self)._setup_scatters(
+            scl_fn=self.labels
+            )
 
 if __name__ == '__main__':
     # copied from test_plot3() in Mayavi
