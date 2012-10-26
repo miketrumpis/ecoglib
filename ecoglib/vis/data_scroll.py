@@ -432,6 +432,81 @@ class ColorCodedDataScroller(DataScroller):
         cx = safe_slice(self.cx_arr, zoom_start, n_zoom_pts, fill=0)
         return x, cx
 
+class ClassCodedDataScroller(DataScroller):
+
+    zoom_plot = Instance(pm.ScrollingClassSegmentedPlot)
+    ts_plot = Instance(pm.PagedClassSegmentedPlot)
+
+    def __init__(
+            self, d_array, ts_array, labels,
+            rowcol=(), Fs=1.0, **traits
+            ):
+        """
+        Display a channel array in a 3-plot format:
+
+        * array image in native array geometry
+        * long-scale time series navigator class labeled plot
+        * short-scale time series zoomed, class labeled plot
+
+        Points in the timeseries plots are color coded to indicate
+        classification according to the labels array.
+
+        Parameters
+        ----------
+
+        d_array: ndarray, 2D or 3D
+          the array recording, in either (n_chan, n_time) or
+          (n_row, n_col, n_time) format
+
+        ts_array: ndarray, 1D
+          a (currently single) timeseries description of the recording
+
+        labels: ndarray, 1D
+          a secondary timeseries which color-codes the ts_array plots
+
+        rowcol: tuple
+          the array geometry, if it cannot be inferred from d_array
+
+        Fs: float
+          sampling rate
+
+        traits: dict
+          other keyword parameters
+
+        """
+        self.labels = labels
+        DataScroller.__init__(
+            self, d_array, ts_array, rowcol=rowcol, Fs=Fs, **traits
+            )
+
+    def construct_ts_plot(self, t, figsize, lim, t0, **lprops):
+        ts_arr = self.ts_arr
+        labels = self.labels
+        return pm.PagedClassSegmentedPlot(
+            t, ts_arr, labels,
+            figsize=figsize, ylim=lim, t0=t0,
+            page_length=self.ts_page_len,
+            line_props=lprops
+            )
+
+    def construct_zoom_plot(self, figsize, lim, **lprops):
+        x, labels = self.zoom_data()
+        unique_labels = np.unique(self.labels)
+        return pm.ScrollingClassSegmentedPlot(
+            x, labels, len(unique_labels >= 0),
+            figsize=figsize, ylim=lim, line_props=lprops
+            )
+
+    def zoom_data(self):
+        d = self.ts_arr
+        l = self.labels
+        n_pts = d.shape[-1]
+        n_zoom_pts = int(np.round(self.tau*self.Fs))
+        zoom_start = int(np.round(self.Fs*(self.time - self.tau/2)))
+        d_sl = safe_slice(d, zoom_start, n_zoom_pts)
+        l_sl = safe_slice(l, zoom_start, n_zoom_pts, fill=-1)
+        return d_sl, l_sl
+
 
 if __name__ == "__main__":
     import sys
