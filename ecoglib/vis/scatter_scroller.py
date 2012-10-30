@@ -82,6 +82,9 @@ class ScatterScroller(HasTraits):
             )
 
     @on_trait_change('scatter.activated')
+    def _plot_scatters(self):
+        self._setup_scatters()
+
     def _setup_scatters(self, scl_fn=None):
         fig = self.scatter.mayavi_scene
         s_array = self.scatter_array
@@ -98,7 +101,8 @@ class ScatterScroller(HasTraits):
                 x, y, z, scl_fn, figure=fig
                 )
             self.scatter_pts = mlab.pipeline.glyph(
-                self.scatter_src, mode='2dvertex'
+                self.scatter_src, mode='2dvertex',
+                colormap='jet'
                 )
 
         self.scatter_pts.actor.property.opacity = 0.5
@@ -249,7 +253,7 @@ class ClassCodedScatterScroller(ScatterScroller):
             )
 
     @on_trait_change('scatter.activated')
-    def _setup_scatters(self):
+    def _plot_scatters(self):
         super(ClassCodedScatterScroller, self)._setup_scatters(
             scl_fn=self.labels
             )
