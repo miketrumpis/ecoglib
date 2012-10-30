@@ -2,7 +2,7 @@ import numpy as np
 import scipy.sparse as sparse
 
 cimport numpy as np
-from knn_graph import gauss_affinity
+from kernels import gauss_affinity
 
 def knn_graph(
         np.ndarray[np.int32_t, ndim=2] neighbors,
