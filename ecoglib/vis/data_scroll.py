@@ -72,7 +72,7 @@ class DataScroller(HasTraits):
 
     zoom_plot = Instance(pm.ScrollingTimeSeriesPlot)
     ts_plot = Instance(pm.PagedTimeSeriesPlot)
-    ts_page_len = Float(50.)
+    ts_page_length = Float(50.)
 
     ## array scene, image, and data (Mayavi components)
 
@@ -80,7 +80,7 @@ class DataScroller(HasTraits):
     arr_img_dsource = Instance(ArraySource, (), transpose_input_array=False)
     array_ipw = Instance(PipelineBase)
     arr_eps = Range(
-        low=0.0, high=1.0, value=0.75,
+        low=0.0, high=1.0, value=0.5,
         editor=RangeEditor(
             format='%1.2f', low_label='tight', high_label='wide'
             )
@@ -144,11 +144,11 @@ class DataScroller(HasTraits):
           other keyword parameters
 
         """
-        npts = d_array.shape[-1]
+        npts = d_array.shape[0]
         if len(d_array.shape) < 3:
             nrow, ncol = rowcol
         else:
-            nrow, ncol = d_array.shape[:2]
+            ncol, nrow = d_array.shape[1:]
         self._tf = float(npts-1) / Fs
         self.Fs = Fs
         # XXX: should set max_amp -- could stochastically sample to
@@ -156,20 +156,26 @@ class DataScroller(HasTraits):
         #self.max_amp = stochastic_limits(ts_array)
         self.max_ts_amp = ts_array.max()
         self.min_ts_amp = ts_array.min()
-        self.max_arr_amp = d_array.max()
-        self.min_arr_amp = d_array.min()
+        # the timeseries peaks are probably a good starting
+        # point for the array peaks
+        self.base_arr_amp = max( self.max_ts_amp, -self.min_ts_amp )
 
         self.ts_arr = ts_array
 
-        # Reshape the data as (ncol, nrow, ntime) to keep it contiguous...
-        # this will also correspond to (k,j,i) indexing. Then flatten
-        # and reshape the array to (ntime, nrow, ncol) (z,y,x) to
-        # satisfy the VTKImageData column-major format
-        new_shape = (npts, nrow, ncol)
-        vtk_arr = np.reshape(d_array.transpose(), new_shape, order='F')
+        # If the array is at base shaped (nsamp, nsite) then the
+        # memory layout corresponds to axes (in ascending order):
+        # (nrow, ncol, nsamp) -- this is a column-major MATLAB artifact.
+        #
+        # Now, set the shape to reflect the shape/stride relationship:
+        # (Z, Y, X) <--> (ncol*nrow, ncol, 1)
+        # Rverse the ordering of axes to create this (column-major)
+        # relationship, which satisfies VTK
+        # (X, Y, Z) <--> (1, ncol, ncol*nrow)
+        new_shape = (npts, ncol, nrow)
+        vtk_arr = np.reshape(d_array, new_shape).transpose()
         # make the time dimension unit length, and put the origin at -1/2
-        self.arr_img_dsource.spacing = 1./npts, 1., 1.
-        self.arr_img_dsource.origin = (-0.5, 0.0, 0.0)
+        self.arr_img_dsource.spacing = 1., 1., 1./npts
+        self.arr_img_dsource.origin = (0.0, 0.0, -0.5)
         self.arr_img_dsource.scalar_data = vtk_arr
 
         # pop out some traits that should be set after initialization
@@ -200,7 +206,7 @@ class DataScroller(HasTraits):
     def construct_ts_plot(self, t, figsize, lim, t0, **lprops):
         return pm.PagedTimeSeriesPlot(
             t, self.ts_arr, figsize=figsize, ylim=lim, t0=t0,
-            page_length=self.ts_page_len,
+            page_length=self.ts_page_length,
             line_props=lprops
             )
 
@@ -263,7 +269,7 @@ class DataScroller(HasTraits):
     @on_trait_change('arr_eps')
     def _update_arr_eps(self):
         lim = self.__map_eps(
-            self.arr_eps, (self.min_arr_amp, self.max_arr_amp)
+            self.arr_eps, (-2*self.base_arr_amp, 2*self.base_arr_amp)
             )
         if self.array_ipw:
             self.array_ipw.module_manager.scalar_lut_manager.data_range = lim
@@ -295,19 +301,20 @@ class DataScroller(HasTraits):
     def _display_image(self):
         scene = self.array_scene
         lim = self.__map_eps(
-            self.arr_eps, (self.min_arr_amp, self.max_arr_amp)
+            self.arr_eps, (-2*self.base_arr_amp, 2*self.base_arr_amp)
             )
         ipw = mlab.pipeline.image_plane_widget(
             self.arr_img_dsource,
-            plane_orientation='x_axes',
+            plane_orientation='z_axes',
             figure=scene.mayavi_scene,
-            vmin=lim[0], vmax=lim[1]
+            vmin=lim[0], vmax=lim[1],
+            colormap='jet'
             )
 
         ipw.ipw.slice_position = np.round(self.time * self.Fs)
         ipw.ipw.interaction = 0
 
-        scene.mlab.view(azimuth=0, elevation=90, distance=50)
+        scene.mlab.view(distance=40)
         scene.scene.interactor.interactor_style = \
           tvtk.InteractorStyleImage()
         scene.scene.background = (0, 0, 0)
@@ -413,7 +420,7 @@ class ColorCodedDataScroller(DataScroller):
         return pm.PagedColorCodedPlot(
             t, ts_arr, cx_arr,
             figsize=figsize, ylim=lim, t0=t0,
-            page_length=self.ts_page_len,
+            page_length=self.ts_page_length,
             line_props=lprops
             )
 
@@ -487,7 +494,7 @@ class ClassCodedDataScroller(DataScroller):
         return pm.PagedClassSegmentedPlot(
             t, ts_arr, labels,
             figsize=figsize, ylim=lim, t0=t0,
-            page_length=self.ts_page_len,
+            page_length=self.ts_page_length,
             line_props=lprops
             )
 
