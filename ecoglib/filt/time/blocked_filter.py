@@ -45,8 +45,19 @@ def bdetrend(x, bsize=0, **kwargs):
         bsize = x.shape[axis]
     x_blk = BlockedSignal(x, bsize, axis=axis)
 
-    for xc in x_blk.fwd():
-        xc[:] = signal.detrend(xc, axis=axis, **kwargs)
+    bp = kwargs.pop('bp', ())
+    bp_table = dict()
+    if len(bp):
+        # find out which block each break-point falls into, and
+        # then set up a break-point table for each block
+        bp = np.asarray(bp)
+        bp_blocks = (bp/bsize).astype('i')
+        new_bp = bp - bsize*bp_blocks
+        bp_table.update( zip(bp_blocks, new_bp) )
+
+    for n, xc in enumerate(x_blk.fwd()):
+        blk_bp = bp_table.get(n, 0)
+        xc[:] = signal.detrend(xc, axis=axis, bp=blk_bp, **kwargs)
     del xc
     del x_blk
 
