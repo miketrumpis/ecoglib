@@ -9,7 +9,7 @@ class BlockedSignal(object):
     in forward or reverse sequence.
     """
 
-    def __init__(self, x, bsize, axis=-1):
+    def __init__(self, x, bsize, overlap=0, axis=-1, partial_block=True):
         """
         Split a (possibly quite large) array into blocks along one axis.
 
@@ -20,8 +20,15 @@ class BlockedSignal(object):
           The signal to blockify.
         bsize: int
           The maximum blocksize for the given axis.
+        overlap: float 0 <= overlap <= 1
+          The proportion of overlap between adjacent blocks. The (k+1)th
+          block will begin at an offset of (1-overlap)*bsize points into
+          the kth block.
         axis: int (optional)
           The axis to split into blocks
+        partial_block: bool
+          If blocks don't divide the axis length exactly, allow a partial
+          block at the end (default True).
 
 
         """
@@ -34,23 +41,25 @@ class BlockedSignal(object):
         while axis < 0:
             axis += len(shape)
 
-        nblock = shape[axis] // bsize
-        if shape[axis] > bsize*nblock:
+        L = int( (1-overlap) * bsize )
+        nblock = (shape[axis] - bsize) // L
+        if partial_block and (shape[axis] > L*nblock + bsize):
             nblock += 1
-            self._last_block_sz = bsize - (nblock*bsize - shape[axis])
+            self._last_block_sz = shape[axis] - L*nblock
+            ## self._last_block_sz = bsize - (nblock*bsize - shape[axis])
         else:
             self._last_block_sz = bsize
-
+        nblock += 1
         nshape = shape[:axis] + (nblock, bsize) + shape[axis+1:]
         # Assuming C-contiguous, strides were previously
         # (..., nx*ny, nx, 1) * bitdepth
         # Change the strides at axis to reflect new shape
         b_offset = np.prod(shape[axis+1:]) * bitdepth
         nstrides = strides[:axis] + \
-          (bsize*b_offset, b_offset) + \
+          (L*b_offset, b_offset) + \
           strides[axis+1:]
+        self.nblock = nblock
         self._axis = axis
-        self._nblock = nblock
         self._x_blk = as_strided(x, shape=nshape, strides=nstrides)
 
     def fwd(self):
@@ -58,9 +67,9 @@ class BlockedSignal(object):
         # this object will be repeatedly modified in the following loop(s)
         blk_slice = [slice(None)] * self._x_blk.ndim
         axis = self._axis
-        for blk in xrange(self._nblock):
+        for blk in xrange(self.nblock):
             blk_slice[self._axis] = blk
-            if blk == self._nblock-1:
+            if blk == self.nblock-1:
                 # VERY important! don't go out of bounds in memory!
                 blk_slice[self._axis+1] = slice(0, self._last_block_sz)
             else:
@@ -74,9 +83,9 @@ class BlockedSignal(object):
         bsize = self._x_blk.shape[self._axis+1]
         # this object will be repeatedly modified in the following loop(s)
         blk_slice = [slice(None)] * self._x_blk.ndim
-        for blk in xrange(self._nblock-1, -1, -1):
+        for blk in xrange(self.nblock-1, -1, -1):
             blk_slice[self._axis] = blk
-            if blk == self._nblock-1:
+            if blk == self.nblock-1:
                 # VERY important! don't go out of bounds in memory!
                 # (XXX: since when does this not work??)
                 # blk_slice[axis+1] = slice(last_block_sz-1, -1, -1)
