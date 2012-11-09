@@ -17,16 +17,12 @@ from mayavi.sources.api import VTKDataSource
 # Pyface Timer
 from pyface.timer.api import Timer
 
-class ScatterScroller(HasTraits):
-    ts_plot = Instance(pm.PagedTimeSeriesPlot)
-    ts_page_length = Float(50.0)
 
-    scatter = Instance(MlabSceneModel, ())
-
-    # Set this relative to the sampling period of the time series
-    # -- e.g. if there is one scatter space point per 25 samples,
-    #    then set scatter_time_scale = 25
-    scatter_time_scale = Float(1.0)
+class ScatterPlot(HasTraits):
+    """
+    This class manages the pipeline which plots and scrolls
+    through the scatter points
+    """
 
     scatter_src = Instance(VTKDataSource)
     scatter_pts = Instance(PipelineBase)
@@ -39,54 +35,20 @@ class ScatterScroller(HasTraits):
     trail_line = Instance(PipelineBase)
     _trail_length = Int(200)
 
-    _t0 = Float(0.0)
-    _tf = Float
-    time = Range(
-        low='_t0', high='_tf',
-        editor=RangeEditor(low_name='_t0', high_name='_tf',
-                           format='%1.2f', mode='slider')
-        )
+    Fs = Float(1.0)
+    time = Float(0.0)
+    # Set this relative to the sampling period of the time series
+    # -- e.g. if there is one scatter space point per 25 samples,
+    #    then set scatter_time_scale = 25
+    scatter_time_scale = Float(1.0)
 
-    ## Animation control
-    fps = Float(20.0)
-    count = Button()
-    t_counter = Any()
+    def __init__(self, scatter_pts, trail_length=200, **traits):
+        traits['_trail_length'] = trail_length
+        super(ScatterPlot, self).__init__(**traits)
+        self.scatter_array = scatter_pts
 
-    def __init__(
-            self, scatter_array, ts_array, Fs=1.0,
-            trailing=0.5, **traits
-            ):
-        self.scatter_array = scatter_array
-        self.ts_array = ts_array
-        self.Fs = Fs
-        self._scrolling = False
-        super(ScatterScroller, self).__init__(**traits)
-        self._trail_length = int(
-            np.round(trailing * self.Fs / self.scatter_time_scale)
-            )
-        self._tf = len(self.ts_array)/self.Fs
-        self.ts_plot # trigger default
-        self.sync_trait('time', self.ts_plot, mutual=True)
-
-    def _ts_plot_default(self):
-        figsize = (6, .25)
-        n = len(self.ts_array)
-        t = np.linspace(self._t0, self._tf, n)
-        d_range = (self.ts_array.min(), self.ts_array.max())
-        mid = (d_range[1] + d_range[0])/2.0
-        extent = (d_range[1] - d_range[0]) * 1.05
-        return pm.PagedTimeSeriesPlot(
-            t, self.ts_array, figsize=figsize, t0=0,
-            page_length=self.ts_page_length,
-            ylim=(mid-extent/2, mid+extent/2), linewidth=1
-            )
-
-    @on_trait_change('scatter.activated')
-    def _plot_scatters(self):
-        self._setup_scatters()
-
-    def _setup_scatters(self, scl_fn=None):
-        fig = self.scatter.mayavi_scene
+    def setup_scatters(self, fig, scl_fn=None):
+        #fig = self.scatter.mayavi_scene
         s_array = self.scatter_array
         x, y, z = s_array.T
         if scl_fn is None:
@@ -171,6 +133,66 @@ class ScatterScroller(HasTraits):
         ##     self.trail_src.mlab_source.dataset.set(points = trail_points)
         ##     self.trail_src.mlab_source.dataset.update()
 
+
+
+class ScatterScroller(HasTraits):
+    ts_plot = Instance(pm.PagedTimeSeriesPlot)
+    ts_page_length = Float(50.0)
+
+    scatter = Instance(MlabSceneModel, ())
+    scatter_plot = Instance(ScatterPlot, ())
+
+    _t0 = Float(0.0)
+    _tf = Float
+    time = Range(
+        low='_t0', high='_tf',
+        editor=RangeEditor(low_name='_t0', high_name='_tf',
+                           format='%1.2f', mode='slider')
+        )
+
+    ## Animation control
+    fps = Float(20.0)
+    count = Button()
+    t_counter = Any()
+
+    def __init__(
+            self, scatter_pts, ts_array, Fs = 1.0,
+            trailing = 0.5, scatter_time_scale = 1.0, **traits
+            ):
+        #self.scatter_array = scatter_array
+        self.ts_array = ts_array
+        self.Fs = Fs
+        self._scrolling = False
+        super(ScatterScroller, self).__init__(**traits)
+        trail_length = int(
+            np.round(trailing * self.Fs / scatter_time_scale)
+            )
+        self._tf = len(self.ts_array)/self.Fs
+        self.ts_plot # trigger default
+        self.scatter_plot = ScatterPlot(
+            scatter_pts, trail_length = trail_length, Fs=Fs,
+            scatter_time_scale = scatter_time_scale
+            )
+        self.sync_trait('time', self.ts_plot, mutual=True)
+        self.sync_trait('time', self.scatter_plot, mutual=True)
+
+    def _ts_plot_default(self):
+        figsize = (6, .25)
+        n = len(self.ts_array)
+        t = np.linspace(self._t0, self._tf, n)
+        d_range = (self.ts_array.min(), self.ts_array.max())
+        mid = (d_range[1] + d_range[0])/2.0
+        extent = (d_range[1] - d_range[0]) * 1.05
+        return pm.PagedTimeSeriesPlot(
+            t, self.ts_array, figsize=figsize, t0=0,
+            page_length=self.ts_page_length,
+            ylim=(mid-extent/2, mid+extent/2), linewidth=1
+            )
+
+    @on_trait_change('scatter.activated')
+    def _plot_scatters(self):
+        self.scatter_plot.setup_scatters(self.scatter.mayavi_scene)
+
     def configure_traits(self, *args, **kwargs):
         ui = super(ScatterScroller, self).configure_traits(*args, **kwargs)
         self._post_canvas_hook()
@@ -254,8 +276,8 @@ class ClassCodedScatterScroller(ScatterScroller):
 
     @on_trait_change('scatter.activated')
     def _plot_scatters(self):
-        super(ClassCodedScatterScroller, self)._setup_scatters(
-            scl_fn=self.labels
+        self.scatter_plot.setup_scatters(
+            self.scatter.mayavi_scene, scl_fn=self.labels
             )
 
 if __name__ == '__main__':

@@ -96,7 +96,7 @@ class DataScroller(HasTraits):
     # going to map this to max_amp*(sin(pi*(eps-1/2)) + 1)/2 to
     # prevent blowing up the ylim too easily with the range slider
     eps = Range(
-        low=0.0, high=1.0, value=0.5,
+        low=0.0, high=1.0, value=1,
         editor=RangeEditor(
             format='%1.2f', low_label='tight', high_label='wide'
             )
