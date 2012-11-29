@@ -116,7 +116,10 @@ class DataScroller(HasTraits):
     count = Button()
     t_counter = Any()
 
-    def __init__(self, d_array, ts_array, rowcol=(), Fs=1.0, **traits):
+    def __init__(
+            self, d_array, ts_array,
+            rowcol=(), Fs=1.0, tx=None, **traits
+            ):
         """
         Display a channel array in a 3-plot format:
 
@@ -187,11 +190,17 @@ class DataScroller(HasTraits):
 
         # configure the ts_plot
         n = self.ts_arr.shape[-1]
-        t = np.linspace(self._t0, self._tf, n)
+        # XXX: disable tx for now.. too hairy
+        if tx is not None:
+            tx = None
+        if tx is None:
+            tx = np.linspace(self._t0, self._tf, n)
+        else:
+            assert len(tx)==n, 'provided time axis has wrong length'
         lim = self.__map_eps(i_eps, (self.min_ts_amp, self.max_ts_amp))
         figsize=(6,.25)
         self.ts_plot = self.construct_ts_plot(
-            t, figsize, lim, time, linewidth=1
+            tx, figsize, lim, time, linewidth=1
             )
         self.sync_trait('time', self.ts_plot, mutual=True)
 

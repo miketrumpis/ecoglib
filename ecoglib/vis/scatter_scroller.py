@@ -112,8 +112,10 @@ class ScatterPlot(HasTraits):
         n = max( min( len(self.scatter_array)-1, n ), 0 )
         t_point = self.scatter_array[n][None,:]
         #self.inst_src.mlab_source.points = t_point
-        t_len = self._trail_length
         self.inst_src.mlab_source.set(points = t_point)
+        t_len = self._trail_length
+        if not t_len:
+            return
         trail_points = self.scatter_array[max(0,n+1-t_len):n+1]
         update_dict = dict(points = trail_points)
         if len(self.trail_src.mlab_source.scalars) < t_len or n < t_len:
