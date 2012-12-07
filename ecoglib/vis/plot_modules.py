@@ -485,6 +485,8 @@ class ColorCodedPlot(ProtoPlot):
             )
         return pc
 
+# XXX: would be nice to have an option to write class labels,
+# possible with "annotate" fn.
 class ClassSegmentedPlot(ProtoPlot):
     """
     A mixin-type whose timeseries image is segmented into k classes
@@ -523,6 +525,8 @@ class ClassSegmentedPlot(ProtoPlot):
             idx = np.where(labels==seg)[0]
             np.put(seg_line, idx, np.take(x, idx))
             color = colors[seg]
+            if seg==0:
+                color[-1] = 0.15
             line = self.ax.plot(t, seg_line, c=color, **line_props)
             seg_lines.extend(line)
         return seg_lines
