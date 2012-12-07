@@ -48,26 +48,38 @@ class ScatterPlot(HasTraits):
         self.scatter_array = scatter_pts
 
     def setup_scatters(self, fig, scl_fn=None):
-        #fig = self.scatter.mayavi_scene
         s_array = self.scatter_array
         x, y, z = s_array.T
+
+        # --- quick and dirty scale ---
+        # this is approximately the number of points on each axis
+        f_idx = np.isfinite(s_array[:,0])
+        n_pt = len(np.unique(s_array[f_idx,0]))
+        n_pt = len(f_idx)
+        density = np.power(n_pt, -1/3.0)
+        # this is approximately the length of each axis
+        bb = s_array[f_idx].ptp(axis=0)
+        relative_scale = np.power(np.prod(bb), 1/3.0)
+        scale = relative_scale * density
+
         if scl_fn is None:
             self.scatter_src = mlab.pipeline.scalar_scatter(
                 x, y, z, np.ones_like(x), figure=fig
                 )
             self.scatter_pts = mlab.pipeline.glyph(
-                self.scatter_src, mode='2dvertex', color=(0,0,1)
+                self.scatter_src, mode='2dcircle', color=(0,0,1),
+                scale_mode='none', scale_factor=scale/4
                 )
         else:
             self.scatter_src = mlab.pipeline.scalar_scatter(
                 x, y, z, scl_fn, figure=fig
                 )
             self.scatter_pts = mlab.pipeline.glyph(
-                self.scatter_src, mode='2dvertex',
-                colormap='jet'
+                self.scatter_src, mode='2dcircle',
+                colormap='jet', scale_mode='none', scale_factor=scale/4
                 )
-
-        self.scatter_pts.actor.property.opacity = 0.5
+        self.scatter_pts.glyph.glyph_source.glyph_source.filled = 1
+        self.scatter_pts.actor.property.opacity = 0.75
 
         n = round(self.time*self.Fs)
         t_point = s_array[n][:,None]
@@ -79,13 +91,9 @@ class ScatterPlot(HasTraits):
         self.inst_src = mlab.pipeline.scalar_scatter(
             x, y, z, init_scl, figure=fig
             )
-        # quick and dirty scale
-        bb = np.array(self.scatter_src.data.bounds)
-        relative_scale = np.power(np.prod(bb[1::2] - bb[0::2]), 1/3.0)
-        scale = 2e-2 * relative_scale
         self.inst_pt = mlab.pipeline.glyph(
             self.inst_src, mode='sphere', colormap='Greens',
-            scale_mode='none', scale_factor=scale, vmin=0.0, vmax=1.0
+            scale_mode='none', scale_factor=scale*1.5, vmin=0.0, vmax=1.0
             )
 
         # copy the same for "trail" scatter
@@ -95,13 +103,13 @@ class ScatterPlot(HasTraits):
             )
         self.trail_pts = mlab.pipeline.glyph(
             self.trail_src, mode='sphere', color=(0.7, 0.2, 0.2),
-            scale_mode='none', scale_factor=scale*0.4
+            scale_mode='none', scale_factor=scale
             )
         #self.trail_pts.actor.property.opacity = 0.4
 
         # and indeed use the same points for trail tube
         s = mlab.pipeline.stripper(self.trail_pts)
-        t = mlab.pipeline.tube(s, tube_radius=scale*0.25)
+        t = mlab.pipeline.tube(s, tube_radius=scale/4)
         self.trail_line = mlab.pipeline.surface(
             t, colormap='Greens', opacity=0.3, vmin=0.0, vmax=1.0
             )
