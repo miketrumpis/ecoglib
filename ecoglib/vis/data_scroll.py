@@ -96,7 +96,7 @@ class DataScroller(HasTraits):
     # going to map this to max_amp*(sin(pi*(eps-1/2)) + 1)/2 to
     # prevent blowing up the ylim too easily with the range slider
     eps = Range(
-        low=0.0, high=1.0, value=1,
+        low=0.0, high=1.0, value=1.0,
         editor=RangeEditor(
             format='%1.2f', low_label='tight', high_label='wide'
             )
@@ -184,7 +184,7 @@ class DataScroller(HasTraits):
         # pop out some traits that should be set after initialization
         time = traits.pop('time', 0)
         tau = traits.pop('tau', 1.0)
-        i_eps = traits.pop('eps', 0.5)
+        i_eps = traits.pop('eps', 1.0)
         HasTraits.__init__(self, **traits)
         self._scrolling = False
 
