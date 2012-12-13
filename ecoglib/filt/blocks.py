@@ -40,7 +40,7 @@ class BlockedSignal(object):
         bitdepth = x.dtype.itemsize
         while axis < 0:
             axis += len(shape)
-
+        bsize = int(bsize)
         L = int( (1-overlap) * bsize )
         nblock = (shape[axis] - bsize) // L
         if partial_block and (shape[axis] > L*nblock + bsize):
