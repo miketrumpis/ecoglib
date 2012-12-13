@@ -17,7 +17,23 @@ def _fast_disp(X):
     np.multiply(Xd, cumidx[::-1], Xd)
     return 2*np.sum(Xd)
 
-def kmedians(X, k, restarts=2, tol=1e-4, max_iter = 100):
+## def _fast_disp2(X):
+
+def _dist_to_centroids(X, partitions, p=1):
+    p_labels = np.sort(np.unique(partitions))
+    k = len(p_labels)
+    err = 0
+    for i in p_labels:
+        part = X[ p==i ]
+        if p == 1:
+            centroid = np.median(part, axis=0)
+        else:
+            centroid = np.mean(part, axis=0)
+        centered = part - centroid
+        err = err + np.power(np.abs(centered), p).sum()
+    return err
+
+def kmedians(X, k, init='random', n_init=2, tol=1e-4, max_iter=100):
 
     m, n = X.shape
 
@@ -32,9 +48,15 @@ def kmedians(X, k, restarts=2, tol=1e-4, max_iter = 100):
     X_dist = np.empty( (m, k), 'd' )
     np.power(X, 2, X_scratch)
     sq_dist = np.sum(X_scratch, axis=1)
+    group_sz = np.zeros(k)
 
-    for n in xrange(restarts):
-        locs = km.k_init(X, k, x_squared_norms=sq_dist)
+    for n in xrange(n_init):
+        if init=='random':
+            r_pts = np.random.randint(0, m, 3*k)
+            r_pts = np.unique(r_pts)
+            locs = X[r_pts[:k]]
+        else:
+            locs = km.k_init(X, k, x_squared_norms=sq_dist)
 
         # perform modified Lloyd's algorithm to
         # 1) assign points to current locations
@@ -71,15 +93,20 @@ def kmedians(X, k, restarts=2, tol=1e-4, max_iter = 100):
         for r in xrange(k):
             Cr = (assignments == r)
             nr = np.sum(Cr)
+            group_sz[r] = nr
             cluster = X[ Cr ]
             cluster.sort(axis=0)
-            # do quick O(nr) calculation of
+            # do quick O(nr*log(nr)) calculation of
             # within-cluster dispersion
             cdiff = np.diff(cluster, axis=0)
             cumidx = np.arange(1,nr).reshape(nr-1, 1)
             np.multiply(cdiff, cumidx, cdiff)
             np.multiply(cdiff, cumidx[::-1], cdiff)
-            group_inertia[r] = 2*np.sum(cdiff)
+            # this calculates sum of pairwise dists in partition r :
+            # ... group_inertia[r] = 2*np.sum(cdiff) ...
+            # want to record sum over all partitions of this term normalized
+            # by 2*nr
+            group_inertia[r] = np.sum(cdiff)/nr
 
         inertia = np.sum(group_inertia)
         if inertia < best_inertia:
@@ -134,7 +161,7 @@ if __name__=='__main__':
     cls_err1 = (g1_1[:n_pts].sum() + (~g1_1[n_pts:2*n_pts]).sum())
     cls_err1 = cls_err1 / float(2*n_pts)
 
-    c2, g2, d2 = kmedians(d, 2, restarts=10)
+    c2, g2, d2 = kmedians(d, 2, n_init=10)
 
     if np.linalg.norm(c2[0] - model_locs[0]) > \
        np.linalg.norm(c2[1] - model_locs[0]):

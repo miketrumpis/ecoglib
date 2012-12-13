@@ -1,18 +1,20 @@
 import numpy as np
 from sklearn.cluster import k_means
+from sandbox import kmedians as kmd
 
-def gap_stat(x, Kmax, nsurr=20, svd=False):
-    wk, r_wk = unsupervised_clusters(x, Kmax, nsurr=nsurr, svd=svd)
+def gap_stat(x, Kmax, nsurr=20, p=2, svd=False):
+    wk, r_wk = unsupervised_clusters(x, Kmax, nsurr=nsurr, p=p, svd=svd)
     lwk = np.log(wk)
     lr_wk = np.log(r_wk)
     gk = np.mean(lr_wk, axis=0) - lwk
     sk = np.std(lr_wk, axis=0) * np.sqrt(1+1/float(nsurr))
     return gk, sk
 
-def unsupervised_clusters(x, Kmax, nsurr=20, svd=False):
+def unsupervised_clusters(x, Kmax, nsurr=20, p=2, svd=False):
     ## wk = [ k_means(x, k, n_init=10)[-1]
     ##        for k in xrange(1,Kmax+1) ]
-    wk = [ pooled_dispersion(x, k, n_init=10) for k in xrange(1, Kmax+1) ]
+    wk = [ pooled_dispersion(x, k, p=p, n_init=10)
+           for k in xrange(1, Kmax+1) ]
     wk = np.array(wk)
     ## bbox_hi = x.max(axis=0)
     ## bbox_lo = x.min(axis=0)
@@ -34,7 +36,7 @@ def unsupervised_clusters(x, Kmax, nsurr=20, svd=False):
         ##       for k in xrange(1,Kmax+1) ]
         ##       )
         rand_wk[n] = np.array(
-            [ pooled_dispersion(rbox, k, init='random', n_init=1)
+            [ pooled_dispersion(rbox, k, p=p, init='random', n_init=2)
               for k in xrange(1, Kmax+1) ]
               )
     #e_wk = np.mean(rand_wk, axis=0)
@@ -55,8 +57,13 @@ def bounding_box(x, svd=False):
     else:
         return bbox_hi, bbox_lo
 
-def pooled_dispersion(x, k, **kws):
-    locs, labels, wk = k_means(x, k, **kws)
+def pooled_dispersion(x, k, p=2, **kws):
+    if p==2:
+        _, _, wk = k_means(x, k, **kws)
+    elif p==1:
+        _, _, wk = kmd.kmedians(x, k, **kws)
+    else:
+        raise ValueError('Only l1, l2 distance implemented')
     return wk
     ## cr = [ np.where(labels==i)[0] for i in xrange(k) ]
     ## nr = np.array( [len(c) for c in cr] )
