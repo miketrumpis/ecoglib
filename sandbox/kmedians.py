@@ -33,7 +33,7 @@ def _dist_to_centroids(X, partitions, p=1):
         err = err + np.power(np.abs(centered), p).sum()
     return err
 
-def kmedians(X, k, init='random', n_init=2, tol=1e-4, max_iter=100):
+def kmedians(X, k, init='k-means++', n_init=2, tol=1e-4, max_iter=100):
 
     m, n = X.shape
 
@@ -51,6 +51,7 @@ def kmedians(X, k, init='random', n_init=2, tol=1e-4, max_iter=100):
     group_sz = np.zeros(k)
 
     for n in xrange(n_init):
+        # this appears to lead to too-close initializations for higher k
         if init=='random':
             r_pts = np.random.randint(0, m, 3*k)
             r_pts = np.unique(r_pts)
@@ -116,6 +117,10 @@ def kmedians(X, k, init='random', n_init=2, tol=1e-4, max_iter=100):
 
     return best_locs, best_labeling, best_inertia
 
+def exemplar(X, p=2):
+    md = np.median(X, axis=0)
+    d = np.sum( np.power(np.abs(X-md), p), axis=1 )
+    return X[ np.argmin(d) ]
 
 if __name__=='__main__':
     n_pts = 50
