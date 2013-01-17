@@ -13,7 +13,7 @@ def gap_stat(x, Kmax, nsurr=20, p=2, svd=False):
 def unsupervised_clusters(x, Kmax, nsurr=20, p=2, svd=False):
     ## wk = [ k_means(x, k, n_init=10)[-1]
     ##        for k in xrange(1,Kmax+1) ]
-    wk = [ pooled_dispersion(x, k, p=p, n_init=10)
+    wk = [ pooled_dispersion(x, k, p=p, n_init=20)
            for k in xrange(1, Kmax+1) ]
     wk = np.array(wk)
     ## bbox_hi = x.max(axis=0)
@@ -25,7 +25,8 @@ def unsupervised_clusters(x, Kmax, nsurr=20, p=2, svd=False):
         bbox_hi, bbox_lo = bounding_box(x)
 
     rand_wk = np.zeros( (nsurr, Kmax) )
-    for n in xrange(20):
+    for n in xrange(nsurr):
+        print n
         rbox = np.random.rand(*x.shape)
         rbox *= (bbox_hi - bbox_lo)
         rbox += bbox_lo
@@ -36,7 +37,7 @@ def unsupervised_clusters(x, Kmax, nsurr=20, p=2, svd=False):
         ##       for k in xrange(1,Kmax+1) ]
         ##       )
         rand_wk[n] = np.array(
-            [ pooled_dispersion(rbox, k, p=p, init='random', n_init=2)
+            [ pooled_dispersion(rbox, k, p=p, n_init=1)
               for k in xrange(1, Kmax+1) ]
               )
     #e_wk = np.mean(rand_wk, axis=0)

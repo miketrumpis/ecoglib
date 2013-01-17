@@ -1,6 +1,8 @@
 from __future__ import division
 import numpy as np
 import scipy.signal as signal
+import scipy.ndimage as ndimage
+import matplotlib.pyplot as pp
 
 ## def find_spikes(mn_trace, winsize, spikewidth, measure='energy'):
 
@@ -55,8 +57,12 @@ import scipy.signal as signal
 
     ## return spikes, sm_energy
 
-def find_spikes(d, spikewidth, Fs, fudge=0.8):
+def find_spikes(d, spikewidth, Fs, spikewindow=None, fudge=0.8):
     spike_samps = int( spikewidth * Fs + 0.5 )
+    if not spikewindow:
+        spikewindow = spike_samps
+    else:
+        spikewindow = int( spikewindow * Fs + 0.5 )
 
     dl = np.abs(d).mean(axis=1)
 
@@ -81,8 +87,8 @@ def find_spikes(d, spikewidth, Fs, fudge=0.8):
     spk_stop = np.where(ds < 0)[0] + 1
 
     spikes = list()
-    pre_spike = spike_samps//2
-    post_spike = spike_samps - pre_spike
+    pre_spike = spikewindow//2
+    post_spike = spikewindow - pre_spike
     for start, stop in zip(spk_start, spk_stop):
         # check for a super-threshold width of > (1 + n*0.8) * spike_samps
         # with n > 0
@@ -200,3 +206,64 @@ def mark_spikes(mn_trace, spikes):
         )
     ax.add_collection(cx)
     pp.show()
+
+
+def simple_spikes(d, thresh, t_refractory, t_min):
+    #dmx = np.abs(d).max(1)
+    dmx = np.abs(np.mean(d, axis=1))
+    super_thresh = (dmx > thresh).astype('i')
+    rising_edge = np.where(np.diff(super_thresh) > 0)[0] + 1
+    falling_edge = np.where(np.diff(super_thresh) < 0)[0] + 1
+
+    spikes = list()
+    last_spike = -t_refractory
+    print len(rising_edge)
+    for start, stop in zip(rising_edge, falling_edge):
+        if stop - start < t_min:
+            continue
+        if start < last_spike + t_refractory:
+            continue
+        else:
+            last_spike = start
+            spikes.append(start)
+    return spikes
+
+
+def delay_map(spike_vecs, arr_dims):
+    n_spikes = spike_vecs.shape[0]
+    sp_frames = spike_vecs.reshape( n_spikes, -1, arr_dims )
+    mn_spikes = np.mean(sp_frames, axis=-1)
+    lag_maps = np.zeros((n_spikes, arr_dims))
+    n = 0
+    for mn_spk, frames in zip(mn_spikes, sp_frames):
+        cross_corr = ndimage.convolve1d(
+            frames, mn_spk[::-1], axis=0, mode='constant'
+            )
+        lag_map = np.argmax(cross_corr, axis=0)
+        centered_time = np.argmax(np.abs(mn_spk))
+        lag_map -= centered_time
+        lag_maps[n] = lag_map
+        n = n + 1
+    return lag_maps
+
+
+def plot_maps(maps, max_plot=30):
+    n_maps = maps.shape[0]
+    if n_maps > max_plot:
+        # choose random subset
+        r = np.arange(n_maps)
+        np.random.shuffle(r)
+        return plot_maps(maps[r[:max_plot]])
+
+    P1 = int( np.ceil(np.sqrt(float(n_maps))) )
+    P2 = int( np.ceil(n_maps / float(P1)) )
+    f = pp.figure()
+    norm = pp.normalize(maps.min(), maps.max())
+    for p, mp in enumerate(maps):
+        pp.subplot(P1, P2, p+1)
+        pp.imshow(mp, interpolation='nearest', norm=norm)
+        pp.gca().xaxis.set_visible(False)
+        pp.gca().yaxis.set_visible(False)
+        pp.gca().set_aspect('auto')
+    f.tight_layout()
+    return f
