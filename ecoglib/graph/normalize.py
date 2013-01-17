@@ -1,6 +1,18 @@
 import numpy as np
 import scipy.sparse as sparse
 
+def degree_matrix(W, p=1):
+    """
+    Computes a diagonal matrix G of the form
+
+    G_ii = (D_ii) ^ {p}
+
+    where D is the degree matrix of adjacency matrix W.
+    """
+    deg = W.sum(1)
+    diags = np.power(deg.A.T, p)
+    return sparse.dia_matrix( (diags, [0]), W.shape )
+
 def laplacian(W):
     """
     Computes the graph laplacian:
@@ -21,8 +33,9 @@ def markov(W):
 
     where D = diag(sum(W, axis=1))
     """
-    deg = W.sum(1)
-    Di = sparse.dia_matrix( (1/deg.A.T, [0]), W.shape )
+    #deg = W.sum(1)
+    #Di = sparse.dia_matrix( (1/deg.A.T, [0]), W.shape )
+    Di = degree_matrix(W, p=-1)
     return Di*W
 
 def normalized_laplacian(W):
@@ -45,8 +58,9 @@ def bimarkov(W):
 
     where D = diag(sum(W, axis=1))
     """
-    deg = W.sum(1)
-    Di = sparse.dia_matrix( (1/np.sqrt(deg.A.T), [0]), W.shape )
+    ## deg = W.sum(1)
+    ## Di = sparse.dia_matrix( (1/np.sqrt(deg.A.T), [0]), W.shape )
+    Di = degree_matrix(W, p=-1/2.)
     return Di*(W*Di)
 
 def anisotropic(W, alpha=0.5):

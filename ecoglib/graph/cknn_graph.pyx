@@ -51,6 +51,8 @@ def knn_graph(
 
     cdef int n_vert = neighbors.shape[0]
     cdef int n_nb = neighbors.shape[1]
+    # check for whether the nearest-neighbors and distance tables
+    # include self-references
     cdef int diag = 1 if (neighbors[0,0] == 0) else 0
     cdef int weighted = 0 if (dists is None) else 1
 
@@ -107,7 +109,7 @@ def knn_graph(
     l_weight = l_weight[:l_idx_cnt]
     # auto-scale distances and compute kernel values
     if weighted:
-        if auto_scale:
+        if auto_scale >= 0:
             u_sig_sq = np.repeat(ascale, np.diff(u_idx_ptr))
             u_sig_sq *= np.take(ascale, u_idx)
             l_sig_sq = np.repeat(ascale, np.diff(l_idx_ptr))
