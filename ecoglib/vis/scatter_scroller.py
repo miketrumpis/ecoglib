@@ -68,7 +68,7 @@ class ScatterPlot(HasTraits):
                 )
             self.scatter_pts = mlab.pipeline.glyph(
                 self.scatter_src, mode='2dcircle', color=(0,0,1),
-                scale_mode='none', scale_factor=scale/4
+                scale_mode='none', scale_factor=scale/3
                 )
         else:
             self.scatter_src = mlab.pipeline.scalar_scatter(
@@ -76,7 +76,7 @@ class ScatterPlot(HasTraits):
                 )
             self.scatter_pts = mlab.pipeline.glyph(
                 self.scatter_src, mode='2dcircle',
-                colormap='jet', scale_mode='none', scale_factor=scale/4
+                colormap='jet', scale_mode='none', scale_factor=scale/3
                 )
         self.scatter_pts.glyph.glyph_source.glyph_source.filled = 1
         self.scatter_pts.actor.property.opacity = 0.75
@@ -272,12 +272,7 @@ class ClassCodedScatterScroller(ScatterScroller):
         d_range = (self.ts_array.min(), self.ts_array.max())
         mid = (d_range[1] + d_range[0])/2.0
         extent = (d_range[1] - d_range[0]) * 1.05
-        if self.scatter_time_scale > 1:
-            ts_labels = np.repeat(
-                self.labels, np.round(self.scatter_time_scale)
-                )
-        else:
-            ts_labels = self.labels
+        ts_labels = self.labels
         return pm.PagedClassSegmentedPlot(
             t, self.ts_array, ts_labels, figsize=figsize, t0=0,
             page_length=self.ts_page_length,
