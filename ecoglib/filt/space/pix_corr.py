@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.ndimage as ndimage
-
+import scipy.signal as signal
 from ..blocks import BlockedSignal
 
 def pixel_corrections(
