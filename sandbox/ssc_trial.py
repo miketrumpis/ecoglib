@@ -37,6 +37,7 @@ dfile = '../../data/cat1/test_41_demux.mat'
 
 d, shape, Fs, tx, segs = load_arr.load_arr(dfile, auto_prune=True)
 nrow, ncol = shape
+N, M0 = d.shape
 post_pruned = load_arr.get_post_snips(dfile)
 
 if dfile.find('test_41') >= 0:
