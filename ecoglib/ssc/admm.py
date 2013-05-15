@@ -11,11 +11,20 @@ def shrink_thresh(x, alpha):
     xl = ~xl & ~xu
     x[xl] = 0
 
-def diag_plus_loaded_inverse(Y, lamz, rho, YYt=None, matrix=False):
+def diag_plus_loaded_inverse(Y, lamz, rho, YYt=None, YtY=None, matrix=False):
     # return a LinearOperator that applies the inverse of
     # lamz*YtY + rho*(I + ee^T)
 
     m, N = Y.shape
+
+    # if m >> N, then just compute inverse directly on N x N matrix
+    if m > N:
+        if YtY is None:
+            YtY = Y.T.dot(Y)
+        T = YtY * lamz
+        T += rho
+        T.flat[0:m*m:(m+1)] += rho
+        return T
 
     if YYt is None:
         YYt = Y.dot(Y.T)
@@ -99,8 +108,8 @@ def admm_one(Y, lamz, lamr, rho, YYt=None, YtY=None, max_it = 1e3):
         YtY = Y.T.dot(Y)
     rhs = np.empty( (N,N) )
 
-    # construct the Woodbury inverse
-    T = diag_plus_loaded_inverse(Y, lamz, rho, YYt=YYt, matrix=True)
+    # construct the Woodbury (or direct) inverse
+    T = diag_plus_loaded_inverse(Y, lamz, rho, YYt=YYt, YtY=YtY, matrix=True)
 
     it = 0
     while True:
