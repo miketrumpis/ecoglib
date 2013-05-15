@@ -23,7 +23,7 @@ def diag_plus_loaded_inverse(Y, lamz, rho, YYt=None, YtY=None, matrix=False):
             YtY = Y.T.dot(Y)
         T = YtY * lamz
         T += rho
-        T.flat[0:m*m:(m+1)] += rho
+        T.flat[0:N*N:(N+1)] += rho
         return np.linalg.inv(T)
 
     if YYt is None:
