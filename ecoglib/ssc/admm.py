@@ -167,5 +167,5 @@ def admm_one(Y, lamz, lamr, rho, YYt=None, YtY=None, max_it = 1e3):
         it += 1
         print it, errs
 
-    return C
+    return C, E
 
