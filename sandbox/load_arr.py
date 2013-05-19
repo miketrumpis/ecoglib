@@ -4,12 +4,16 @@ import tables
 import os
 
 # these segments are intended for snipping pre-processed data at load
+# (or possibly clipping beginning/end segments?)
 _load_prune_db = dict()
 _load_prune_db['cat1.2010-05-19_test_41_filtered'] = (
     (200, 17700), (23000, 92848)
     )
 _load_prune_db['cat1.test_40_filtered2'] = (
     (0, 577083), (577362, 582313), (582592, 610094), (610371, 678146)
+    )
+_load_prune_db['cat1.test_30_demux'] = (
+    (48889, 84584),
     )
 
 # these segments are for snipping after filtering raw data

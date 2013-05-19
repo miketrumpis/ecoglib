@@ -8,7 +8,26 @@ from numpy.lib.stride_tricks import as_strided
 import ecoglib.filt.blocks as blocks
 
 def mtm_specgram(x, n, pl=0.25, detrend='', **mtm_kwargs):
+    """
+    Make spectrogram using the multitaper spectral estimation method at
+    each block.
 
+    Parameters
+    ----------
+
+    n: int
+      number of points per block
+    pl: float
+      percent overlap between blocks
+    detrend: ''
+      detrend each block as 'linear', 'constant',  (or not at all)
+    mtm_args: dict
+      keyword arguments for the multitaper family of methods
+
+    Returns
+    -------
+    tx, fx, psd_matrix
+    """
     assert x.ndim == 1, 'Only taking spectrograms of single timeseries'
 
     lx = len(x)
