@@ -92,21 +92,35 @@ def auto_mu(Y, YtY=None):
     return (muz, mue)
 
 
-def admm_one(Y, lamz, lamr, rho, YYt=None, YtY=None, max_it = 1e3):
+def admm_one(Y, lamz, lamr, rho, X=None, YYt=None, YtY=None, max_it = 1e3):
     # Y is (m, N) where m is feature length and N is # of pts
+
+    # If X is provided, then X is (m, N1) and the problem is to
+    # respresent X (not Y) in terms of Y and a sparse error matrix E.
+    # In this case,
+    # C, A are (N, N1)
+    # E is (m, N1)
+    # Dlta is (N, N1)
+    # dlta is (N1, 1)
 
     m, N = Y.shape
 
+    if X is None:
+        N1 = N
+    else:
+        N1 = X.shape[1]
+        YtX = Y.T.dot(X)
+
     # initialization ( >= 4 NxN matrices!!)
-    C = np.zeros( (N,N) )
-    Akm1 = np.zeros( (N,N) )
-    E = np.zeros_like(Y)
-    Ekm1 = np.zeros_like(Y)
-    Dlta = np.zeros( (N,N) )
-    dlta = np.zeros( (N,1) )
+    C = np.zeros( (N,N1) )
+    Akm1 = np.zeros( (N,N1) )
+    E = np.zeros_like(Y) if X is None else np.zeros_like(X)
+    Ekm1 = np.zeros_like(Y) if X is None else np.zeros_like(X)
+    Dlta = np.zeros( (N,N1) )
+    dlta = np.zeros( (N1,1) )
     if YtY is None:
         YtY = Y.T.dot(Y)
-    rhs = np.empty( (N,N) )
+    rhs = np.empty( (N,N1) )
 
     # construct the Woodbury (or direct) inverse
     T = diag_plus_loaded_inverse(Y, lamz, rho, YYt=YYt, YtY=YtY, matrix=True)
@@ -114,7 +128,7 @@ def admm_one(Y, lamz, lamr, rho, YYt=None, YtY=None, max_it = 1e3):
     it = 0
     while True:
         # update A -- first compute crazy RHS matrix
-        rhs[:] = YtY
+        rhs[:] = YtY if X is None else YtX
         rhs -= Y.T.dot(E)
         rhs *= lamz
 
@@ -133,13 +147,16 @@ def admm_one(Y, lamz, lamr, rho, YYt=None, YtY=None, max_it = 1e3):
         C /= rho
         C += A
         shrink_thresh(C, 1/rho)
-        dC = C.diagonal()
-        C.flat[0:N*N:(N+1)] -= dC
+        if X is not None:
+            dC = C.diagonal()
+            C.flat[0:N*N:(N+1)] -= dC
 
         # update E
         E = Y.dot(A)
-        E *= -1
-        E += Y
+        if X is None:
+            E -= Y
+        else:
+            E -= X
         shrink_thresh(E, lamr/lamz)
 
         # step up the Langrange multipliers
