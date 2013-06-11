@@ -51,6 +51,10 @@ class ScatterPlot(HasTraits):
         s_array = self.scatter_array
         x, y, z = s_array.T
 
+        if scl_fn is not None:
+            scl_fn = scl_fn[::int(self.scatter_time_scale)]
+            scl_fn = scl_fn[:len(x)]
+
         # --- quick and dirty scale ---
         # this is approximately the number of points on each axis
         f_idx = np.isfinite(s_array[:,0])
@@ -60,26 +64,39 @@ class ScatterPlot(HasTraits):
         # this is approximately the length of each axis
         bb = s_array[f_idx].ptp(axis=0)
         relative_scale = np.power(np.prod(bb), 1/3.0)
-        scale = relative_scale * density
-
+        scale = relative_scale * density / 2
+        scale *= 10
+        # XXX: trying to fine tune the scale of the dots here.. work in progress
+        ## if n_pt > 20000:
+        ##     scale = 3e-3
+        ## else:
+        ##     scale = 10e-2
+        ## print scale
+        # XXX: Also, 2dvertex or 2dcircle? 2dcircle has issues with the
+        # ambient lighting in the 3d scene, but 2dvertex has no volume, so
+        # it looks bad with low density sampling
         if scl_fn is None:
             self.scatter_src = mlab.pipeline.scalar_scatter(
                 x, y, z, np.ones_like(x), figure=fig
                 )
             self.scatter_pts = mlab.pipeline.glyph(
-                self.scatter_src, mode='2dcircle', color=(0,0,1),
-                scale_mode='none', scale_factor=scale/3
+            #self.scatter_src, mode='2dcircle', color=(0,0,1),
+                self.scatter_src, mode='2dvertex', color=(0,0,1),
+                scale_mode='scalar', scale_factor=scale
                 )
         else:
             self.scatter_src = mlab.pipeline.scalar_scatter(
                 x, y, z, scl_fn, figure=fig
                 )
             self.scatter_pts = mlab.pipeline.glyph(
-                self.scatter_src, mode='2dcircle',
-                colormap='jet', scale_mode='none', scale_factor=scale/3
+            #self.scatter_src, mode='2dcircle',
+                self.scatter_src, mode='2dvertex',
+                colormap='jet', scale_mode='none', scale_factor=scale
                 )
         self.scatter_pts.glyph.glyph_source.glyph_source.filled = 1
         self.scatter_pts.actor.property.opacity = 0.75
+        # XXX: this may be tuned for presentations
+        self.scatter_pts.actor.property.point_size = 3
 
         n = round(self.time*self.Fs)
         t_point = s_array[n][:,None]
@@ -93,7 +110,7 @@ class ScatterPlot(HasTraits):
             )
         self.inst_pt = mlab.pipeline.glyph(
             self.inst_src, mode='sphere', colormap='Greens',
-            scale_mode='none', scale_factor=scale*1.5, vmin=0.0, vmax=1.0
+            scale_mode='none', scale_factor=scale, vmin=0.0, vmax=1.0
             )
 
         # copy the same for "trail" scatter
@@ -103,7 +120,7 @@ class ScatterPlot(HasTraits):
             )
         self.trail_pts = mlab.pipeline.glyph(
             self.trail_src, mode='sphere', color=(0.7, 0.2, 0.2),
-            scale_mode='none', scale_factor=scale
+            scale_mode='none', scale_factor=scale*0.8
             )
         #self.trail_pts.actor.property.opacity = 0.4
 
