@@ -16,20 +16,19 @@ class BlockedSignal(object):
         Parameters
         ----------
 
-        x: ndarray
+        x : ndarray
           The signal to blockify.
-        bsize: int
+        bsize : int
           The maximum blocksize for the given axis.
-        overlap: float 0 <= overlap <= 1
+        overlap : float 0 <= overlap <= 1
           The proportion of overlap between adjacent blocks. The (k+1)th
           block will begin at an offset of (1-overlap)*bsize points into
           the kth block.
-        axis: int (optional)
+        axis : int (optional)
           The axis to split into blocks
-        partial_block: bool
+        partial_block : bool
           If blocks don't divide the axis length exactly, allow a partial
           block at the end (default True).
-
 
         """
         # if x is not contiguous then I think we're out of luck
@@ -48,7 +47,6 @@ class BlockedSignal(object):
         if partial_block and (shape[axis] > L*nblock + bsize):
             nblock += 1
             self._last_block_sz = shape[axis] - L*nblock
-            ## self._last_block_sz = bsize - (nblock*bsize - shape[axis])
         else:
             self._last_block_sz = bsize
         nblock += 1
@@ -104,6 +102,7 @@ class BlockedSignal(object):
             yield xc
 
     def block(self, b):
+        "Yield the index b block"
         blk_slice = [slice(None)] * self._x_blk.ndim
         while b < 0:
             b += self.nblock
