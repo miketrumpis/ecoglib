@@ -32,7 +32,9 @@ class BlockedSignal(object):
 
 
         """
-
+        # if x is not contiguous then I think we're out of luck
+        if not x.flags.c_contiguous:
+            raise RuntimeError('The data to be blocked must be C-contiguous')
         # first reshape x to have shape (..., nblock, bsize, ...),
         # where the (nblock, bsize) pair replaces the axis in kwargs
         shape = x.shape
@@ -100,3 +102,16 @@ class BlockedSignal(object):
                 blk_slice[self._axis+1] = slice(None, None, -1)
             xc = self._x_blk[ tuple(blk_slice) ]
             yield xc
+
+    def block(self, b):
+        blk_slice = [slice(None)] * self._x_blk.ndim
+        while b < 0:
+            b += self.nblock
+        if b >= self.nblock:
+            raise IndexError
+        blk_slice[self._axis] = b
+        if b == self.nblock-1:
+            blk_slice[self._axis+1] = slice(0, self._last_block_sz)
+        else:
+            blk_slice[self._axis+1] = slice(None)
+        return self._x_blk[ tuple(blk_slice) ]
