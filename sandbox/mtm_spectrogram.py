@@ -327,7 +327,7 @@ def mtm_complex_demodulate(
     if adaptive:
         if xk.ndim == 2:
             xk.shape = (1,) + xk.shape
-        weight = np.empty( xk.shape[:2] + (nfft/2+1,), 'd' )
+        weight = np.empty( (xk.shape[0], nfft/2+1), 'd' )
         for m in xrange(xk.shape[0]):
             w, _ = nt_utils.adaptive_weights(xk[m], eigs, sides='onesided')
             weight[m] = np.sum(w**2, axis=0)
