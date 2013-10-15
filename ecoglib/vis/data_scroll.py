@@ -161,7 +161,9 @@ class DataScroller(HasTraits):
         self.min_ts_amp = ts_array.min()
         # the timeseries peaks are probably a good starting
         # point for the array peaks
-        self.base_arr_amp = max( self.max_ts_amp, -self.min_ts_amp )
+        #self.base_arr_amp = max( self.max_ts_amp, -self.min_ts_amp )
+        # can spare a couple O(N) ops here
+        self.base_arr_amp = 1.1*max( d_array.max(), -d_array.min() )
 
         self.ts_arr = ts_array
 
@@ -189,7 +191,7 @@ class DataScroller(HasTraits):
         self._scrolling = False
 
         # configure the ts_plot
-        n = self.ts_arr.shape[-1]
+        n = self.ts_arr.shape[0]
         # XXX: disable tx for now.. too hairy
         if tx is not None:
             tx = None
@@ -244,7 +246,6 @@ class DataScroller(HasTraits):
 
     def zoom_data(self):
         d = self.ts_arr
-        n_pts = d.shape[-1]
         n_zoom_pts = int(np.round(self.tau*self.Fs))
         zoom_start = int(np.round(self.Fs*(self.time - self.tau/2)))
         return safe_slice(d, zoom_start, n_zoom_pts)
@@ -443,7 +444,6 @@ class ColorCodedDataScroller(DataScroller):
 
     def zoom_data(self):
         d = self.ts_arr
-        n_pts = d.shape[-1]
         n_zoom_pts = int(np.round(self.tau*self.Fs))
         zoom_start = int(np.round(self.Fs*(self.time - self.tau/2)))
         x = safe_slice(d, zoom_start, n_zoom_pts)
@@ -518,7 +518,6 @@ class ClassCodedDataScroller(DataScroller):
     def zoom_data(self):
         d = self.ts_arr
         l = self.labels
-        n_pts = d.shape[-1]
         n_zoom_pts = int(np.round(self.tau*self.Fs))
         zoom_start = int(np.round(self.Fs*(self.time - self.tau/2)))
         d_sl = safe_slice(d, zoom_start, n_zoom_pts)

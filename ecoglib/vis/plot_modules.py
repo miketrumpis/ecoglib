@@ -405,7 +405,7 @@ class ScrollingFunctionPlot(LongNarrowPlot):
         the new interval). If given, "tc" is the current time defining
         the interval.
         """
-        winsize = len(x)
+        winsize = x.shape[0]
         if winsize == self.winsize:
             t, old_x = self.zoom_element.get_data()
             self.zoom_element.set_data(t, x)
@@ -444,7 +444,7 @@ class StandardPlot(ProtoPlot):
         print 'CREATING STANDARD PLOT'
         # in this case, just a plot
         if t is None:
-            t = np.arange(len(x))
+            t = np.arange(x.shape[0])
         line = self.ax.plot(t, x, **line_props)[0]
         return line
 
