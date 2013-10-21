@@ -9,7 +9,10 @@ from traitsui.basic_editor_factory import BasicEditorFactory
 # Matplotlib
 import matplotlib
 # We want matplotlib to use a QT backend
-matplotlib.use('QtAgg')
+try:
+    matplotlib.use('QtAgg')
+except ValueError:
+    matplotlib.use('Qt4Agg')
 from matplotlib.backends.backend_qt4agg import \
      FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
