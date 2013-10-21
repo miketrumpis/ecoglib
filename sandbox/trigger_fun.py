@@ -1,6 +1,6 @@
 import numpy as np
 
-# define some trigger aggregating utilities
+# define some trigger-locked aggregating utilities
 
 def fenced_out(samps, quantiles=(25,75), thresh=2.0, axis=None, low=True):
 
@@ -38,7 +38,7 @@ def cond_trigger_avg(x, trig_code, pre=0, post=-1, sum_limit=-1, iqr_thresh=-1):
     Arguments
     ---------
 
-    data: (nchan, npts)
+    x: data (nchan, npts)
 
     trig_code: array (2, stim)
       First row is the trigger indices, second
@@ -70,7 +70,7 @@ def cond_trigger_avg(x, trig_code, pre=0, post=-1, sum_limit=-1, iqr_thresh=-1):
 
     """
 
-
+    x.shape = (1,) + x.shape if x.ndim == 1 else x.shape
     pos_edge = trig_code[0]; conds = trig_code[1]
     epoch_len = int( np.round(np.median(np.diff(pos_edge))) )
 
@@ -107,6 +107,7 @@ def cond_trigger_avg(x, trig_code, pre=0, post=-1, sum_limit=-1, iqr_thresh=-1):
 
         avg[:,c-1,:] = np.sum(epochs, axis=1) / n_avg[:,c-1][:,None]
 
+    x.shape = filter(lambda x: x > 1, x.shape)
     return avg, n_avg
 
 def extract_epochs(x, trig_code, selected, pre=0, post=-1):
@@ -135,6 +136,7 @@ def extract_epochs(x, trig_code, selected, pre=0, post=-1):
 
     """
 
+    x.shape = (1,) + x.shape if x.ndim == 1 else x.shape
     pos_edge = trig_code[0]
     epoch_len = int( np.median(np.diff(pos_edge)) )
 
@@ -150,5 +152,6 @@ def extract_epochs(x, trig_code, selected, pre=0, post=-1):
     for n, k in enumerate(pos_edge):
         idx = (slice(None), slice(k-pre, k+post))
         epochs[:,n,:] = x[idx]
-
+        
+    x.shape = filter(lambda x: x > 1, x.shape)
     return epochs
