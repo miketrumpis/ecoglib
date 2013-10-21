@@ -19,12 +19,18 @@ import matplotlib.mlab as mlab
 import sandbox.mtm_spectrogram as mtm_spec
 import sandbox.trigger_fun as tfn
 
-import tables
-
-f = tables.open_file('../../../mlab/fooaug6.mat')
-data = f.root.s.data[:].T
-trig_coding = f.root.s.trig_coding[:].T.astype('i')
-Fs = f.root.s.Fs[0,0]
+try:
+    import scipy.io as sio
+    m = sio.loadmat('../../../mlab/test35_proc_unr_781Hz_3-300bp.mat')
+    data = m['s']['data'][0,0]
+    trig_coding = m['s']['trig_coding'][0,0].astype('i')
+    Fs = float( m['s']['Fs'][0,0] )
+except NotImplementedError:
+    import tables
+    f = tables.open_file('../../../mlab/test35_proc_unr_781Hz_3-300bp.mat')
+    data = f.root.s.data[:].T
+    trig_coding = f.root.s.trig_coding[:].T.astype('i')
+    Fs = f.root.s.Fs[0,0]
 
 avg, navg = tfn.cond_trigger_avg(
     data, trig_coding, post=int(np.round(Fs*.2)), iqr_thresh=3
@@ -61,7 +67,7 @@ Compute the full spectrogram for channel 16's recording
 Find best stim for a given channel
 """
 
-ch = 28 - 1
+ch = 16 - 1
 c_best = np.argmax(rms[ch])
 c_labels = np.sort(np.where(trig_coding[1] == c_best + 1)[0])
 
@@ -78,7 +84,7 @@ Demo the components of the VEP power
 ====================================
 
 """
-NW = 20
+NW = 15
 dpss, eigs = nt_alg.dpss_windows(trials.shape[-1], NW, 2*NW)
 k = eigs > .99
 dpss = dpss[k]
