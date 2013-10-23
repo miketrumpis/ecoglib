@@ -262,6 +262,14 @@ class DataScroller(HasTraits):
         # 3) VTK ImagePlaneWidget needs to be resliced
         if self.array_ipw:
             self.array_ipw.ipw.slice_index = int( np.round(self.time*self.Fs) )
+            # It looks like ipw.ipw.reslice.output_{extent,spacing}
+            # need to be set and enforced each time slice_index changes
+            ipw = self.array_ipw
+            xyz = self.arr_img_dsource.scalar_data.shape
+            ipw.ipw.reslice.output_extent = \
+              np.array([0, xyz[0], 0, xyz[1], 0, 0], 'd') - 0.5
+            ipw.ipw.reslice.output_spacing = 1., 1., 1./xyz[2]
+
 
     def __map_eps(self, eps, limits):
         p = ((np.sin(np.pi*(eps-1/2.0))+1)/2.0)**2
@@ -321,8 +329,18 @@ class DataScroller(HasTraits):
             colormap='jet'
             )
 
+        ipw.ipw.texture_interpolate = 0
+        ipw.ipw.reslice_interpolate = 0
         ipw.ipw.slice_position = np.round(self.time * self.Fs)
         ipw.ipw.interaction = 0
+
+        # It looks like ipw.ipw.reslice.output_{extent,spacing}
+        # need to be set and enforced each time slice_index changes
+        xyz = self.arr_img_dsource.scalar_data.shape
+        ipw.ipw.reslice.output_extent = \
+          np.array([0, xyz[0], 0, xyz[1], 0, 0], 'd') - 0.5
+        ipw.ipw.reslice.output_spacing = 1., 1., 1./xyz[2]
+
 
         scene.mlab.view(distance=40)
         scene.scene.interactor.interactor_style = \
