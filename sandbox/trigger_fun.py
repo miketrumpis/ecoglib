@@ -62,7 +62,7 @@ def cond_trigger_avg(x, trig_code, pre=0, post=-1, sum_limit=-1, iqr_thresh=-1):
     Returns
     -------
 
-    x: (nchan, ncond, epoch_length)
+    avg: (nchan, ncond, epoch_length)
 
     n_avg: number of triggers found for each condition
 

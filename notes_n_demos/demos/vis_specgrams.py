@@ -22,15 +22,15 @@ import sandbox.trigger_fun as tfn
 try:
     import scipy.io as sio
     m = sio.loadmat('../../../mlab/test35_proc_unr_781Hz_3-300bp.mat')
-    data = m['s']['data'][0,0]
-    trig_coding = m['s']['trig_coding'][0,0].astype('i')
-    Fs = float( m['s']['Fs'][0,0] )
+    data = m['data'][0,0]
+    trig_coding = m['trig_coding'][0,0].astype('i')
+    Fs = float( m['Fs'][0,0] )
 except NotImplementedError:
     import tables
     f = tables.open_file('../../../mlab/test35_proc_unr_781Hz_3-300bp.mat')
-    data = f.root.s.data[:].T
-    trig_coding = f.root.s.trig_coding[:].T.astype('i')
-    Fs = f.root.s.Fs[0,0]
+    data = f.root.data[:].T
+    trig_coding = f.root.trig_coding[:].T.astype('i')
+    Fs = f.root.Fs[0,0]
 
 avg, navg = tfn.cond_trigger_avg(
     data, trig_coding, post=int(np.round(Fs*.2)), iqr_thresh=3

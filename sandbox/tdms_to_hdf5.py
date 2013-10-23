@@ -88,7 +88,7 @@ def tdms_to_hdf5(tdms_file, h5_file, memmap=True, compression_level=0):
 if __name__ == '__main__':
     argv = sys.argv[1:]
     t_file, h_file = argv[:2]
-    memmap = bool(int(argv[2])) if len(argv) > 2 else False
+    memmap = bool(int(argv[2])) if len(argv) > 2 else True
     c_level = int(argv[3]) if len(argv) > 3 else 0
 
     tdms_to_hdf5(t_file, h_file, memmap=memmap, compression_level=c_level)
