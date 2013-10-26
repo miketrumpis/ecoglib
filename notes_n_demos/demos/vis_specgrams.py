@@ -21,13 +21,13 @@ import sandbox.trigger_fun as tfn
 
 try:
     import scipy.io as sio
-    m = sio.loadmat('../../../mlab/test35_proc_unr_781Hz_3-300bp.mat')
+    m = sio.loadmat('../../../data/AnimalExperiment-2012-12-04/proc_data/test35_proc_unr_781Hz_3-300bp.mat')
     data = m['data'][0,0]
     trig_coding = m['trig_coding'][0,0].astype('i')
     Fs = float( m['Fs'][0,0] )
 except NotImplementedError:
     import tables
-    f = tables.open_file('../../../mlab/test35_proc_unr_781Hz_3-300bp.mat')
+    f = tables.open_file('../../../data/AnimalExperiment-2012-12-04/proc_data/test35_proc_unr_781Hz_3-300bp.mat')
     data = f.root.data[:].T
     trig_coding = f.root.trig_coding[:].T.astype('i')
     Fs = f.root.Fs[0,0]
@@ -51,17 +51,29 @@ rfs = 1 - rfs
 Compute the full spectrogram for channel 16's recording
 """
 
-## bsize = 512; pl = 0.75; NW = 4
-## tx, fx, pmat = mtm_spec.mtm_spectrogram(
-##     data[15], bsize, pl=pl, detrend='linear',
-##     NW=NW, low_bias=True, adaptive=False
-##     )
+bsize = 512; pl = 0.75; NW = 4
+tx, fx, pmat = mtm_spec.mtm_spectrogram(
+    data[15], bsize, pl=pl, detrend='linear',
+    NW=NW, low_bias=True, adaptive=False
+    )
 ## pp.figure()
 ## pp.imshow(
 ##     np.log10(pmat), cmap='spectral', extent=(tx[0], tx[-1], 0, Fs/2),
 ##     interpolation='nearest', norm=pp.normalize(-12.5, -10.5)
 ##     )
 
+"""
+Can easily integrate power over subbands
+"""
+fx *= Fs
+gma_band = np.where( (fx>40) & (fx<180) )[0]
+gma_pwr = pmat[gma_band].sum(axis=0)
+
+bta_band = np.where( (fx>10) & (fx<25) )[0]
+bta_pwr = pmat[bta_band].sum(axis=0)
+
+pp.figure()
+pp.plot(tx/Fs, np.c_[bta_pwr, gma_pwr])
 
 """
 Find best stim for a given channel
