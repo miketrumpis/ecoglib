@@ -110,7 +110,7 @@ def cond_trigger_avg(x, trig_code, pre=0, post=-1, sum_limit=-1, iqr_thresh=-1):
     x.shape = filter(lambda x: x > 1, x.shape)
     return avg, n_avg
 
-def extract_epochs(x, trig_code, selected, pre=0, post=-1):
+def extract_epochs(x, trig_code, selected=(), pre=0, post=-1):
     """
     Extract an array of epochs pivoted at the specified triggers.
 
@@ -123,7 +123,8 @@ def extract_epochs(x, trig_code, selected, pre=0, post=-1):
       First row is the stim times, second is the condition labeling
 
     selected : sequencef
-      Indices into trig_code for a subset of stims
+      Indices into trig_code for a subset of stims. If empty, return *ALL*
+      epochs (*a potentially very large array*)
 
     pre, post : ints
       Number of pre- and post-stim samples in interval. post + pre > 0
@@ -144,14 +145,15 @@ def extract_epochs(x, trig_code, selected, pre=0, post=-1):
         post = epoch_len
 
     epoch_len = post + pre
-    pos_edge = pos_edge[selected]
+    if len(selected):
+        pos_edge = pos_edge[selected]
 
-    epochs = np.empty( (x.shape[0], len(selected), epoch_len), x.dtype )
+    epochs = np.empty( (x.shape[0], len(pos_edge), epoch_len), x.dtype )
     epochs.fill(np.nan)
 
     for n, k in enumerate(pos_edge):
         idx = (slice(None), slice(k-pre, k+post))
         epochs[:,n,:] = x[idx]
-        
+
     x.shape = filter(lambda x: x > 1, x.shape)
     return epochs
