@@ -6,23 +6,36 @@ import tempfile
 import os, sys
 import contextlib
 
-def tdms_to_hdf5(tdms_file, h5_file, memmap=True, compression_level=0):
+def tdms_to_hdf5(
+        tdms_file, h5_file, chan_map='',
+        memmap=True, compression_level=0
+        ):
+    """
+    Converts TDMS data to a more standard HDF5 format.
 
-    #map_dir = tempfile.gettempdir() if memmap else None
-    map_dir = './tmp' if memmap else None
-    try:
-        os.mkdir('./tmp')
-    except OSError:
-        pass
+    Parameters
+    ----------
+
+    tdms_file : path (string)
+    h5_file : path (string)
+    chan_map : path (string)
+      Optional table specifying a channel permutation. The first p rows
+      of the outgoing H5 file will be the contents of these channels in
+      sequence. The next (N-p) rows will be any channels not specified,
+      in the order they are found.
+    memmap : bool
+    compression_level : int
+      Optionally compress the outgoing H5 rows with zlib compression.
+      This can reduce the time cost caused by disk access.
+    """
+
+    map_dir = tempfile.gettempdir() if memmap else None
 
     # put these operations in a context so that the temp files
     # get killed whether or not things go well inside
-    #with nptdms.TdmsFile(tdms_file, memmap_dir=map_dir) as tdms_file:
     with contextlib.nested(nptdms.TdmsFile(tdms_file, memmap_dir=map_dir),
                            tables.open_file(h5_file, mode='w')) as \
                            (tdms_file, h5_file):
-
-        #h5_file = tables.open_file(h5_file, mode='w')
 
         # assume for now there is only a single group -- see more files later
         t_group = tdms_file.groups()[0]
@@ -74,40 +87,67 @@ def tdms_to_hdf5(tdms_file, h5_file, memmap=True, compression_level=0):
                 )
         else:
             filters = None
-        ## d_array = h5_file.create_carray(
-        ##     h5_file.root, 'data', atom=atom, shape=(n_row, n_col),
-        ##     filters=filters
-        ##     )
-        # this one is transposed
+
         d_array = h5_file.create_earray(
             h5_file.root, 'data', atom=atom, shape=(0, n_row),
             filters=filters, expectedrows=n_col
             )
 
-        # the following *should* be a dictionary lookup for 'NI_ArrayColumn'
-        col_mapping = [ch.properties.values()[0] for ch in chans]
-        col_mapping = np.argsort(col_mapping)
+        ## col_mapping = [ch.properties.values()[0] for ch in chans]
 
-        for n in xrange(n_col):
+        # create a reverse lookup to index channels by number
+        col_mapping = dict(( (ch.properties['NI_ArrayColumn'], ch)
+                             for ch in chans ))
+        # If a channel permutation is requested, lay down channels
+        # in that order. Otherwise go in sequential order.
+        if chan_map:
+            chan_map = np.loadtxt(chan_map).astype('i')
+            # do any channels not specified at the end
+            if len(chan_map) < n_col:
+                left_out = set(range(n_col)).difference(chan_map.tolist())
+                left_out = sorted(left_out)
+                chan_map = np.r_[chan_map, left_out]
+        else:
+            chan_map = range(n_col)
+
+        for n in chan_map:
             # get TDMS column
-            ch = chans[ col_mapping[n] ]
+            ch = col_mapping[n]
             # make a temp array here.. if all data in memory, then this is
             # slightly wasteful, but if it is mmap'd then this is more flexible
             d = ch.data[:]
             d_array.append(d[None,:])
             print 'copied channel', n, d_array.shape
 
-    #h5_file.flush()
-    #h5_file.close()
     return h5_file
 
-
-
-
 if __name__ == '__main__':
-    argv = sys.argv[1:]
-    t_file, h_file = argv[:2]
-    memmap = bool(int(argv[2])) if len(argv) > 2 else True
-    c_level = int(argv[3]) if len(argv) > 3 else 0
+    import argparse
 
-    tdms_to_hdf5(t_file, h_file, memmap=memmap, compression_level=c_level)
+    prs = argparse.ArgumentParser(description='Convert TDMS to HDF5')
+    prs.add_argument(
+        'tdms_file', help='path to the TDMS file', type=str
+        )
+    prs.add_argument(
+        'h5_file', help='name of the HDF5 file to create', type=str
+        )
+    prs.add_argument(
+        '-p', '--permutation', type=str, default='',
+        help='file with table of channel permutations'
+        )
+    prs.add_argument(
+        '-m', '--memmap', help='use disk mapping for large files',
+        action='store_true'
+        )
+    prs.add_argument(
+        '-z', '--compression', type=int, default=0,
+        help='use zlib level # compression in HDF5'
+        )
+
+    args = prs.parse_args()
+
+    tdms_to_hdf5(
+        args.tdms_file, args.h5_file, chan_map=args.permutation,
+        memmap=args.memmap, compression_level=args.compression
+        )
+
