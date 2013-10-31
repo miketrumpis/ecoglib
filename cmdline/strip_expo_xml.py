@@ -4,6 +4,7 @@
 import sys
 import os
 import itertools
+import warnings
 
 import numpy as np
 import scipy.io as sio
@@ -187,8 +188,20 @@ def main(xml_file, mat_file):
         pix_size = np.array([pix_size]),
         tick_len = np.array([tick_len])
         )
+    warnings.filterwarnings("ignore")
     sio.savemat(mat_file, data)
 
 if __name__ == '__main__':
-    xf, mf = sys.argv[1:]
-    main(xf, mf)
+
+    import argparse
+
+    prs = argparse.ArgumentParser(description='Strip Trial Info From Expo XML')
+    prs.add_argument(
+        'xml_file', help='path to the Expo XML file', type=str
+        )
+    prs.add_argument(
+        'mat_file', help='name of the MATLAB file to create', type=str
+        )
+
+    args = prs.parse_args()
+    main(args.xml_file, args.mat_file)
