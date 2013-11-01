@@ -66,6 +66,51 @@ def safe_slice(x, start, num, fill=np.nan):
         sx = x[start:start+num, ...]
     return sx
 
+#### Utility to prepare volumetric data for VTK without
+#### resorting to mem copying (if possible)
+def volumetric_data(data, rowcol):
+
+    # quick conditions
+    # data is C-contiguous and shaped (npt, nchan) or (npt, ncol, nrow)
+    # -- data may have come from MATLAB
+    # data is C-contiguous and shaped (nchan, npt) or (ncol, nrow, npt)
+    # -- data is probably from a HDF5 table format
+    #
+    #   (Other quick conditions exist for F-contiguous, deal with later)
+    #
+
+    shape = data.shape
+    t_ax = np.argmax(shape)
+    npt = shape[t_ax]
+    if (t_ax == 0) and data.flags.c_contiguous:
+        if len(shape) > 2:
+            assert (shape[1] == rowcol[1]) and (shape[0] == rowcol[0])
+        else:
+            assert shape[1] == rowcol[0]*rowcol[1]
+        # If the array is at base shaped (nsamp, nsite) and c-contiguous,
+        # then the memory layout corresponds to axes (in ascending order):
+        # (nrow, ncol, nsamp) -- this is a column-major MATLAB artifact.
+        #
+        # Now, set the shape to reflect the shape/stride relationship:
+        # (Z, Y, X) <--> (ncol*nrow, ncol, 1)
+        # Reverse the ordering of axes to create this (column-major)
+        # relationship, which satisfies VTK
+        # (X, Y, Z) <--> (1, ncol, ncol*nrow)
+        #
+        # The final transpose does not copy memory but just changes
+        # the view to be F-contiguous
+        final_shape_t = (npt, rowcol[1], rowcol[0])
+        # return a F-contiguous array in the correct shape (no copy)
+        return np.reshape(data, final_shape_t).transpose()
+    if (t_ax > 0) and data.flags.c_contiguous:
+        # simpler case.. just unpack the 0th axis if it is packed
+        if len(shape) > 2:
+            return data
+        else:
+            return data.reshape( rowcol + (npt,) )
+    else:
+        raise NotImplementedError('work in progress')
+
 class DataScroller(HasTraits):
 
     ## these may need to be more specialized for handling 1D/2D timeseries
@@ -147,11 +192,12 @@ class DataScroller(HasTraits):
           other keyword parameters
 
         """
-        npts = d_array.shape[0]
         if len(d_array.shape) < 3:
             nrow, ncol = rowcol
         else:
             ncol, nrow = d_array.shape[1:]
+        vtk_arr = volumetric_data(d_array, (nrow, ncol))
+        npts = vtk_arr.shape[-1]
         self._tf = float(npts-1) / Fs
         self.Fs = Fs
         # XXX: should set max_amp -- could stochastically sample to
@@ -167,17 +213,8 @@ class DataScroller(HasTraits):
 
         self.ts_arr = ts_array
 
-        # If the array is at base shaped (nsamp, nsite) then the
-        # memory layout corresponds to axes (in ascending order):
-        # (nrow, ncol, nsamp) -- this is a column-major MATLAB artifact.
-        #
-        # Now, set the shape to reflect the shape/stride relationship:
-        # (Z, Y, X) <--> (ncol*nrow, ncol, 1)
-        # Rverse the ordering of axes to create this (column-major)
-        # relationship, which satisfies VTK
-        # (X, Y, Z) <--> (1, ncol, ncol*nrow)
-        new_shape = (npts, ncol, nrow)
-        vtk_arr = np.reshape(d_array, new_shape).transpose()
+        ## new_shape = (npts, ncol, nrow)
+        ## vtk_arr = np.reshape(d_array, new_shape).transpose()
         # make the time dimension unit length, and put the origin at -1/2
         self.arr_img_dsource.spacing = 1., 1., 1./npts
         self.arr_img_dsource.origin = (0.0, 0.0, -0.5)
