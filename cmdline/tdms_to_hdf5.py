@@ -102,6 +102,14 @@ def tdms_to_hdf5(
         # in that order. Otherwise go in sequential order.
         if chan_map:
             chan_map = np.loadtxt(chan_map).astype('i')
+            if chan_map.ndim > 1:
+                print chan_map.shape
+                # the actual channel permutation is in the 1st column
+                # the array matrix coordinates are in the next columns
+                chan_ij = chan_map[:,1:3]
+                chan_map = chan_map[:,0]
+            else:
+                chan_ij = None
             # do any channels not specified at the end
             if len(chan_map) < n_col:
                 left_out = set(range(n_col)).difference(chan_map.tolist())
@@ -109,6 +117,7 @@ def tdms_to_hdf5(
                 chan_map = np.r_[chan_map, left_out]
         else:
             chan_map = range(n_col)
+            chan_ij = None
 
         for n in chan_map:
             # get TDMS column
@@ -118,6 +127,9 @@ def tdms_to_hdf5(
             d = ch.data[:]
             d_array.append(d[None,:])
             print 'copied channel', n, d_array.shape
+
+        if chan_ij is not None:
+            h5_file.create_array(h5_file.root, 'channel_ij', obj=chan_ij)
 
     return h5_file
 
