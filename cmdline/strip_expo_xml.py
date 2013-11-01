@@ -140,8 +140,8 @@ class SparsenoiseEvent(StimEvent):
 
 class RingEvent(StimEvent):
     children = (
-        ChildInfo('32.0', dict(inner_rad=2)),
-        ChildInfo('32.1', dict(outer_rad=2)),
+        ChildInfo('32.0', dict(outer_rad=2)),
+        ChildInfo('32.1', dict(inner_rad=2)),
         )
 
 class WedgeEvent(StimEvent):
