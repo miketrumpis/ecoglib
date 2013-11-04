@@ -7,5 +7,5 @@ import scipy.signal as sig
 def butter_bp(lo, hi, Fs=1, ord=6):
 
     return sig.filter_design.butter(
-        ord, np.array([lo, hi])/Fs, btype='bandpass'
+        ord, 2*np.array([lo, hi])/Fs, btype='bandpass'
         )
