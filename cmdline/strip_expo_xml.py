@@ -24,6 +24,15 @@ except ImportError:
       print "What's wrong with your distro??"
       sys.exit(1)
 
+def check_closure(xmlfile):
+    f = open(xmlfile)
+    for ln in f:
+        pass
+    f.close()
+    if ln.find('ExpoXData') < 0:
+        f = open(xmlfile, 'a')
+        f.write('\n</ExpoXData>\n')
+    f.close()
 
 def itertag_wrap(xml_ish, tag):
     """lxml provides a filter based on element tag.
@@ -253,6 +262,7 @@ if __name__ == '__main__':
 
     for xf, mf in zip(all_xml, all_mat):
         print xf, '\t', mf
+        check_closure(xf)
         try:
             main(xf, mf)
         except ValueError as ve:
