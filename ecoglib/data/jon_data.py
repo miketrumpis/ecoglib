@@ -3,6 +3,8 @@ import scipy.io as sio
 import tables
 import os
 
+from ecoglib.util import Bunch
+
 # these segments are intended for snipping pre-processed data at load
 # (or possibly clipping beginning/end segments?)
 _load_prune_db = dict()
@@ -69,7 +71,11 @@ def load_arr(dfile, pruned_pts = (), auto_prune = True):
     elif min(d.shape) != nrow*ncol:
         # explicitly make contiguous
         d = d.T[:, :nrow*ncol].copy() if t else d[:,:nrow*ncol].copy()
-    return d, (nrow, ncol), Fs, tx, segs
+    
+    array_bunch = Bunch(
+        data=d, rowcol=(nrow, ncol), Fs=Fs, tx=tx, segs=segs
+        )
+    return array_bunch
 
 def load_hdf5_arr(dfile):
     f = tables.openFile(dfile)
