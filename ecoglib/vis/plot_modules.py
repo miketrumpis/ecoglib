@@ -82,7 +82,8 @@ class BlitPlot(HasTraits):
         self._old_size = tuple(self.ax.bbox.size)
         self._mpl_connections = []
         traits = dict(xlim=xlim, ylim=ylim)
-        super(BlitPlot, self).__init__(**traits)
+        #super(BlitPlot, self).__init__(**traits)
+        HasTraits.__init__(self, **traits)
 
     def add_static_artist(self, a):
         if not np.iterable(a):
@@ -217,9 +218,9 @@ class StaticFunctionPlot(LongNarrowPlot):
         # just do BlitPlot with defaults -- this gives us a figure and axes
         bplot_kws['xlim'] = (t[0], t[-1])
         figure = bplot_kws.pop('figure', None)
-        super(StaticFunctionPlot, self).__init__(figure=figure)
+        super(StaticFunctionPlot, self).__init__(figure=figure, **bplot_kws)
         # XXX: why setting traits after construction?
-        self.trait_set(**bplot_kws)
+        #self.trait_set(**bplot_kws)
         if t0 is None:
             t0 = t[0]
         ts_line = self.create_fn_image(x, t=t, **line_props)
@@ -269,10 +270,6 @@ class PagedFunctionPlot(StaticFunctionPlot):
     "pages" of set duration.
     """
 
-    #page_length = Int(10000) # default 10000 point window
-    page_length = Float(100) # units are arbitrary, as long as they match
-                             # the time axis
-
     _mx_page = Int
     _page = Range(low=0, high='_mx_page', value=0)
     _overlap = Float(0.15)
@@ -280,7 +277,15 @@ class PagedFunctionPlot(StaticFunctionPlot):
     next_page = Button()
     prev_page = Button()
 
-    def __init__(self, t, x, **traits):
+    def __init__(self, t, x, page_length=100, **traits):
+        self._tmin = t[0]
+        self._tmax = t[-1]
+        # if page_length is not set, then choose appropriate length
+        tspan = self._tmax - self._tmin
+        if tspan < page_length:
+            self.page_length = 1.05*tspan
+        else:
+            self.page_length = page_length
         super(PagedFunctionPlot, self).__init__(t, x, **traits)
         self._init_pages(t)
 
@@ -289,7 +294,7 @@ class PagedFunctionPlot(StaticFunctionPlot):
         # each page is staggered at (1-overlap) * page_length points
         plen = (1-self._overlap)*self.page_length
         full_window = float( t[-1] - t[0] )
-        self._mx_page = int( full_window / plen )
+        self._mx_page = max(1, int( full_window / plen ))
         self._time_insensitive = False
         self.change_page(self._page)
 
@@ -304,7 +309,7 @@ class PagedFunctionPlot(StaticFunctionPlot):
         # the page length is set, but the page stride is
         # (1-overlap) * page_length
         stride = (1-self._overlap)*self.page_length
-        x_start = page * stride
+        x_start = page * stride + self._tmin
         x_stop = x_start + self.page_length
         # this will triger a redraw
         self.xlim = (x_start, x_stop)

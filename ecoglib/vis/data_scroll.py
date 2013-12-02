@@ -117,6 +117,7 @@ class DataScroller(HasTraits):
 
     zoom_plot = Instance(pm.ScrollingTimeSeriesPlot)
     ts_plot = Instance(pm.PagedTimeSeriesPlot)
+    # XXX: this should probably not be a trait
     ts_page_length = Float(50.)
 
     ## array scene, image, and data (Mayavi components)
