@@ -60,39 +60,56 @@ def show():
         fm.canvas.figure.savefig('%s_%02i.png' %
                                  (figure_basename, fcount+1))
 
+
+def skip_example(filename):
+    """Search for a skip-conversion indicator within the header material.
+    """
+    inheader = True
+    with open(filename) as xfile:
+        for line in xfile:
+            # if we clear the header without finding flag, then do conversion
+            if inheader and \
+              (line.startswith('"""') or line.startswith("'''")):
+                return False
+
+            if line.lower().find('skip') >= 0:
+                return True
+        
 _mpl_show = plt.show
 plt.show = show
 
 #-----------------------------------------------------------------------------
 # Main script
 #-----------------------------------------------------------------------------
+if __name__=='__main__':
+    # Work in examples directory
+    cd('demos')
+    if not os.getcwd().endswith('notes_n_demos/demos'):
+        raise OSError('This must be run from notes_n_demos/demos directory')
 
-# Work in examples directory
-cd('demos')
-if not os.getcwd().endswith('notes_n_demos/demos'):
-    raise OSError('This must be run from notes_n_demos/demos directory')
+    # Run the conversion from .py to rst file
+    sh('../tools/ex2rst --project HD-ECoG --outdir . .')
 
-# Run the conversion from .py to rst file
-sh('../tools/ex2rst --project Nitime --outdir . .')
+    # Make the index.rst file
+    index = open('index.rst', 'w')
+    index.write(examples_header)
+    for name in [os.path.splitext(f)[0] for f in glob('*.rst')]:
+        #Don't add the index in there to avoid sphinx errors and don't add the
+        #note_about examples again (because it was added at the top):
+        if name not in(['index','note_about_examples']):
+            index.write('   %s\n' % name)
+    index.close()
+    # Execute each python script in the directory.
+    if '--no-exec' in sys.argv:
+        pass
+    else:
+        if not os.path.isdir('fig'):
+            os.mkdir('fig')
 
-# Make the index.rst file
-index = open('index.rst', 'w')
-index.write(examples_header)
-for name in [os.path.splitext(f)[0] for f in glob('*.rst')]:
-    #Don't add the index in there to avoid sphinx errors and don't add the
-    #note_about examples again (because it was added at the top):
-    if name not in(['index','note_about_examples']):
-        index.write('   %s\n' % name)
-index.close()
-# Execute each python script in the directory.
-if '--no-exec' in sys.argv:
-    pass
-else:
-    if not os.path.isdir('fig'):
-        os.mkdir('fig')
-
-    for script in glob('*.py'):
-        figure_basename = pjoin('fig', os.path.splitext(script)[0])
-        execfile(script)
-        plt.close('all')
+        for script in glob('*.py'):
+            if skip_example(script):
+                continue
+            figure_basename = pjoin('fig', os.path.splitext(script)[0])
+            execfile(script)
+            plt.close('all')
     

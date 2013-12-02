@@ -21,6 +21,7 @@ import sys
 import re
 import glob
 from optparse import OptionParser
+from make_examples import skip_example
 
 
 def auto_image(line):
@@ -157,6 +158,9 @@ def exfile2rst(filename):
 def exfile2rstfile(filename, opts):
     """
     """
+    if skip_example(filename):
+        return
+    
     #  doc filename
     dfilename = os.path.basename(filename[:-3]) + '.rst'
 

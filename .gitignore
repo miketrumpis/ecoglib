@@ -10,6 +10,10 @@
 # build dir
 build/
 
+# docs dir
+notes_n_demos/_build/
+notes_n_demos/demos/*.rst
+
 # scratch work unless specifically staged
 scripts/
 scripts/*.py

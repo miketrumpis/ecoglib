@@ -1,3 +1,4 @@
+## skip demo
 """
 
 .. _vis_specgrams:
@@ -19,15 +20,17 @@ import matplotlib.mlab as mlab
 import sandbox.mtm_spectrogram as mtm_spec
 import sandbox.trigger_fun as tfn
 
+pth = '~/experiment_data/AnimalExperiment-2012-12-04/proc_data/'
+
 try:
     import scipy.io as sio
-    m = sio.loadmat('../../../data/AnimalExperiment-2012-12-04/proc_data/test35_proc_unr_781Hz_3-300bp.mat')
+    m = sio.loadmat(pth+'test35_proc_unr_781Hz_3-300bp.mat')
     data = m['data'][0,0]
     trig_coding = m['trig_coding'][0,0].astype('i')
     Fs = float( m['Fs'][0,0] )
 except NotImplementedError:
     import tables
-    f = tables.open_file('../../../data/AnimalExperiment-2012-12-04/proc_data/test35_proc_unr_781Hz_3-300bp.mat')
+    f = tables.open_file(pth+'test35_proc_unr_781Hz_3-300bp.mat')
     data = f.root.data[:].T
     trig_coding = f.root.trig_coding[:].T.astype('i')
     Fs = f.root.Fs[0,0]

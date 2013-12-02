@@ -1,3 +1,4 @@
+## skip example
 """
 
 .. _vis_specgrams:

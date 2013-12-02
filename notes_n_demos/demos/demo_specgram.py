@@ -68,6 +68,7 @@ pp.plot(fm_freq + 0.15)
 pp.ylim(0, 0.5)
 pp.subplot(212)
 pp.imshow(pmat, interpolation='nearest', extent=[0, N-1, 0, 0.5], cmap='hot')
+pp.axis('auto')
 pp.gcf().tight_layout()
 
 """
@@ -96,6 +97,7 @@ pp.imshow(
     welsh_specgram, interpolation='nearest',
     extent=(wb[0], wb[-1], 0, 0.5), cmap='hot'
     )
+pp.axis('auto')
 pp.gcf().tight_layout()
 
 """
