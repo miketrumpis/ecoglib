@@ -7,14 +7,21 @@ import os
 from ecoglib.util import Bunch
 
 def load_preproc(f, load=True):
-    with tables.open_file(f) as h5:
-        pre = traverse_table(h5, load=load)
     if load:
+        with tables.open_file(f) as h5:
+            pre = traverse_table(h5, load=True)
         # convert a few arrays
         pre.trig_coding = pre.trig_coding.astype('i')
         pre.emap = pre.emap.astype('i')
         pre.egeo = tuple(pre.egeo.astype('i'))
         pre.orig_coditions = pre.orig_conditions.astype('i')
+        # convert indexing
+        pre.trig_coding[0] -= 1
+        pre.emap -= 1
+    else:
+        # this keeps the h5 file open?
+        h5 = tables.open_file(f)
+        pre = traverse_table(h5, load=False)
     return pre
 
 def traverse_table(f, path='/', load=True):
