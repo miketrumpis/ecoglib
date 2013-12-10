@@ -238,14 +238,14 @@ class DataScroller(HasTraits):
         else:
             assert len(tx)==n, 'provided time axis has wrong length'
         lim = self.__map_eps(i_eps, (self.min_ts_amp, self.max_ts_amp))
-        figsize=(6,.25)
+        figsize=(6,1)
         self.ts_plot = self.construct_ts_plot(
             tx, figsize, lim, time, linewidth=1
             )
         self.sync_trait('time', self.ts_plot, mutual=True)
 
         # configure the zoomed plot
-        figsize=(4,2)
+        figsize=(5,2)
         self.zoom_plot = self.construct_zoom_plot(figsize, lim)
 
         self.trait_setq(tau=tau)
@@ -403,7 +403,7 @@ class DataScroller(HasTraits):
             HGroup(
                 Item(
                     'ts_plot', editor=pm.MPLFigureEditor(),
-                    show_label=False, width=700, height=100, resizable=True
+                    show_label=False, width=600, height=100, resizable=True
                     ),
                 Item('fps', label='FPS'),
                 Item('count', label='Run Clock')

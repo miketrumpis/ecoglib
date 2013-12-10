@@ -73,7 +73,6 @@ class BlitPlot(HasTraits):
             self.ax = axes
         else:
             self.ax = self.fig.add_subplot(111)
-
         xlim = traits.pop('xlim', self.ax.get_xlim())
         ylim = traits.pop('ylim', self.ax.get_ylim())
         self.static_artists = []
@@ -193,7 +192,10 @@ class LongNarrowPlot(BlitPlot):
             ylim = self.ylim
         else:
             self.trait_setq(ylim=ylim)
-        y_ticks = np.linspace(ylim[0], ylim[1], self.n_yticks)
+        md = 0.5 * (ylim[0] + ylim[1])
+        rng = 0.5 * (ylim[1] - ylim[0])
+        y_ticks = np.linspace(md - 0.8*rng, md + 0.8*rng, self.n_yticks)
+        self.ax.yaxis.set_ticks(y_ticks)
         super(LongNarrowPlot, self).set_ylim(*ylim)
 
 ##############################################################################
