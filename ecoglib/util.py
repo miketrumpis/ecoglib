@@ -7,7 +7,17 @@ class Bunch(dict):
         self.__dict__ = self
 
     def __repr__(self):
-        return [(k, type(v)) for (k,v) in self.iteritems()]
+        k_rep = self.keys()
+        v_rep = [str(type(self[k])) for k in k_rep]
+        mx_c1 = max([len(s) for s in k_rep])
+        mx_c2 = max([len(s) for s in v_rep])
+        
+        table = [ '{0:<{col1}} : {1:<{col2}}\n'.format(
+            k, v, col1=mx_c1, col2=mx_c2
+            ) for (k, v) in zip(k_rep, v_rep) ]
+        
+        table = reduce(lambda x,y: x+y, table)
+        return table.strip()
 
 def flat_to_mat(mn, idx, col_major=True):
     # convert a flat matrix index into (i,j) style
