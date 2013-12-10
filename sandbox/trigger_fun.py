@@ -1,4 +1,8 @@
 import numpy as np
+import pyfftw
+import pyfftw.interfaces.numpy_fft as nfft
+
+import ecoglib.util as ut
 
 # define some trigger-locked aggregating utilities
 
@@ -31,7 +35,9 @@ def fenced_out(samps, quantiles=(25,75), thresh=2.0, axis=None, low=True):
     return out_mask
 
 
-def cond_trigger_avg(x, trig_code, pre=0, post=-1, sum_limit=-1, iqr_thresh=-1):
+def ep_trigger_avg(
+        x, trig_code, pre=0, post=-1, sum_limit=-1, iqr_thresh=-1
+        ):
     """
     Average response to 1 or more experimental conditions
 
@@ -157,3 +163,85 @@ def extract_epochs(x, trig_code, selected=(), pre=0, post=-1):
 
     x.shape = filter(lambda x: x > 1, x.shape)
     return epochs
+
+
+def psd_trigger_avg(
+        x, trig_code, plan, Fs,
+        pre=0, post=0, ntaper=2, induced=1, stats=False, units='V^2'
+        ):
+    
+    if pre < 10:
+        pre = int( round(pre*Fs) )
+    if post < 10:
+        post = int( round(post*Fs) )
+    ncond= plan.n_conds
+    nvar = plan.n_var
+    nchan = x.shape[0]
+    nfft = ut.nextpow2(pre+post)
+    spectra = ut.Bunch()
+    for name in plan.var_names:
+        spectra[name] = np.empty( (nchan, ncond, nfft/2+1), 'd' )
+        
+    # want to write routine like this
+    
+    for c, cond_spec in enumerate(plan.walk_conditions()):
+        maps = cond_spec.maps
+        for n, var in enumerate(maps):
+            # extract epochs corresponding to var
+            epochs = extract_epochs(
+                x, trig_code, selected=var, pre=pre, post=post
+                )
+            if induced:
+                mn = np.mean(epochs, axis=1)
+                epochs -= mn[:,None,:]
+            # do mtm_psd on var
+            pf, f = mtm_wrap(
+                epochs, NFFT=nfft, jackknife=False, NW=(ntaper+1)/2.
+                )
+            # take average over trials
+            name = plan.var_names[n]
+            pxx = spectra[name]
+            pxx = np.mean(pf, axis=1)
+            if units.lower()=='db':
+                pxx[:,c,:] = 10*np.log10(pxx)
+            else:
+                pxx[:,c,:] = pxx
+        if stats:
+            # make statistical comparison of vars against baseline
+            # (need to make decision about what baseline is..
+            #  e.g. if baseline is an interval, then extract the
+            #  correct intervals and to psd here)
+            pass
+        print 'proc cond', c
+    
+    spectra.fx = f
+    spectra.units = units
+        
+    return spectra
+
+
+import nitime.algorithms as ntalg
+def mtm_wrap(x, **kwargs):
+    r = ntalg.multi_taper_psd(x, **kwargs)
+    fx, pxx = r[:2]
+    return pxx, fx
+
+## XXX: keep this for notes, but it's not very fast
+## def par_mtm_factory(view, x, **kwargs):
+##     fn_str = """
+## def mtm_call(x, **kwargs):
+##     from nitime.algorithms import multi_taper_psd
+##     r = multi_taper_psd(x, **kwargs)
+##     return r
+##     """
+##     view.execute(fn_str, block=True)
+##     view.scatter('x', x)
+##     view.push(dict(kwargs=kwargs))
+##     view.execute('r = mtm_call(x, **kwargs)', block=True)
+##     res = view.gather('r', block=True)
+##     ## blk = view.block
+##     ## view.block = True
+##     ## res = view.apply_sync(mtm_call, x, **kwargs)
+##     ## res = view.map_sync(mtm_call, x, **kwargs)
+##     ## view.block = blk
+##     return res
