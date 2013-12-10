@@ -2,6 +2,8 @@ from __future__ import division
 import numpy as np
 import matplotlib.pyplot as pp
 
+from ecoglib.util import flat_to_mat, mat_to_flat
+
 def flat_to_mat(mn, idx, col_major=True):
     # convert a flat matrix index into (i,j) style
     (m, n) = mn if col_major else mn[::-1]

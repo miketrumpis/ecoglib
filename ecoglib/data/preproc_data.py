@@ -17,6 +17,8 @@ def load_preproc(f, load=True):
         pre.orig_coditions = pre.orig_conditions.astype('i')
         # convert indexing
         pre.trig_coding[0] -= 1
+        # transpose
+        pre.trig_coding = pre.trig_coding.T
         pre.emap -= 1
     else:
         # this keeps the h5 file open?
