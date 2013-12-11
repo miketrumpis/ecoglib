@@ -75,7 +75,7 @@ def ep_trigger_avg(
     skipped: (nskip, nchan, epoch_length) epochs that were not averaged
 
     """
-
+    (pre, post) = map(int, (pre, post))
     x.shape = (1,) + x.shape if x.ndim == 1 else x.shape
     pos_edge = trig_code[0]; conds = trig_code[1]
     epoch_len = int( np.round(np.median(np.diff(pos_edge))) )
@@ -142,7 +142,7 @@ def extract_epochs(x, trig_code, selected=(), pre=0, post=-1):
     epochs : array (n_chan, n_epoch, epoch_len)
 
     """
-
+    (pre, post) = map(int, (pre, post))
     x.shape = (1,) + x.shape if x.ndim == 1 else x.shape
     pos_edge = trig_code[0]
     epoch_len = int( np.median(np.diff(pos_edge)) )
@@ -196,16 +196,17 @@ def psd_trigger_avg(
                 epochs -= mn[:,None,:]
             # do mtm_psd on var
             pf, f = mtm_wrap(
-                epochs, NFFT=nfft, jackknife=False, NW=(ntaper+1)/2.
+                epochs,
+                NFFT=nfft, jackknife=False, NW=(ntaper+1)/2., Fs=Fs
                 )
             # take average over trials
             name = plan.var_names[n]
             pxx = spectra[name]
-            pxx = np.mean(pf, axis=1)
+            pfm = np.mean(pf, axis=1)
             if units.lower()=='db':
-                pxx[:,c,:] = 10*np.log10(pxx)
+                pxx[:,c,:] = 10*np.log10(pfm)
             else:
-                pxx[:,c,:] = pxx
+                pxx[:,c,:] = pfm
         if stats:
             # make statistical comparison of vars against baseline
             # (need to make decision about what baseline is..
