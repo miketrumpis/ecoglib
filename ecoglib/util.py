@@ -44,3 +44,12 @@ def flat_to_flat(mn, idx, col_major=True):
 def nextpow2(n):
     pow = int( np.floor( np.log2(n) ) + 1 )
     return 2**pow
+
+def ndim_prctile(x, p, axis=0):
+    xs = np.sort(x, axis=axis)
+    dim = xs.shape[axis]
+    idx = np.round( float(dim) * np.asarray(p) / 100 ).astype('i')
+    slicer = [slice(None)] * x.ndim
+    slicer[axis] = idx
+    return xs[slicer]
+        
