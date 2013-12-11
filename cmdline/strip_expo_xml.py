@@ -106,8 +106,8 @@ class ChildInfo(object):
         Data="1,0,0.999793,0.999793,-3.29783,4.1484,0,0,0,0"
 
         We want to save elements {2,3,4,5} with names {'cell_wd',
-        'cell_ht', 'cell_y', 'cell_x'}. Then the data_lookup would be
-        specified as dict(cell_ht=2, cell_wd=3, cell_y=4, cell_x=5)
+        'cell_ht', 'cell_x', 'cell_y'}. Then the data_lookup would be
+        specified as dict(cell_ht=2, cell_wd=3, cell_x=4, cell_y=5)
         """
         self.rid = rid # a string
         self.data_lookup = data_lookup # a dict
@@ -147,7 +147,7 @@ class FlickerEvent(StimEvent):
 
 class SparsenoiseEvent(StimEvent):
     children = (
-        ChildInfo('32', dict(cell_ht=2, cell_wd=3, cell_y=4, cell_x=5)),
+        ChildInfo('32', dict(cell_ht=2, cell_wd=3, cell_x=4, cell_y=5)),
         )
 
 class RingEvent(StimEvent):
