@@ -58,8 +58,11 @@ def write_anim(fname, fig, func, n_frame, title='Array Movie', fps=5):
 
 def dynamic_frames_and_series(
         frames, series, tx=None, title='Array Movie',
+        xlabel='Epoch', ylabel='$\mu V$',
         imshow_kw={}, line_props={}
         ):
+    # returns a function that can be used to step through
+    # figure frames
     
     fig = pp.figure(figsize=(5, 10))
     frame_ax = fig.add_subplot(211)
@@ -74,7 +77,8 @@ def dynamic_frames_and_series(
     ## Set up timeseries trace(s)
     ylim = (series.min(), series.max())
     trace_ax.plot(tx, series, **line_props)
-    trace_ax.set_xlabel('Session Interval')
+    trace_ax.set_xlabel(xlabel)
+    trace_ax.set_ylabel(ylabel)
     trace_ax.set_ylim(ylim)
     time_mark = trace_ax.axvline(x=tx[0], color='r', ls='-')
     
@@ -95,51 +99,14 @@ def dynamic_frames_and_series(
         
             
 def animate_frames_and_series(
-        frames, series, tx=None, title='Array Movie',
-        fps=5, imshow_kw={}, line_props={}
+        frames, series, **kwargs
         ):
-    
-    fig = pp.figure(figsize=(5, 10))
-    frame_ax = fig.add_subplot(211)
-    trace_ax = fig.add_subplot(212)
-    
-    if tx is None:
-        tx = np.arange(len(stack_data))
-    
-    if series.ndim == 2:
-        ptp = np.median(series.ptp(axis=0))
-        series = series + np.arange(series.shape[1])*ptp
-    ## Set up timeseries trace(s)
-    ylim = (series.min(), series.max())
-    ## tsp = pm.PagedTimeSeriesPlot(
-    ##     tx, series, t0=tx[0], ylim=ylim,
-    ##     figure=fig, axes=trace_ax,
-    ##     line_props=line_props
-    ##     )
-    ## tsp.time = tx[0]
-    trace_ax.plot(tx, series, **line_props)
-    trace_ax.set_xlabel('Session Interval')
-    #trace_ax.set_ylim(ylim)
-    time_mark = trace_ax.axvline(x=tx[0], color='r', ls='-')
-    
-    ## Set up array frames
-    f_img = frame_ax.imshow(frames[0], **imshow_kw)
-    frame_ax.axis('image'); frame_ax.axis('off')
-    frame_ax.set_title(title, fontsize=18)
-    
-    def _step_time(num, tx, frames, frame_img, tm):
-        #tsp.time = tx[num]
-        #tsp.draw_dynamic()
-        tm.set_data(( [tx[num], tx[num]], [0, 1] ))
-        frame_img.set_data(frames[num])
-        time.sleep(20/1000.)
-        #return (tsp.time_mark, frame_img)
-        return (frame_img, tm)
-        
-    
+
+    fps = kwargs.pop('fps', 5)
+    fig, func = dynamic_frames_and_series(frames, series, **kwargs)
+    # blit don't seem to work
     ani = _animation.FuncAnimation(
-        fig, _step_time, frames=len(tx),
-        fargs=(tx, frames, f_img, time_mark),
-        interval=1000.0/fps, blit=True
+        fig, func, frames=frames.shape[0],
+        interval=1000.0/fps, blit=False
         )
     return ani
