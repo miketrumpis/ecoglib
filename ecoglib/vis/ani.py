@@ -5,56 +5,51 @@ import os
 import ecoglib.vis.plot_modules as pm
 import time
 
-def animate_frames(frames, movie_name='', fps=5, **imshow_kw):
-    fig = pp.figure()
-    ims = []
-    for n, f in enumerate(frames):
-        i = pp.imshow(f, **imshow_kw)
-        ims.append([i])
-    ani = _animation.ArtistAnimation(fig, ims)
-    if movie_name:
-        #pfx='-vcodec libx264 -vpre ultrafast -crf 15 -an'
-        ani.save(
-            movie_name+'.mp4', fps=fps,
-            extra_args=['-vcodec', 'libx264']
-            )
-    return ani
+def write_frames(
+        frames, fname='', title='Array Movie', fps=5, 
+        quicktime=False, **imshow_kw
+        ):
+    # most simple frame writer -- no tricks
+    f = pp.figure()
+    ax = f.add_subplot(111)
+    im = ax.imshow(frames[0], **imshow_kw)
+    ax.axis('image')
+    def _step_time(num, frames, frame_im):
+        frame_im.set_data(frames[num])
+        print np.linalg.norm(frame_im._A.ravel())
+        return (frame_im,)
+    func = lambda x: _step_time(x, frames, im)
+    write_anim(
+        fname, f, func, frames.shape[0], fps=fps, title=title,
+        quicktime=quicktime
+        )
+        
+def write_anim(
+        fname, fig, func, n_frame,
+        title='Array Movie', fps=5, quicktime=False
+        ):
 
-def write_frames(frames, fname='', title='Array Movie', fps=5, **imshow_kw):
     FFMpegWriter = _animation.writers['ffmpeg']
-    metadata = dict(title=title, artist='Matplotlib')
-    #metadata = dict()
-    ## writer = FFMpegWriter(
-    ##     fps=fps, metadata=metadata,
-    ##     extra_args=['-x264opts qp=1:bframes=1']
-    ##     )
+    metadata = dict(title=title, artist='ecoglib')
     writer = FFMpegWriter(
         fps=fps, metadata=metadata, codec='libx264'
         )
-    fig = pp.figure()
-    im = pp.imshow(np.empty_like(frames[0]), **imshow_kw)
-    fig.axes[0].axis('image')
-    fig.tight_layout()
-    fig.axes[0].set_title(title)
-    
-    with writer.saving(fig, fname+'.mp4', 100):
-        for frm in frames:
-            im.set_data(frm)
-            writer.grab_frame()
-    
-def write_anim(fname, fig, func, n_frame, title='Array Movie', fps=5):
-
-    FFMpegWriter = _animation.writers['ffmpeg']
-    metadata = dict(title=title, artist='Matplotlib')
-    writer = FFMpegWriter(
-        fps=fps, metadata=metadata, codec='libx264'
-        )
+    if quicktime:
+        # do arguments that are quicktime compatible
+        extra_args = ['-pix_fmt', 'yuv420p', '-qp', '1']
+        # yuv420p looks a bit crappy, but upping the res helps
+        dpi = 300
+    else:
+        # yuv422p seems pretty good
+        extra_args = ['-pix_fmt', 'yuv422p', '-qp', '0']
+        dpi = fig.dpi
+    writer.extra_args = extra_args
     fname = fname.split('.mp4')[0]
-    with writer.saving(fig, fname+'.mp4', 100):
+    with writer.saving(fig, fname+'.mp4', dpi):
         for n in xrange(n_frame):
             func(n)
+            ## pp.draw()
             writer.grab_frame()
-
 
 def dynamic_frames_and_series(
         frames, series, tx=None, title='Array Movie',
