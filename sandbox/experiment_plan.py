@@ -61,6 +61,7 @@ class ExperimentPlan(object):
                     )
         (self.n_conds, self.n_var) = self.conds.shape
         baseline = config.get(exp_name, 'baseline')
+        active_var = range(self.n_var)
         try:
             self.baseline = 'interval'
             self.b_itvl = map(float, baseline.split(','))
@@ -72,8 +73,10 @@ class ExperimentPlan(object):
                     'I do not understand the baseline: %s'%baseline
                     )
             self.baseline = 'variation'
-            self.baseline = int(baseline.split('var')[1])
-        
+            self.baseline = int(baseline.split('var')[1]) - 1
+            active_var.pop(self.baseline)
+
+        self.active = tuple(active_var)
         self._init_maps()
                 
         return
