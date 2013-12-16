@@ -2,9 +2,12 @@ from __future__ import division
 import numpy as np
 import matplotlib.pyplot as pp
 
-from ecoglib.util import flat_to_mat, mat_to_flat, ndim_prctile
+from ecoglib.util import flat_to_mat, mat_to_flat
+from ecoglib.numutil import ndim_prctile
 
-def tiled_axes(geo, p, figsize=(10,10), col_major=True):
+def tiled_axes(
+        geo, p, figsize=(10,10), col_major=True, cmap=pp.cm.gray,
+        ):
     n_plots = len(p)
     missed_tiles = set(range(geo[0]*geo[1]))
     missed_tiles.difference_update(p)
@@ -19,16 +22,16 @@ def tiled_axes(geo, p, figsize=(10,10), col_major=True):
         (i, j) = flat_to_mat(geo, pn, col_major=col_major)
         ax = pp.subplot2grid( geo, (i, j) )
         ax.imshow(
-            np.array([ [.15, .25], [.25, .15] ]), cmap=pp.cm.gray,
+            np.array([ [.85, .75], [.75, .85] ]), cmap=pp.cm.gray,
             clim=(0, 1), interpolation='nearest'
             )
-        pp.axis('off')
+        ax.axis('off')
         missed_axes.append(ax)
     return fig, plot_axes, missed_axes
          
 
 def tile_images(maps, geo=(), p=(), col_major=True,
-                border_axes=False, **imkw):
+                border_axes=False, title='', **imkw):
 
     # maps is (n_maps, mx, my), or (nx_tiles, ny_tiles, mx, my)
     # if ndim < 4, then geo must be provided
@@ -41,7 +44,7 @@ def tile_images(maps, geo=(), p=(), col_major=True,
 
     if not ( imkw.has_key('clim') or imkw.has_key('vmin') or \
              imkw.has_key('vmax') or imkw.has_key('norm') ):
-        vmin = maps.min(); vmax = maps.max()
+        vmin = np.nanmin(maps); vmax = np.nanmax(maps)
         imkw['norm'] = pp.Normalize(vmin, vmax)
 
     if maps.ndim == 4:
@@ -75,7 +78,7 @@ def tile_images(maps, geo=(), p=(), col_major=True,
             if i+1 == geo[0]:
                 ax.yaxis.set_visible(False)
         else:
-            pp.axis('off')
+            ax.axis('off')
 
     # xxx: work this later
     if border_axes:
@@ -88,12 +91,18 @@ def tile_images(maps, geo=(), p=(), col_major=True,
             left=0.02, bottom=0.02, right=1-0.02,
             wspace=0.02, hspace=0.02, top=1-.1
             )
+    if title:
+        fig.text(
+            0.5, .925, title, fontsize=18, 
+            va='baseline', ha='center'
+            )
+
     maps.shape = oshape
     return fig
 
 def tile_traces(
         traces, geo, p=(), yl=(), twin=(), plot_style='sample',
-        border_axes=False, col_major=True
+        border_axes=False, col_major=True, title=''
         ):
 
     # traces is either (n_chan, n_trial, n_pts) or (n_chan, n_pts)
@@ -154,6 +163,11 @@ def tile_traces(
         fig.subplots_adjust(
             left=0.02, bottom=0.02, right=1-0.02,
             wspace=0.02, hspace=0.02, top=1-.1
+            )
+    if title:
+        fig.text(
+            0.5, .925, title, fontsize=18, 
+            va='baseline', ha='center'
             )
     return fig
 
