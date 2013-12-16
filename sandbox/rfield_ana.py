@@ -61,9 +61,14 @@ def test_for_rf(
     n_trial = max( [max(map(len, c_maps)) for c_maps in exp_plan.maps] )
 
     n_test = len(exp_plan.active)
+    # these arrays are samples of the integrated field response
     field_var = np.zeros( (n_test, n_trial, n_sites) )
     baseline_var = np.zeros( (n_test, n_trial, n_sites) )
+    # these arrays are trial-averages of the field responses
+    field_mn = np.zeros( (n_test, n_sites, n_cond) )
+    baseline_mn = np.zeros( (n_test, n_sites, n_cond) )
 
+    
     # finally check to see if baseline is one of the vars,
     # or needs to be computed from pre-stim.
     # If prestim baseline is used, then the baseline samples are 
@@ -122,6 +127,9 @@ def test_for_rf(
         # finally, integrate over the field of conditions
         field_var[:,:,n] = np.var(active_pwr, axis=1)
         baseline_var[:,:,n] = np.var(baseln_pwr, axis=1)
+        # and save the trial-average field response
+        field_mn[:,n,:] = np.mean(active_pwr, axis=2)
+        baseline_mn[:,n,:] = np.mean(baseln_pwr, axis=2)
         
             
             
@@ -129,13 +137,17 @@ def test_for_rf(
     res = Bunch()
     #ratio_fn = lambda x,y: np.mean(x/y, axis=0)
     ratio_fn = lambda x,y: np.mean(x, axis=0)/np.mean(y, axis=0)
-    for t, (active, baseline) in enumerate(zip(field_var, baseline_var)):
+    for t in xrange(n_test):
+        active = field_var[t]
+        baseline = baseline_var[t]
         ci = boots_ci( 
             (active, baseline), ratio_fn, alpha=alpha
             )
         name = exp_plan.var_names[exp_plan.active[t]]
         res[name+'_ci'] = ci
         res[name+'_snr'] = ratio_fn(active, baseline)
+        res[name+'_field'] = field_mn[t]
+        res[name+'_ctrl'] = baseline_mn[t]
     res['test_names'] = (exp_plan.var_names[a] for a in exp_plan.active)
     res['alpha'] = alpha
     return res
