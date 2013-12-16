@@ -16,6 +16,43 @@ def ndim_prctile(x, p, axis=0):
     slicer[axis] = idx
     return xs[slicer]
 
+def unity_normalize(x, axis=None):
+    if axis is None:
+        mn = x.min(axis=axis)
+        mx = x.max(axis=axis)
+        return (x-mn)/(mx-mn)
+
+    x = np.rollaxis(x, axis)
+    mn = x.min(axis=-1)
+    mx = x.max(axis=-1)
+    while mn.ndim > 1:
+        mn = mn.min(axis=-1)
+        mx = mx.max(axis=-1)
+    
+    slicer = [slice(None)] + [np.newaxis]*(x.ndim-1)
+    x = x - mn[slicer]
+    x = x / (mx-mn)[slicer]
+    return np.rollaxis(x, 0, axis+1)
+
+def density_normalize(x, axis=None):
+    mn = x.min(axis=axis)
+    if axis is None:
+        x = x - mn
+        return x / x.sum()
+
+    x = np.rollaxis(x, axis)
+    mn = x.min(axis=-1)
+    accum = x.sum(axis=-1)
+    while mn.ndim > 1:
+        mn = mn.min(axis=-1)
+        accum = accum.sum(axis=-1)
+
+    n_pt = np.prod(x.shape[1:])
+    slicer = [slice(None)] + [np.newaxis]*(x.ndim-1)
+    x = x - mn[slicer]
+    x = x / (accum-n_pt*mn)[slicer]
+    return np.rollaxis(x, 0, axis+1)
+
 def mirror_extend(x, border):
     """Extend matrix x by amount in border.
     """
