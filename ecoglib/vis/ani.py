@@ -53,7 +53,7 @@ def write_anim(
 
 def dynamic_frames_and_series(
         frames, series, tx=None, title='Array Movie',
-        xlabel='Epoch', ylabel='$\mu V$',
+        xlabel='Epoch (s)', ylabel='$\mu V$', stack_traces=True,
         imshow_kw={}, line_props={}
         ):
     # returns a function that can be used to step through
@@ -66,11 +66,13 @@ def dynamic_frames_and_series(
     if tx is None:
         tx = np.arange(len(stack_data))
     
-    if series.ndim == 2:
+    if series.ndim == 2 and stack_traces:
         ptp = np.median(series.ptp(axis=0))
         series = series + np.arange(series.shape[1])*ptp
     ## Set up timeseries trace(s)
-    ylim = (series.min(), series.max())
+    ylim = line_props.pop('ylim', ())
+    if not ylim:
+        ylim = (series.min(), series.max())
     trace_ax.plot(tx, series, **line_props)
     trace_ax.set_xlabel(xlabel)
     trace_ax.set_ylabel(ylabel)
