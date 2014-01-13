@@ -77,18 +77,18 @@ def anisotropic(W, alpha=0.5):
     This method computes the new graph whose edge weights are defined
     by a reweighted anisotropic diffusion kernel matrix
 
-    W2_{i,j} = K(x_i, x_j) / (p(x_i)p(x_j))^(\alpha)
+    Wa_{i,j} = K(x_i, x_j) / (p(x_i)p(x_j))^(\alpha)
 
     This method would normally be followed by computing the markov
     normalization of the anisotropic diffusion graph.
 
-    M = D^(-1) * W2
+    M = D^(-1) * Wa
 
     Note: M is adjoint to the following symmetric matrix
 
-    Ms = D^(1/2) * M * D^(-1/2) = D^(-1/2) * W2 * D^(-1/2)
+    Ms = D^(1/2) * M * D^(-1/2) = D^(-1/2) * Wa * D^(-1/2)
 
-    which is the bimarkov normalization of W2. Since it can be more
+    which is the bimarkov normalization of Wa. Since it can be more
     stable to compute eigen-values/vectors of the symmetric matrix,
     one may wish to work with the bimarkov normalized matrix.
     In this case, the eigenvectors {u} of Ms relate
@@ -111,8 +111,12 @@ def anisotropic(W, alpha=0.5):
     px = np.take(deg, ix)
     px *= np.take(deg, jx)
 
-    weights = W.data / px
-
-    return sparse.csr_matrix((weights, W.indices, W.indptr), W.shape)
+    if sparse.issparse(W):
+        weights = W.data / px
+        return sparse.csr_matrix((weights, W.indices, W.indptr), W.shape)
+    else:
+        Wa = np.matrix( (W.A.ravel() / px).reshape(W.shape) )
+        return Wa
+        
 
 
