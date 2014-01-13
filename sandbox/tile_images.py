@@ -5,8 +5,26 @@ import matplotlib.pyplot as pp
 from ecoglib.util import flat_to_mat, mat_to_flat
 from ecoglib.numutil import ndim_prctile
 
+def quick_tiles(n_frames, nrow=None, ncol=None):
+    if not (nrow or ncol):
+        ncol = 4
+
+    if nrow and not ncol:
+        ncol = int( np.ceil( float(n_frames) / nrow ) )
+    elif ncol and not nrow:
+        nrow = int( np.ceil( float(n_frames) / ncol ) )
+    if ncol * nrow < n_frames:
+        raise ValueError('Not enough tiles for frames')
+
+    fig, axes, _ = tiled_axes( 
+        (nrow, ncol), np.arange(n_frames), figsize=(ncol, nrow),
+        col_major=False, fill_empty=False
+        )
+    return fig, axes
+
 def tiled_axes(
         geo, p, figsize=(10,10), col_major=True, cmap=pp.cm.gray,
+        fill_empty=True
         ):
     n_plots = len(p)
     missed_tiles = set(range(geo[0]*geo[1]))
@@ -21,10 +39,11 @@ def tiled_axes(
     for pn in missed_tiles:
         (i, j) = flat_to_mat(geo, pn, col_major=col_major)
         ax = pp.subplot2grid( geo, (i, j) )
-        ax.imshow(
-            np.array([ [.85, .75], [.75, .85] ]), cmap=pp.cm.gray,
-            clim=(0, 1), interpolation='nearest'
-            )
+        if fill_empty:
+            ax.imshow(
+                np.array([ [.85, .75], [.75, .85] ]), cmap=cmap,
+                clim=(0, 1), interpolation='nearest'
+                )
         ax.axis('off')
         missed_axes.append(ax)
     return fig, plot_axes, missed_axes
