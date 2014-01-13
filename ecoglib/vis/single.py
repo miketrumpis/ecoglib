@@ -48,12 +48,14 @@ def subspace_scatters(x, labels=None, oneplot=False, **kwargs):
         P1 = int( np.ceil(np.sqrt(float(n_plots))) )
         P2 = int( np.ceil(n_plots / float(P1)) )
         f = pp.figure()
-
+    else:
+        plots = list()
+    
     for p, ij in enumerate(itertools.combinations(range(n), 2)):
         if oneplot:
             pp.subplot(P2,P1,p+1)
         else:
-            f = pp.figure()
+            plots.append(pp.figure())
         i, j = ij
         pp.scatter(x[:,i], x[:,j], c=c, **kwargs)
         #pp.title(r'$f_{%d}$ vs $f_{%d}$'%(j+1,i+1))
@@ -66,3 +68,5 @@ def subspace_scatters(x, labels=None, oneplot=False, **kwargs):
         #pp.gca().yaxis.set_visible(False)
     if oneplot:
         f.tight_layout()
+        return f
+    return plots
