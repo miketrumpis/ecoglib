@@ -1,4 +1,5 @@
 # ye olde utilities module
+import numpy as np
 
 # ye olde Bunch object
 class Bunch(dict):
@@ -19,7 +20,34 @@ class Bunch(dict):
         table = reduce(lambda x,y: x+y, table)
         return table.strip()
 
+class ChannelMap(list):
+    def __init__(self, chan_map, geo, col_major=True):
+        list.__init__(self)
+        self[:] = chan_map
+        self.col_major = col_major
+        self.geometry = geo
+
+    def as_row_major(self):
+        if self.col_major:
+            return ChannelMap(
+                flat_to_flat(self.geometry, self[:]),
+                self.geometry, col_major=False
+                )
+        return self
+
+    def as_col_major(self):
+        if not self.col_major:
+            return ChannelMap(
+                flat_to_flat(self.geometry, self[:], col_major=False),
+                self.geometry, col_major=True
+                )
+
+        return self
+
+    
+
 def flat_to_mat(mn, idx, col_major=True):
+    idx = np.asarray(idx)
     # convert a flat matrix index into (i,j) style
     (m, n) = mn if col_major else mn[::-1]
 
@@ -28,6 +56,7 @@ def flat_to_mat(mn, idx, col_major=True):
     return (i, j) if col_major else (j, i)
 
 def mat_to_flat(mn, i, j, col_major=True):
+    (i, j) = map(np.asarray, (i, j))
     # covert matrix indexing to a flat (linear) indexing
     (fast, slow) = (i, j) if col_major else (j, i)
     block = mn[0] if col_major else mn[1]
