@@ -59,15 +59,19 @@ def traverse_table(f, path='/', load=True):
             subbunch = traverse_table(
                 f, path=os.path.join(path, gname)
                 )
-            # get any attributes if they're around
-            for attr in n._v_attrs._f_list():
-                subbunch[attr] = n._v_attrs[attr]
+            ## # get any attributes if they're around
+            ## for attr in n._v_attrs._f_list():
+            ##     subbunch[attr] = n._v_attrs[attr]
                 
             gbunch[gname] = subbunch
             
         else:
             gbunch[n.name] = 'Not Loaded!'
-    
+
+    this_node = f.get_node(path)
+    for attr in this_node._v_attrs._f_list():
+        gbunch[attr] = this_node._v_attrs[attr]
+            
     return gbunch
             
 
