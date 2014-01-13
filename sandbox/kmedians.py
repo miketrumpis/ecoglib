@@ -57,7 +57,7 @@ def kmedians(X, k, init='k-means++', n_init=2, tol=1e-4, max_iter=100):
             r_pts = np.unique(r_pts)
             locs = X[r_pts[:k]]
         else:
-            locs = km.k_init(X, k, x_squared_norms=sq_dist)
+            locs = km._k_init(X, k, x_squared_norms=sq_dist)
 
         # perform modified Lloyd's algorithm to
         # 1) assign points to current locations
