@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.interpolate import interp1d
 import matplotlib.pyplot as pp
 import matplotlib.animation as _animation
 import os
@@ -16,7 +17,6 @@ def write_frames(
     ax.axis('image')
     def _step_time(num, frames, frame_im):
         frame_im.set_data(frames[num])
-        print np.linalg.norm(frame_im._A.ravel())
         return (frame_im,)
     func = lambda x: _step_time(x, frames, im)
     write_anim(
@@ -53,7 +53,8 @@ def write_anim(
 
 def dynamic_frames_and_series(
         frames, series, tx=None, title='Array Movie',
-        xlabel='Epoch (s)', ylabel='$\mu V$', stack_traces=True,
+        xlabel='Epoch (s)', ylabel='$\mu V$', 
+        stack_traces=True, interp=1,
         imshow_kw={}, line_props={}
         ):
     # returns a function that can be used to step through
@@ -65,7 +66,15 @@ def dynamic_frames_and_series(
     
     if tx is None:
         tx = np.arange(len(stack_data))
-    
+
+    if interp > 1:
+        n = len(tx)
+        tx_plot = np.linspace(tx[0], tx[-1], (n-1)*interp)
+        ifun = interp1d(tx, series, kind='cubic', axis=0)
+        series = ifun(tx_plot)
+    else:
+        interp = max(interp, 1)
+        tx_plot = tx
     if series.ndim == 2 and stack_traces:
         ptp = np.median(series.ptp(axis=0))
         series = series + np.arange(series.shape[1])*ptp
@@ -73,7 +82,7 @@ def dynamic_frames_and_series(
     ylim = line_props.pop('ylim', ())
     if not ylim:
         ylim = (series.min(), series.max())
-    trace_ax.plot(tx, series, **line_props)
+    trace_ax.plot(tx_plot, series, **line_props)
     trace_ax.set_xlabel(xlabel)
     trace_ax.set_ylabel(ylabel)
     trace_ax.set_ylim(ylim)
@@ -87,11 +96,13 @@ def dynamic_frames_and_series(
     def _step_time(num, tx, frames, frame_img, tm):
         #tsp.time = tx[num]
         #tsp.draw_dynamic()
-        tm.set_data(( [tx[num], tx[num]], [0, 1] ))
+        x = tx[num]
+        tm.set_data(( [x, x], [0, 1] ))
         frame_img.set_data(frames[num])
         return (frame_img, tm)
 
     func = lambda x: _step_time(x, tx, frames, f_img, time_mark)
+    fig.tight_layout()
     return fig, func
         
             
