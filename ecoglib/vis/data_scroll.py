@@ -278,6 +278,7 @@ class DataScroller(HasTraits):
 
     def _post_canvas_hook(self):
         self.ts_plot.connect_live_interaction()
+        self.zoom_plot.connect_live_interaction()
 
     @on_trait_change('time')
     def _update_time(self):
