@@ -431,8 +431,8 @@ class StandardPlot(ProtoPlot):
         # in this case, just a plot
         if t is None:
             t = np.arange(x.shape[0])
-        line = self.ax.plot(t, x, **line_props)[0]
-        return line
+        lines = self.ax.plot(t, x, **line_props)
+        return lines
 
 class ColorCodedPlot(ProtoPlot):
     """
