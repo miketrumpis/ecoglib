@@ -116,9 +116,9 @@ class DataScroller(HasTraits):
     ## these may need to be more specialized for handling 1D/2D timeseries
 
     zoom_plot = Instance(pm.ScrollingTimeSeriesPlot)
-    ts_plot = Instance(pm.PagedTimeSeriesPlot)
+    ts_plot = Instance(pm.WindowedTimeSeriesPlot)
     # XXX: this should probably not be a trait
-    ts_page_length = Float(50.)
+    ts_window_length = Float(50.)
 
     ## array scene, image, and data (Mayavi components)
 
@@ -254,9 +254,9 @@ class DataScroller(HasTraits):
         self.trait_setq(eps=i_eps)
 
     def construct_ts_plot(self, t, figsize, lim, t0, **lprops):
-        return pm.PagedTimeSeriesPlot(
+        return pm.WindowedTimeSeriesPlot(
             t, self.ts_arr, figsize=figsize, ylim=lim, t0=t0,
-            page_length=self.ts_page_length,
+            window_length=self.ts_window_length,
             line_props=lprops
             )
 
@@ -408,7 +408,7 @@ class DataScroller(HasTraits):
 class ColorCodedDataScroller(DataScroller):
 
     zoom_plot = Instance(pm.ScrollingColorCodedPlot)
-    ts_plot = Instance(pm.PagedColorCodedPlot)
+    ts_plot = Instance(pm.WindowedColorCodedPlot)
 
     def __init__(
             self, d_array, ts_array, cx_array,
@@ -447,7 +447,7 @@ class ColorCodedDataScroller(DataScroller):
 
         downsamp: int (Default 10)
           Downsample factor for the large-scale color coded plot (updates
-          to page and scale limits can be quite slow with many color-coded
+          to window and scale limits can be quite slow with many color-coded
           points).
 
         traits: dict
@@ -465,10 +465,10 @@ class ColorCodedDataScroller(DataScroller):
         t = t[::dfac]
         ts_arr = self.ts_arr[::dfac]
         cx_arr = self.cx_arr[::dfac]
-        return pm.PagedColorCodedPlot(
+        return pm.WindowedColorCodedPlot(
             t, ts_arr, cx_arr,
             figsize=figsize, ylim=lim, t0=t0,
-            page_length=self.ts_page_length,
+            window_length=self.ts_window_length,
             line_props=lprops
             )
 
@@ -483,7 +483,7 @@ class ColorCodedDataScroller(DataScroller):
 class ClassCodedDataScroller(DataScroller):
 
     zoom_plot = Instance(pm.ScrollingClassSegmentedPlot)
-    ts_plot = Instance(pm.PagedClassSegmentedPlot)
+    ts_plot = Instance(pm.WindowedClassSegmentedPlot)
 
     def __init__(
             self, d_array, ts_array, labels,
@@ -530,10 +530,10 @@ class ClassCodedDataScroller(DataScroller):
     def construct_ts_plot(self, t, figsize, lim, t0, **lprops):
         ts_arr = self.ts_arr
         labels = self.labels
-        return pm.PagedClassSegmentedPlot(
+        return pm.WindowedClassSegmentedPlot(
             t, ts_arr, labels,
             figsize=figsize, ylim=lim, t0=t0,
-            page_length=self.ts_page_length,
+            window_length=self.ts_window_length,
             line_props=lprops
             )
 

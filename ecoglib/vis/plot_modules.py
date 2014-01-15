@@ -269,70 +269,70 @@ class StaticFunctionPlot(LongNarrowPlot):
         elif self._scrolling and ev.name == 'motion_notify_event':
             self.time = ev.xdata
 
-class PagedFunctionPlot(StaticFunctionPlot):
+class WindowedFunctionPlot(StaticFunctionPlot):
     """
-    Same behavior as a static plot, but the plot window flips between
-    "pages" of set duration.
+    Same behavior as a static plot, but the plot view flips between
+    windows of set duration.
     """
 
-    _mx_page = Int
-    _page = Range(low=0, high='_mx_page', value=0)
+    _mx_window = Int
+    _window = Range(low=0, high='_mx_window', value=0)
     _overlap = Float(0.15)
 
-    next_page = Button()
-    prev_page = Button()
+    next_window = Button()
+    prev_window = Button()
 
-    def __init__(self, t, x, page_length=100, **traits):
+    def __init__(self, t, x, window_length=100, **traits):
         self._tmin = t[0]
         self._tmax = t[-1]
-        # if page_length is not set, then choose appropriate length
+        # if window_length is not set, then choose appropriate length
         tspan = self._tmax - self._tmin
-        if tspan < page_length:
-            self.page_length = 1.05*tspan
+        if tspan < window_length:
+            self.window_length = 1.05*tspan
         else:
-            self.page_length = page_length
-        super(PagedFunctionPlot, self).__init__(t, x, **traits)
-        self._init_pages(t)
+            self.window_length = window_length
+        super(WindowedFunctionPlot, self).__init__(t, x, **traits)
+        self._init_windows(t)
 
-    def _init_pages(self, t):
-        # set up the number of pages and the associated limits
-        # each page is staggered at (1-overlap) * page_length points
-        plen = (1-self._overlap)*self.page_length
+    def _init_windows(self, t):
+        # set up the number of windows and the associated limits
+        # each window is staggered at (1-overlap) * window_length points
+        plen = (1-self._overlap)*self.window_length
         full_window = float( t[-1] - t[0] )
-        self._mx_page = max(1, int( full_window / plen ))
+        self._mx_window = max(1, int( full_window / plen ))
         self._time_insensitive = False
-        self.change_page(self._page)
+        self.change_window(self._window)
 
-    @on_trait_change('_page')
-    def change_page(self, *page):
-        if page:
-            page = page[0]
-            self.trait_setq(_page=page)
+    @on_trait_change('_window')
+    def change_window(self, *window):
+        if window:
+            window = window[0]
+            self.trait_setq(_window=window)
         else:
-            page = self._page
+            window = self._window
 
-        # the page length is set, but the page stride is
-        # (1-overlap) * page_length
-        stride = (1-self._overlap)*self.page_length
-        x_start = page * stride + self._tmin
-        x_stop = x_start + self.page_length
+        # the window length is set, but the window stride is
+        # (1-overlap) * window_length
+        stride = (1-self._overlap)*self.window_length
+        x_start = window * stride + self._tmin
+        x_stop = x_start + self.window_length
         # this will triger a redraw
         self.xlim = (x_start, x_stop)
-        # if a page was switched while the current time is somewhere
+        # if a window was switched while the current time is somewhere
         # outside the current interval, then enter a mode where subsequent
-        # time updates won't change the page back. This will last until
-        # the current time comes back into the current page
+        # time updates won't change the window back. This will last until
+        # the current time comes back into the current window
         if self.time < x_start or self.time > x_stop:
             self._time_insensitive = True
 
-    def _next_page_fired(self):
-        self._page = min(self._mx_page, self._page+1)
+    def _next_window_fired(self):
+        self._window = min(self._mx_window, self._window+1)
 
-    def _prev_page_fired(self):
-        self._page = max(0, self._page-1)
+    def _prev_window_fired(self):
+        self._window = max(0, self._window-1)
 
-    def page_from_time(self, time):
-        stride = (1-self._overlap)*self.page_length
+    def window_from_time(self, time):
+        stride = (1-self._overlap)*self.window_length
         # (n+1)*stride > time > n*stride
         n = int(time/stride)
         return n
@@ -350,31 +350,33 @@ class PagedFunctionPlot(StaticFunctionPlot):
         if not within:
             if self._time_insensitive:
                 return
-            self._page = self.page_from_time(time)
+            self._window = self.window_from_time(time)
         else:
             # if time is within the interval then we can always
             # be sensitive to it
             self._time_insensitive = False
-        super(PagedFunctionPlot, self).move_bar(time)
+        super(WindowedFunctionPlot, self).move_bar(time)
 
     def connect_live_interaction(self, *extra_connections):
         # connect a right-mouse-button triggered paging
         connections = (
-            ('button_press_event', self._page_handler),
+            ('button_press_event', self._window_handler),
             )
         connections = connections + extra_connections
-        super(PagedFunctionPlot, self).connect_live_interaction(*connections)
+        super(
+            WindowedFunctionPlot, self
+            ).connect_live_interaction(*connections)
 
 
-    def _page_handler(self, ev):
+    def _window_handler(self, ev):
         if ev.button != 3 or not ev.inaxes:
             return
         x = ev.xdata
         x_lo, x_hi = self.xlim
         if np.abs(x - x_lo) < np.abs(x - x_hi):
-            self.prev_page = True
+            self.prev_window = True
         else:
-            self.next_page = True
+            self.next_window = True
 
 class ScrollingFunctionPlot(StaticFunctionPlot):
 
@@ -571,14 +573,14 @@ class StaticSegmentedPlot(StaticFunctionPlot, ClassSegmentedPlot):
             t, x, t0=t0, line_props=line_props, **bplot_kws
             )
 
-class PagedTimeSeriesPlot(PagedFunctionPlot, StandardPlot):
+class WindowedTimeSeriesPlot(WindowedFunctionPlot, StandardPlot):
     """
-    A static plot that is flipped between pages.
+    A static plot that is flipped between windows.
     """
     # defaults for both classes
     pass
 
-class PagedColorCodedPlot(PagedFunctionPlot, ColorCodedPlot):
+class WindowedColorCodedPlot(WindowedFunctionPlot, ColorCodedPlot):
     """
     A static color-coded plot that is flipped between intervals
     """
@@ -593,11 +595,11 @@ class PagedColorCodedPlot(PagedFunctionPlot, ColorCodedPlot):
             mn = cx.min()
             cx_limits = (mn, mx)
         self.cx_limits = cx_limits
-        super(PagedColorCodedPlot, self).__init__(
+        super(WindowedColorCodedPlot, self).__init__(
             t, x, t0=t0, line_props=line_props, **bplot_kws
             )
 
-class PagedClassSegmentedPlot(PagedFunctionPlot, ClassSegmentedPlot):
+class WindowedClassSegmentedPlot(WindowedFunctionPlot, ClassSegmentedPlot):
     """
     A static class-colored plot that is flipped between intervals
     """
@@ -607,7 +609,7 @@ class PagedClassSegmentedPlot(PagedFunctionPlot, ClassSegmentedPlot):
         self.labels = labels
         unique_labels = np.unique(labels)
         self.n_classes = len( unique_labels >= 0 )
-        super(PagedClassSegmentedPlot, self).__init__(
+        super(WindowedClassSegmentedPlot, self).__init__(
             t, x, t0=t0, line_props=line_props, **bplot_kws
             )
 

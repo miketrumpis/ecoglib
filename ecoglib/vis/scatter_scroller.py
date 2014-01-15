@@ -163,8 +163,8 @@ class ScatterPlot(HasTraits):
 
 
 class ScatterScroller(HasTraits):
-    ts_plot = Instance(pm.PagedTimeSeriesPlot)
-    ts_page_length = Float(50.0)
+    ts_plot = Instance(pm.WindowedTimeSeriesPlot)
+    ts_window_length = Float(50.0)
 
     scatter = Instance(MlabSceneModel, ())
     scatter_plot = Instance(ScatterPlot, ())
@@ -210,9 +210,9 @@ class ScatterScroller(HasTraits):
         d_range = (self.ts_array.min(), self.ts_array.max())
         mid = (d_range[1] + d_range[0])/2.0
         extent = (d_range[1] - d_range[0]) * 1.05
-        return pm.PagedTimeSeriesPlot(
+        return pm.WindowedTimeSeriesPlot(
             t, self.ts_array, figsize=figsize, t0=0,
-            page_length=self.ts_page_length,
+            window_length=self.ts_window_length,
             ylim=(mid-extent/2, mid+extent/2), linewidth=1
             )
 
@@ -271,7 +271,7 @@ class ScatterScroller(HasTraits):
         )
 
 class ClassCodedScatterScroller(ScatterScroller):
-    ts_plot = Instance(pm.PagedClassSegmentedPlot)
+    ts_plot = Instance(pm.WindowedClassSegmentedPlot)
 
     def __init__(
             self, scatter_array, ts_array, labels,
@@ -290,9 +290,9 @@ class ClassCodedScatterScroller(ScatterScroller):
         mid = (d_range[1] + d_range[0])/2.0
         extent = (d_range[1] - d_range[0]) * 1.05
         ts_labels = self.labels
-        return pm.PagedClassSegmentedPlot(
+        return pm.WindowedClassSegmentedPlot(
             t, self.ts_array, ts_labels, figsize=figsize, t0=0,
-            page_length=self.ts_page_length,
+            window_length=self.ts_window_length,
             ylim=(mid-extent/2, mid+extent/2), linewidth=1
             )
 
