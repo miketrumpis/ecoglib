@@ -72,7 +72,7 @@ class BlitPlot(HasTraits):
             self.fig.add_axes(axes)
             self.ax = axes
         else:
-            self.ax = self.fig.add_subplot(111)
+            self.ax = self.fig.add_axes([.15, .12, .8, .85])
         xlim = traits.pop('xlim', self.ax.get_xlim())
         ylim = traits.pop('ylim', self.ax.get_ylim())
         self.static_artists = []
@@ -179,7 +179,8 @@ class BlitPlot(HasTraits):
         self._mpl_connections = []
 
     def _resize_handler(self, ev):
-        print ev.name
+        #print ev.name
+        pass
 
 class LongNarrowPlot(BlitPlot):
     """
@@ -220,6 +221,8 @@ class StaticFunctionPlot(LongNarrowPlot):
         # just do BlitPlot with defaults -- this gives us a figure and axes
         bplot_kws['xlim'] = (t[0], t[-1])
         figure = bplot_kws.pop('figure', None)
+        if 'ylim' not in bplot_kws:
+            bplot_kws['ylim'] = (x.min(), x.max())
         super(StaticFunctionPlot, self).__init__(figure=figure, **bplot_kws)
         # XXX: why setting traits after construction?
         #self.trait_set(**bplot_kws)
@@ -373,63 +376,36 @@ class PagedFunctionPlot(StaticFunctionPlot):
         else:
             self.next_page = True
 
+class ScrollingFunctionPlot(StaticFunctionPlot):
 
-class ScrollingFunctionPlot(LongNarrowPlot):
-    """
-    Plain vanilla x(t) plot, but only over a given interval. A time
-    marker is placed at the current time, which by default is the
-    center of the window.
-    """
+    winsize = Float
+    
+    def __init__(
+            self, t, x, winsize, t0=None, line_props=dict(), **bplot_kws
+            ):
+        super(ScrollingFunctionPlot, self).__init__(
+            t, x, t0=t0, line_props=line_props, **bplot_kws
+            )
+        if t0 is None:
+            t0 = t[0]
+        self.winsize = float(winsize)
+        self.move_bar(t0)
 
-    # Caution: mixin-only. Supposes the method
-    # * create_fn_image() which produces a particular plot
-    #
-    # This method is provided by the ProtoPlot types (e.g. StandardPlot)
+    @on_trait_change('time')
+    def move_bar(self, *time):
+        if time:
+            time = time[0]
+            self.trait_setq(time=time)
+        else:
+            time = self.time
+        self.time_mark.set_data(( [time, time], [0, 1] ))
+        self.xlim = (time - self.winsize/2, time + self.winsize/2)
 
-    def __init__(self, x, line_props=dict(), **bplot_kws):
-        """
-        Parameters
-        ----------
-
-        x: ndarray
-          x is a restriction of some function over an initial interval
-
-        """
-        self.winsize = len(x)
-        bplot_kws['xlim'] = (-1, self.winsize)
-        super(ScrollingFunctionPlot, self).__init__()
-        self.trait_set(**bplot_kws)
-        self.ax.xaxis.set_visible(False)
-        self.zoom_element = self.create_fn_image(x, **line_props)
-        self.add_dynamic_artist(self.zoom_element)
-        t0 = np.floor(self.winsize/2.)
-        self.time_mark = self.ax.axvline(x=t0, color='r', ls=':')
-        self.add_static_artist(self.time_mark)
-
-    # XXX: should reconsider resetting the data in this plot at every
-    # step -- would be more self-contained to just move the x-limits,
-    # or somehow handle the transition within this object
-    def set_window(self, x, tc=None):
-        """
-        Update the interval of the function (x is restriction to
-        the new interval). If given, "tc" is the current time defining
-        the interval.
-        """
-        winsize = x.shape[0]
-        if winsize == self.winsize:
-            t, old_x = self.zoom_element.get_data()
-            self.zoom_element.set_data(t, x)
-            self.draw_dynamic()
-            return
-        t = np.arange(winsize)
-        self.zoom_element.set_data(t, x)
-        if tc is None:
-            tc = np.round(winsize/2.)
-        self.time_mark.set_data([tc, tc], [0, 1])
-        self.winsize = winsize
-        # setting xlim triggers draw
-        self.xlim = (-1, self.winsize)
-
+    @on_trait_change('winsize')
+    def change_window(self):
+        time = self.time
+        self.xlim = (time - self.winsize/2, time + self.winsize/2)
+        
 ##############################################################################
 ########## Classes To Define Plot Styles #####################################
 
@@ -520,12 +496,18 @@ class ClassSegmentedPlot(ProtoPlot):
                 )
         if labels is None:
             labels = self.labels
-        colors = cmap(np.linspace(0, 1, self.n_classes))
         # for each class sequentially fill out-of-class pts with nan,
         # and line plot in-class points with the appropriate color
         seg_line = np.empty_like(x)
         seg_lines = []
         unique_labels = np.unique(labels)
+        n_labels = len(unique_labels)
+        label_to_idx = dict( zip( unique_labels, range(n_labels) ) )
+        if 0 in unique_labels:
+            colors = cmap(np.linspace(0, 1, n_labels-1))
+            colors = np.row_stack( ([0, 0, 0, 0.15], colors) )
+        else:
+            colors = cmap(np.linspace(0, 1, n_labels))
         for seg in unique_labels:
             # -1 codes for out of bounds
             if seg < 0:
@@ -534,9 +516,10 @@ class ClassSegmentedPlot(ProtoPlot):
             seg_line.fill(np.nan)
             idx = np.where(labels==seg)[0]
             np.put(seg_line, idx, np.take(x, idx))
-            color = colors[seg]
-            if seg==0:
-                color[-1] = 0.15
+            cidx = label_to_idx[seg]
+            color = colors[cidx]
+            ## if seg==0:
+            ##     color[-1] = 0.15
             line = self.ax.plot(t, seg_line, c=color, **line_props)
             seg_lines.extend(line)
         return seg_lines
@@ -639,70 +622,36 @@ class ScrollingColorCodedPlot(ScrollingFunctionPlot, ColorCodedPlot):
     """
     A scrolling plot, but points are color-coded by a co-function c(t)
     """
-    def __init__(self, x, cx, cx_limits, line_props=dict(), **bplot_kws):
+    def __init__(
+            self, t, x, winsize, cx, t0=None, cx_limits=(), 
+            line_props=dict(), **bplot_kws
+            ):
         # make sure to set the color code first
         self.cx = cx
-        # cx_limits *must* be provided, since it is unreliable to estimate
-        # them from the short window of cx provided here
+        if not cx_limits:
+            mx = cx.max()
+            mn = cx.min()
+            cx_limits = (mn, mx)
         self.cx_limits = cx_limits
         super(ScrollingColorCodedPlot, self).__init__(
-            x, line_props=line_props, **bplot_kws
+            t, x, winsize, t0=t0, line_props=line_props, **bplot_kws
             )
-
-    # the signature of set_window changes now (XXX: dangerous?)
-    def set_window(self, x, cx):
-        winsize = len(x)
-        norm = self.zoom_element.norm
-        cmap = self.zoom_element.cmap
-        if winsize == self.winsize:
-            old_offset = self.zoom_element.get_offsets()
-            # possibility that the previous set of points included
-            # NaNs, in which case the offset data itself was truncated --
-            # thus make a new pseudo-time axis if necessary
-            if old_offset.shape[0] != winsize:
-                t = np.arange(winsize)
-            else:
-                t = old_offset[:,0]
-            self.zoom_element.set_offsets( np.c_[t, x] )
-            self.zoom_element.set_color( cmap( norm(cx) ) )
-            self.draw_dynamic()
-            return
-        t = np.arange(winsize)
-        self.zoom_element.set_offsets( np.c_[t, x] )
-        self.zoom_element.set_color( cmap( norm(cx) ) )
-        t0 = np.round(winsize/2.)
-        self.time_mark.set_data([t0, t0], [0, 1])
-        self.winsize = winsize
-        self.xlim = (-1, self.winsize)
 
 class ScrollingClassSegmentedPlot(ScrollingFunctionPlot, ClassSegmentedPlot):
     """
     A scrolling plot, but points are color-coded by class.
     """
 
-    def __init__(self, x, labels, n_classes, line_props=dict(), **bplot_kws):
+    def __init__(
+            self, t, x, winsize, labels, 
+            line_props=dict(), **bplot_kws
+            ):
         # make sure to set the class code first
         self.labels = labels
-        self.n_classes = n_classes
+        unique_labels = np.unique(labels)
+        self.n_classes = len( unique_labels >= 0 )
         # hold onto these
         self._lprops = line_props
         super(ScrollingClassSegmentedPlot, self).__init__(
-            x, line_props=line_props, **bplot_kws
+            t, x, winsize, line_props=line_props, **bplot_kws
             )
-
-    def set_window(self, x, labels):
-        winsize = len(x)
-        # want to flush previous lines and re-generate class coded lines
-        while self.dynamic_artists:
-            line = self.dynamic_artists.pop()
-            line.remove()
-        self.zoom_element = self.create_fn_image(
-            x, labels=labels, **self._lprops
-            )
-        self.add_dynamic_artist(self.zoom_element)
-        t0 = np.round(winsize/2.)
-        self.time_mark.set_data([t0, t0], [0, 1])
-        self.winsize = winsize
-        self.xlim = (-1, self.winsize)
-        self.draw_dynamic()
-

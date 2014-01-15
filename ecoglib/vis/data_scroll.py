@@ -246,7 +246,8 @@ class DataScroller(HasTraits):
 
         # configure the zoomed plot
         figsize=(5,2)
-        self.zoom_plot = self.construct_zoom_plot(figsize, lim)
+        self.zoom_plot = self.construct_zoom_plot(tx, figsize, lim)
+        self.sync_trait('time', self.zoom_plot, mutual=True)
 
         self.trait_setq(tau=tau)
         self.trait_setq(time=time)
@@ -259,10 +260,10 @@ class DataScroller(HasTraits):
             line_props=lprops
             )
 
-    def construct_zoom_plot(self, figsize, lim, **lprops):
-        x = self.zoom_data()
+    def construct_zoom_plot(self, t, figsize, lim, **lprops):
         return pm.ScrollingTimeSeriesPlot(
-            x, figsize=figsize, ylim=lim
+            t, self.ts_arr, self.tau, 
+            line_props=lprops, figsize=figsize, ylim=lim
             )
 
     def configure_traits(self, *args, **kwargs):
@@ -277,26 +278,11 @@ class DataScroller(HasTraits):
 
     def _post_canvas_hook(self):
         self.ts_plot.connect_live_interaction()
-        self.ts_plot.fig.tight_layout()
-        self.ts_plot.draw()
-        self.zoom_plot.fig.tight_layout()
-        self.zoom_plot.draw()
-
-    def zoom_data(self):
-        d = self.ts_arr
-        n_zoom_pts = int(np.round(self.tau*self.Fs))
-        zoom_start = int(np.round(self.Fs*(self.time - self.tau/2)))
-        return safe_slice(d, zoom_start, n_zoom_pts)
 
     @on_trait_change('time')
     def _update_time(self):
         # 1) long ts_plot should be automatically linked to 'time'
-        # 2) zoomed ts_plot needs new x data
-        x = self.zoom_data()
-        # manipulate x to accomodate overloaded input/output
-        if type(x) != tuple:
-            x = (x,)
-        self.zoom_plot.set_window(*x) # works with overloaded zoom_data()
+        # 2) zoomed ts_plot needs new x data (**no longer**)
         # 3) VTK ImagePlaneWidget needs to be resliced
         if self.array_ipw:
             self.array_ipw.ipw.slice_index = int( np.round(self.time*self.Fs) )
@@ -307,7 +293,6 @@ class DataScroller(HasTraits):
             ipw.ipw.reslice.output_extent = \
               np.array([0, xyz[0], 0, xyz[1], 0, 0], 'd') - 0.5
             ipw.ipw.reslice.output_spacing = 1., 1., 1./xyz[2]
-
 
     def __map_eps(self, eps, limits):
         p = ((np.sin(np.pi*(eps-1/2.0))+1)/2.0)**2
@@ -332,11 +317,7 @@ class DataScroller(HasTraits):
 
     @on_trait_change('tau')
     def _plot_new_zoom(self):
-        x = self.zoom_data()
-        # manipulate x to accomodate overloaded input/output
-        if type(x) != tuple:
-            x = (x,)
-        self.zoom_plot.set_window(*x)
+        self.zoom_plot.winsize = self.tau
 
     def _count_fired(self):
         if self.t_counter is not None and self.t_counter.IsRunning():
@@ -490,21 +471,13 @@ class ColorCodedDataScroller(DataScroller):
             line_props=lprops
             )
 
-    def construct_zoom_plot(self, figsize, lim, **lprops):
-        x, cx = self.zoom_data()
+    def construct_zoom_plot(self, t, figsize, lim, **lprops):
         cx_lim = self.ts_plot.cx_limits # ooh! hacky
         return pm.ScrollingColorCodedPlot(
-            x, cx, cx_lim,
+            t, self.ts_arr, self.tau, self.cx_arr,
+            cx_limits=cx_lim,
             figsize=figsize, ylim=lim, line_props=lprops
             )
-
-    def zoom_data(self):
-        d = self.ts_arr
-        n_zoom_pts = int(np.round(self.tau*self.Fs))
-        zoom_start = int(np.round(self.Fs*(self.time - self.tau/2)))
-        x = safe_slice(d, zoom_start, n_zoom_pts)
-        cx = safe_slice(self.cx_arr, zoom_start, n_zoom_pts, fill=0)
-        return x, cx
 
 class ClassCodedDataScroller(DataScroller):
 
@@ -563,23 +536,11 @@ class ClassCodedDataScroller(DataScroller):
             line_props=lprops
             )
 
-    def construct_zoom_plot(self, figsize, lim, **lprops):
-        x, labels = self.zoom_data()
-        unique_labels = np.unique(self.labels)
+    def construct_zoom_plot(self, t, figsize, lim, **lprops):
         return pm.ScrollingClassSegmentedPlot(
-            x, labels, len(unique_labels >= 0),
+            t, self.ts_arr, self.tau, self.labels,
             figsize=figsize, ylim=lim, line_props=lprops
             )
-
-    def zoom_data(self):
-        d = self.ts_arr
-        l = self.labels
-        n_zoom_pts = int(np.round(self.tau*self.Fs))
-        zoom_start = int(np.round(self.Fs*(self.time - self.tau/2)))
-        d_sl = safe_slice(d, zoom_start, n_zoom_pts)
-        l_sl = safe_slice(l, zoom_start, n_zoom_pts, fill=-1)
-        return d_sl, l_sl
-
 
 if __name__ == "__main__":
     import sys
