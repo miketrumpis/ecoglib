@@ -43,7 +43,7 @@ def get_load_snips(dfile):
 def get_post_snips(dfile):
     return _post_prune_db.get(_parse_path(dfile), ())
 
-def load_arr(dfile, pruned_pts = (), auto_prune = True):
+def load_arr(dfile, pruned_pts = (), auto_prune = True, trig=-1):
     try:
         m = sio.loadmat(dfile)
         d = m.pop('data')
@@ -64,16 +64,25 @@ def load_arr(dfile, pruned_pts = (), auto_prune = True):
     if pruned_pts:
         #d = d.T[pruned_pts, :nrow*ncol] if t else d[pruned_pts, :nrow*ncol]
         if t:
-            d, _ = pruned_arr(d[:nrow*ncol, :].T, pruned_pts, axis=0)
+            data, _ = pruned_arr(d[:nrow*ncol, :].T, pruned_pts, axis=0)
         else:
-            d, _ = pruned_arr(d[:, :nrow*ncol], pruned_pts, axis=0)
+            data, _ = pruned_arr(d[:, :nrow*ncol], pruned_pts, axis=0)
         tx, segs = pruned_arr(tx, pruned_pts)
     elif min(d.shape) != nrow*ncol:
         # explicitly make contiguous
-        d = d.T[:, :nrow*ncol].copy() if t else d[:,:nrow*ncol].copy()
-    
+        data = d.T[:, :nrow*ncol].copy() if t else d[:,:nrow*ncol].copy()
+
+    if trig >= 0:
+        if t:
+            trigger_chan = d[trig,:]
+        else:
+            trigger_chan = d[:,trig]
+    else:
+        trigger_chan = None
+    del d
     array_bunch = Bunch(
-        data=d, rowcol=(nrow, ncol), Fs=Fs, tx=tx, segs=segs
+        data=data, rowcol=(nrow, ncol), Fs=Fs, tx=tx, segs=segs, 
+        trigger_chan=trigger_chan
         )
     return array_bunch
 
@@ -87,7 +96,8 @@ def load_hdf5_arr(dfile):
     ##     d = d[pruned_pts, :nrow*ncol]
     ## else:
     ##     d = d[:, :nrow*ncol]
-    d = d[:,:nrow*ncol]
+    #d = d[:,:nrow*ncol]
+    d = d[:]
     f.close()
     del f
     return d, (nrow, ncol), Fs

@@ -11,10 +11,12 @@ def load_preproc(f, load=True):
         with tables.open_file(f) as h5:
             pre = traverse_table(h5, load=True)
         # convert a few arrays
-        pre.trig_coding = pre.trig_coding.astype('i')
-        pre.emap = pre.emap.astype('i')
-        pre.egeo = tuple(pre.egeo.astype('i'))
-        pre.orig_coditions = pre.orig_conditions.astype('i')
+        for key in ('trig_coding', 'emap', 'egeo', 'orig_condition'):
+            if key in pre:
+                arr = pre[key]
+                pre[key] = arr.astype('i')
+                if key == 'egeo':
+                    pre[key] = tuple(arr)
         # transpose
         pre.trig_coding = pre.trig_coding.T
         # convert indexing
