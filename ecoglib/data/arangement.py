@@ -1,16 +1,12 @@
 import numpy as np
 import ecoglib.util as ut
 
-def array_geometry(data, geo, map, axis=-1, col_major=True):
+def array_geometry(data, map, axis=-1):
     # re-arange the 2D matrix of timeseries data such that the
     # channel axis is ordered by the array geometry
-    
-    
-    ## i, j = ut.flat_to_mat(geo, map, col_major=True)
-    ## row_maj_conv = ut.mat_to_flat(geo, i, j, col_major=False)
-    if col_major:
-        map = ut.flat_to_flat(geo, map, col_major=True)
-    
+        
+    map = map.as_row_major()
+    geo = map.geometry
     
     dims = list(data.shape)
     while axis < 0:
@@ -22,12 +18,10 @@ def array_geometry(data, geo, map, axis=-1, col_major=True):
     new_data.shape = (-1, ts_dim)
     new_data[map,:] = data if axis==0 else data.T
 
-    if col_major:
-        map = ut.flat_to_flat(geo, map, col_major=False)
     null_sites = set(range(geo[0]*geo[1]))
     null_sites.difference_update(map)
     
-    return new_data, np.array(list(null_sites))
+    return new_data, ut.ChannelMap(list(null_sites), geo, col_major=False)
     
     
     
