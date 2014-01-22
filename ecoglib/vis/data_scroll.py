@@ -1,13 +1,11 @@
 import numpy as np
 
-# std lib
-import random
-
-
 # ETS Traits
 from traits.api import \
-     HasTraits, Instance, on_trait_change, Float, Button, Range, Int, Any
-from traitsui.api import Item, View, VGroup, HGroup, RangeEditor
+     HasTraits, Instance, on_trait_change, Float, Button, \
+     Range, Int, Any, Bool
+from traitsui.api import Item, View, VGroup, HGroup, \
+     RangeEditor, HSplit, VSplit
 
 # Mayavi/TVTK
 from mayavi import mlab
@@ -21,50 +19,7 @@ from mayavi.sources.api import ArraySource
 from pyface.timer.api import Timer
 
 import plot_modules as pm
-
-
-#### Utility for quick range finding XXX: way too liberal of a bound!
-def stochastic_limits(x, n_samps=100, conf=98.0):
-    """
-    Use Markov's inequality to estimate a bound on the
-    absolute values in the array x.
-    """
-    n = len(x)
-    r_pts = random.sample(xrange(n), n_samps)
-    r_samps = np.take(x, r_pts)
-    # unbiased estimator??
-    e_abs = np.abs(r_samps).mean()
-    # Pr{ |X| > t } <= E{|X|}/t = 1 - conf/100
-    # so find the threshold for which there is only a
-    # (100-conf)% chance that |X| is greater
-    return e_abs/(1.0-conf/100.0)
-
-#### Utility for safe sub-slicing
-def safe_slice(x, start, num, fill=np.nan):
-    """
-    Slice array x contiguously (along 1st dimension) for num pts,
-    starting from start. If all or part of the range lies outside
-    of the actual bounds of x, then fill with NaN
-    """
-    lx = x.shape[0]
-    sub_shape = (num,) + x.shape[1:]
-    if start < 0 or start + num > lx:
-        sx = np.empty(sub_shape, dtype=x.dtype)
-        if start <= -num or start >= lx:
-            sx.fill(np.nan)
-            # range is entirely outside
-            return sx
-        if start < 0:
-            # fill beginning ( where i < 0 ) with NaN
-            sx[:-start, ...] = fill
-            # fill the rest with x
-            sx[-start:, ...] = x[:(num + start), ...]
-        else:
-            sx[:(lx-start), ...] = x[start:, ...]
-            sx[(lx-start):, ...] = fill
-    else:
-        sx = x[start:start+num, ...]
-    return sx
+import ecoglib.util as ut
 
 #### Utility to prepare volumetric data for VTK without
 #### resorting to mem copying (if possible)
@@ -122,6 +77,7 @@ class DataScroller(HasTraits):
 
     ## array scene, image, and data (Mayavi components)
 
+    _has_video = Bool
     array_scene = Instance(MlabSceneModel, ())
     arr_img_dsource = Instance(ArraySource, (), transpose_input_array=False)
     array_ipw = Instance(PipelineBase)
@@ -135,7 +91,7 @@ class DataScroller(HasTraits):
     ## view controls
 
     # interval for zoom plot (units sec)
-    tau = Range(low=1.0, high=50.0, value=1.0)
+    tau = Range(low=0.050, high=200.0, value=1.0)
 
     # limits for abs-amplitude (auto tuned)
 
@@ -193,17 +149,35 @@ class DataScroller(HasTraits):
           other keyword parameters
 
         """
-        if len(d_array.shape) < 3:
-            nrow, ncol = rowcol
+        shape = list(d_array.shape)
+        tdim = np.argmax(shape)
+        npts = shape[tdim]
+        shape.pop(tdim)
+        if d_array.ndim == 3:
+            rowcol = tuple(shape)
         else:
-            ncol, nrow = d_array.shape[1:]
-        vtk_arr = volumetric_data(d_array, (nrow, ncol))
-        npts = vtk_arr.shape[-1]
+            # check that the shape is consistent
+            if np.prod(rowcol) != shape[0]:
+                rowcol = ()
+        # Try to catch some cases where video is not intended
+        if rowcol:
+            try:
+                vtk_arr = volumetric_data(d_array, rowcol)
+                # make the time dimension unit length, 
+                # and put the origin at -1/2
+                self.arr_img_dsource.spacing = 1., 1., 1./npts
+                self.arr_img_dsource.origin = (0.0, 0.0, -0.5)
+                self.arr_img_dsource.scalar_data = vtk_arr
+                self._has_video = True
+            except NotImplementedError:
+                self._has_video = False
+                print 'no video due to implementation problem'
+        else:
+            # if still no shape info, then no video
+            self._has_video = False
+        
         self._tf = float(npts-1) / Fs
         self.Fs = Fs
-        # XXX: should set max_amp -- could stochastically sample to
-        # estimate mean and variance
-        #self.max_amp = stochastic_limits(ts_array)
         self.max_ts_amp = ts_array.max()
         self.min_ts_amp = ts_array.min()
         # the timeseries peaks are probably a good starting
@@ -214,16 +188,9 @@ class DataScroller(HasTraits):
 
         self.ts_arr = ts_array
 
-        ## new_shape = (npts, ncol, nrow)
-        ## vtk_arr = np.reshape(d_array, new_shape).transpose()
-        # make the time dimension unit length, and put the origin at -1/2
-        self.arr_img_dsource.spacing = 1., 1., 1./npts
-        self.arr_img_dsource.origin = (0.0, 0.0, -0.5)
-        self.arr_img_dsource.scalar_data = vtk_arr
-
         # pop out some traits that should be set after initialization
         time = traits.pop('time', 0)
-        tau = traits.pop('tau', 1.0)
+        #tau = traits.pop('tau', 1.0)
         i_eps = traits.pop('eps', 1.0)
         HasTraits.__init__(self, **traits)
         self._scrolling = False
@@ -237,25 +204,25 @@ class DataScroller(HasTraits):
             tx = np.linspace(self._t0, self._tf, n)
         else:
             assert len(tx)==n, 'provided time axis has wrong length'
-        lim = self.__map_eps(i_eps, (self.min_ts_amp, self.max_ts_amp))
-        figsize=(6,1)
+        lim = self._map_eps(i_eps, (self.min_ts_amp, self.max_ts_amp))
+        figsize=()
         self.ts_plot = self.construct_ts_plot(
             tx, figsize, lim, time, linewidth=1
             )
         self.sync_trait('time', self.ts_plot, mutual=True)
 
         # configure the zoomed plot
-        figsize=(5,2)
+        figsize=()
         self.zoom_plot = self.construct_zoom_plot(tx, figsize, lim)
         self.sync_trait('time', self.zoom_plot, mutual=True)
 
-        self.trait_setq(tau=tau)
+        #self.trait_setq(tau=tau)
         self.trait_setq(time=time)
         self.trait_setq(eps=i_eps)
 
     def construct_ts_plot(self, t, figsize, lim, t0, **lprops):
         return pm.WindowedTimeSeriesPlot(
-            t, self.ts_arr, figsize=figsize, ylim=lim, t0=t0,
+            t, self.ts_arr, ylim=lim, t0=t0,
             window_length=self.ts_window_length,
             line_props=lprops
             )
@@ -263,7 +230,7 @@ class DataScroller(HasTraits):
     def construct_zoom_plot(self, t, figsize, lim, **lprops):
         return pm.ScrollingTimeSeriesPlot(
             t, self.ts_arr, self.tau, 
-            line_props=lprops, figsize=figsize, ylim=lim
+            line_props=lprops, ylim=lim
             )
 
     def configure_traits(self, *args, **kwargs):
@@ -295,7 +262,7 @@ class DataScroller(HasTraits):
               np.array([0, xyz[0], 0, xyz[1], 0, 0], 'd') - 0.5
             ipw.ipw.reslice.output_spacing = 1., 1., 1./xyz[2]
 
-    def __map_eps(self, eps, limits):
+    def _map_eps(self, eps, limits):
         p = ((np.sin(np.pi*(eps-1/2.0))+1)/2.0)**2
         mn, mx = limits
         half_width = (mx - mn)*p / 2.0
@@ -304,13 +271,15 @@ class DataScroller(HasTraits):
 
     @on_trait_change('eps')
     def _update_eps(self):
-        lim = self.__map_eps(self.eps, (self.min_ts_amp, self.max_ts_amp))
+        full_limits = max(abs(self.min_ts_amp), abs(self.max_ts_amp))
+        #lim = self._map_eps(self.eps, (self.min_ts_amp, self.max_ts_amp))
+        lim = self._map_eps(self.eps, (-full_limits, full_limits))
         self.ts_plot.ylim = lim
         self.zoom_plot.ylim = lim
 
     @on_trait_change('arr_eps')
     def _update_arr_eps(self):
-        lim = self.__map_eps(
+        lim = self._map_eps(
             self.arr_eps, (-2*self.base_arr_amp, 2*self.base_arr_amp)
             )
         if self.array_ipw:
@@ -318,7 +287,8 @@ class DataScroller(HasTraits):
 
     @on_trait_change('tau')
     def _plot_new_zoom(self):
-        self.zoom_plot.winsize = self.tau
+        if self.zoom_plot:
+            self.zoom_plot.winsize = self.tau
 
     def _count_fired(self):
         if self.t_counter is not None and self.t_counter.IsRunning():
@@ -337,8 +307,10 @@ class DataScroller(HasTraits):
 
     @on_trait_change('array_scene.activated')
     def _display_image(self):
+        if not self._has_video:
+            return
         scene = self.array_scene
-        lim = self.__map_eps(
+        lim = self._map_eps(
             self.arr_eps, (-2*self.base_arr_amp, 2*self.base_arr_amp)
             )
         ipw = mlab.pipeline.image_plane_widget(
@@ -375,7 +347,8 @@ class DataScroller(HasTraits):
             HGroup(
                 Item(
                     'array_scene', editor=SceneEditor(scene_class=Scene),
-                    height=200, width=200, show_label=False
+                    height=200, width=200, show_label=False,
+                    enabled_when='_has_video'
                     ),
                 Item(
                     'zoom_plot', editor=pm.MPLFigureEditor(),
@@ -467,7 +440,7 @@ class ColorCodedDataScroller(DataScroller):
         cx_arr = self.cx_arr[::dfac]
         return pm.WindowedColorCodedPlot(
             t, ts_arr, cx_arr,
-            figsize=figsize, ylim=lim, t0=t0,
+            ylim=lim, t0=t0,
             window_length=self.ts_window_length,
             line_props=lprops
             )
@@ -477,7 +450,7 @@ class ColorCodedDataScroller(DataScroller):
         return pm.ScrollingColorCodedPlot(
             t, self.ts_arr, self.tau, self.cx_arr,
             cx_limits=cx_lim,
-            figsize=figsize, ylim=lim, line_props=lprops
+            ylim=lim, line_props=lprops
             )
 
 class ClassCodedDataScroller(DataScroller):
@@ -532,7 +505,7 @@ class ClassCodedDataScroller(DataScroller):
         labels = self.labels
         return pm.WindowedClassSegmentedPlot(
             t, ts_arr, labels,
-            figsize=figsize, ylim=lim, t0=t0,
+            ylim=lim, t0=t0,
             window_length=self.ts_window_length,
             line_props=lprops
             )
@@ -540,9 +513,199 @@ class ClassCodedDataScroller(DataScroller):
     def construct_zoom_plot(self, t, figsize, lim, **lprops):
         return pm.ScrollingClassSegmentedPlot(
             t, self.ts_arr, self.tau, self.labels,
-            figsize=figsize, ylim=lim, line_props=lprops
+            ylim=lim, line_props=lprops
             )
 
+class ChannelScroller(DataScroller):
+    """View all array channels at once, with marked stimulation events
+    """
+    ts_plot = Instance(pm.PagedTimeSeriesPlot)
+    _zero = Int(0)
+    page = Range(low='_zero', high='_mx_page')
+    page_length = Range(low=100, high=100000)
+    _mx_page = Int
+    page_up = Button()
+    page_dn = Button()
+    draw_stims = Bool(False)
+    show_zoom = Bool(False)
+    _has_stim = Bool
+    
+    def __init__(
+            self, array_data, page_len, chans=(), exp=None,
+            Fs=1.0, **traits_n_kw
+            ):
+
+        t_axis = np.argmax(array_data.shape)
+        npts = array_data.shape[t_axis]
+        ts_arr = np.rollaxis(array_data, t_axis).reshape(npts, -1)
+        if chans:
+            ts_arr = ts_arr[:,chans]
+        self.chans = chans
+        self.page_length = int( round(Fs * page_len) )
+        self._mx_page = int( npts // self.page_length ) + 1
+        self.exp = exp
+        traits_n_kw['tau'] = page_len
+        DataScroller.__init__(
+            self, array_data, ts_arr, Fs=Fs, _has_stim = (exp is not None),
+            **traits_n_kw
+            )
+        self.draw_events()
+        self.sync_trait('page', self.ts_plot, mutual=True)
+        self.sync_trait('page_length', self.ts_plot, mutual=True)
+    
+    def construct_ts_plot(self, t, figsize, lim, t0, **lprops):
+        if 'color' not in lprops:
+            lprops['color'] = 'b'
+        lprops['linewidth'] = 0.5
+        n_lines = self.ts_arr.shape[1]
+        plot = pm.PagedTimeSeriesPlot(
+            t, self.ts_arr, self.page_length, stack_traces=True,
+            t0=t0, line_props=lprops
+            )
+        plot.n_yticks = n_lines
+        #plot.ax.set_yticks(np.arange(n_lines) * plot._spacing)
+        ## plot.ax.set_yticks(
+        ##     np.linspace(plot.ylim[0], plot.ylim[1], n_lines)
+        ##     )
+        #from matplotlib.ticker import LinearLocator
+        #plot.ax.yaxis.set_major_locator(LinearLocator(numticks=n_lines))
+        if isinstance(self.chans, ut.ChannelMap):
+            ii, jj = self.chans.to_mat()
+            plot.ax.set_yticklabels(
+                ['%d: (%d, %d)'%x for x in zip(self.chans, ii, jj)],
+                fontsize=8
+                )
+        else:
+            plot.ax.set_yticklabels( 
+                ['%s'%n for n in xrange(n_lines)], fontsize=8
+                )
+        return plot
+
+    def construct_zoom_plot(self, t, figsize, lim, **lprops):
+        return pm.ScrollingTimeSeriesPlot(
+            t, self.ts_arr.mean(axis=1), self.tau, 
+            line_props=lprops, ylim=lim
+            )
+            
+    def draw_events(self):
+        self._event_lines = list()
+        if not (self.draw_stims and self._has_stim):
+            return
+        ylim = self.ts_plot.ylim
+        delta = (ylim[1] - ylim[0]) / 100
+        page = self.page
+        plen = self.page_length
+        events = self.exp.trig_times
+        plotted_stims = (events >= page*plen) & (events < (page+1)*plen)
+        stim_idx = np.where(plotted_stims)[0]
+        for idx in stim_idx:
+            time = events[idx]/self.Fs
+            ln = self.ts_plot.ax.axvline(
+                x=time, color=[.25, .25, .25, .8], 
+                linestyle='--', linewidth=2
+                )
+            s = self.exp.stim_str(idx, mpl_text=True)
+            s.set_position( (time, ylim[1]+delta) )
+            s.set_transform(self.ts_plot.ax.transData)
+            s.set_clip_on(False)
+            s.update(dict(va='baseline', ha='center', fontsize=7))
+            self.ts_plot.ax.add_artist(s)
+            self._event_lines.extend( (ln, s) )
+            self.ts_plot.add_static_artist( (ln, s) )
+            
+        self.ts_plot.draw()
+
+    def undraw_events(self):
+        self.ts_plot.remove_static_artist(self._event_lines)
+        self._event_lines = list()
+
+    def _change_page(self, page):
+        self.undraw_events()
+        self.page = page
+        self.draw_events()
+        
+    def _page_up_fired(self):
+        if self.page < self._mx_page:
+            self._change_page(self.page+1)
+
+    def _page_dn_fired(self):
+        if self.page > 0:
+            self._change_page(self.page-1)
+
+    @on_trait_change('page_length')
+    def _change_mx_page(self):
+        self._mx_page = int( self.ts_arr.shape[0] // self.page_length ) + 1
+        self.ts_plot.page_length = self.page_length
+        print self.ts_plot.page
+        self.page = self.ts_plot.page
+        self._change_page(self.page)
+
+    @on_trait_change('draw_stims')
+    def _stim_handler(self):
+        if self.draw_stims and not len(self._event_lines):
+            self.draw_events()
+        if not self.draw_stims:
+            self.undraw_events()
+            self.ts_plot.draw()
+        
+    @on_trait_change('eps')
+    def _update_eps(self):
+        full_limits = max(abs(self.min_ts_amp), abs(self.max_ts_amp))
+        #lim = self._map_eps(self.eps, (self.min_ts_amp, self.max_ts_amp))
+        lim = self._map_eps(self.eps, (-full_limits, full_limits))
+        self.zoom_plot.ylim = lim
+
+    view = View(
+        HSplit(
+            Item(
+                'ts_plot', editor=pm.MPLFigureEditor(), show_label=False,
+                width=400, height=1200, resizable=True
+                ),
+            VSplit(
+                Item(
+                    'array_scene', editor=SceneEditor(scene_class=Scene),
+                    height=600, width=500, show_label=False,
+                    visible_when='_has_video'
+                    ),
+                VSplit(
+                    Item(
+                        'zoom_plot', editor=pm.MPLFigureEditor(), 
+                        show_label=False,
+                        width=400, height=150, resizable=True
+                        ),
+                    HGroup(
+                        Item('tau', label='Zoom Width'),
+                        Item('eps', label='Array Limits')
+                        ),
+                    visible_when='show_zoom'
+                    ),
+                HGroup(
+                    VGroup(
+                        Item('page_up', label='Page FWD', show_label=False),
+                        Item('page_dn', label='Page BWD', show_label=False)
+                        ),
+                    VGroup(
+                        Item('page', label='Page Num'),
+                        Item('page_length', label='Page Len'),
+                        Item('draw_stims', label='Draw Stim Events',
+                             enabled_when='_has_stim>0'),
+                        Item('show_zoom', label='Plot CAR')
+                        ),
+                    VGroup(
+                        Item('arr_eps', label='Array Color'),
+                        Item('count', label='Run Clock'),
+                        Item('fps', label='FPS')
+                        )
+                    )
+                )
+            ),
+        resizable=True, title='ChannelScroller'
+    )
+                
+                
+                 
+        
+    
 if __name__ == "__main__":
     import sys
     from pyface.qt import QtGui

@@ -133,7 +133,7 @@ class ScatterPlot(HasTraits):
 
     @on_trait_change('time')
     def _update_time(self):
-        n = round(self.time*self.Fs/self.scatter_time_scale)
+        n = int(round(self.time*self.Fs/self.scatter_time_scale))
         n = max( min( len(self.scatter_array)-1, n ), 0 )
         t_point = self.scatter_array[n][None,:]
         #self.inst_src.mlab_source.points = t_point

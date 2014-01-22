@@ -19,6 +19,8 @@ from matplotlib.figure import Figure
 from matplotlib.colors import Normalize
 from matplotlib import cm
 
+from . import plot_tools as pt
+
 # XXX: an incomplete decorator for the listen/set pattern of traits callbacks
 ## def set_or_listen(attr):
 
@@ -93,6 +95,20 @@ class BlitPlot(HasTraits):
         if not np.iterable(a):
             a = (a,)
         self.dynamic_artists.extend(a)
+
+    def remove_static_artist(self, a):
+        if not np.iterable(a):
+            a = (a,)
+        for artist in a:
+            artist.remove()
+            self.static_artists.remove(artist)
+
+    def remove_dynamic_artist(self, a):
+        if not np.iterable(a):
+            a = (a,)
+        for artist in a:
+            artist.remove()
+            self.dynamic_artists.remove(artist)
 
     @on_trait_change('xlim')
     def set_xlim(self, *xlim):
@@ -187,16 +203,23 @@ class LongNarrowPlot(BlitPlot):
     A BlitPlot with less tick clutter on the y-axis.
     """
     n_yticks = Int(2)
+
+    def __init__(self, *args, **traits):
+        super(LongNarrowPlot, self).__init__(*args, **traits)
+    
     @on_trait_change('ylim')
     def set_ylim(self, *ylim):
         if not ylim:
             ylim = self.ylim
         else:
             self.trait_setq(ylim=ylim)
-        md = 0.5 * (ylim[0] + ylim[1])
-        rng = 0.5 * (ylim[1] - ylim[0])
-        y_ticks = np.linspace(md - 0.8*rng, md + 0.8*rng, self.n_yticks)
-        self.ax.yaxis.set_ticks(y_ticks)
+        ## md = 0.5 * (ylim[0] + ylim[1])
+        ## rng = 0.5 * (ylim[1] - ylim[0])
+        ## y_ticks = np.linspace(md - 0.8*rng, md + 0.8*rng, self.n_yticks)
+        ## self.ax.yaxis.set_ticks(y_ticks)
+        self.ax.yaxis.set_major_locator(
+            matplotlib.ticker.LinearLocator(numticks=self.n_yticks)
+            )
         super(LongNarrowPlot, self).set_ylim(*ylim)
 
 ##############################################################################
@@ -229,6 +252,7 @@ class StaticFunctionPlot(LongNarrowPlot):
         if t0 is None:
             t0 = t[0]
         ts_line = self.create_fn_image(x, t=t, **line_props)
+        self.ax.xaxis.get_major_formatter().set_useOffset(False)
         self.add_static_artist(ts_line)
         self.time_mark = self.ax.axvline(x=t0, color='r', ls='-')
         self.add_dynamic_artist(self.time_mark)
@@ -277,7 +301,7 @@ class WindowedFunctionPlot(StaticFunctionPlot):
 
     _mx_window = Int
     _window = Range(low=0, high='_mx_window', value=0)
-    _overlap = Float(0.15)
+    overlap = Float(0.15)
 
     next_window = Button()
     prev_window = Button()
@@ -297,7 +321,7 @@ class WindowedFunctionPlot(StaticFunctionPlot):
     def _init_windows(self, t):
         # set up the number of windows and the associated limits
         # each window is staggered at (1-overlap) * window_length points
-        plen = (1-self._overlap)*self.window_length
+        plen = (1-self.overlap)*self.window_length
         full_window = float( t[-1] - t[0] )
         self._mx_window = max(1, int( full_window / plen ))
         self._time_insensitive = False
@@ -313,7 +337,7 @@ class WindowedFunctionPlot(StaticFunctionPlot):
 
         # the window length is set, but the window stride is
         # (1-overlap) * window_length
-        stride = (1-self._overlap)*self.window_length
+        stride = (1-self.overlap)*self.window_length
         x_start = window * stride + self._tmin
         x_stop = x_start + self.window_length
         # this will triger a redraw
@@ -332,7 +356,7 @@ class WindowedFunctionPlot(StaticFunctionPlot):
         self._window = max(0, self._window-1)
 
     def window_from_time(self, time):
-        stride = (1-self._overlap)*self.window_length
+        stride = (1-self.overlap)*self.window_length
         # (n+1)*stride > time > n*stride
         n = int(time/stride)
         return n
@@ -366,7 +390,6 @@ class WindowedFunctionPlot(StaticFunctionPlot):
         super(
             WindowedFunctionPlot, self
             ).connect_live_interaction(*connections)
-
 
     def _window_handler(self, ev):
         if ev.button != 3 or not ev.inaxes:
@@ -407,7 +430,104 @@ class ScrollingFunctionPlot(StaticFunctionPlot):
     def change_window(self):
         time = self.time
         self.xlim = (time - self.winsize/2, time + self.winsize/2)
-        
+
+class PagedFunctionPlot(StaticFunctionPlot):
+
+    page = Int(0)
+    page_length = Int
+    
+    def __init__(self, t, x, page_length, stack_traces=False, **traits):
+        self.lims = (x.min(), x.max())
+        #self._spacing = np.median( np.ptp(x, axis=0) )
+        self._stack_traces = stack_traces
+        self._zooming = False
+        self.page_length = page_length
+        self.page = 0
+        self.x = x
+        self.t = t
+        t_init, x_init = self._data_page()
+        ## x_init = pt.safe_slice(x, 0, page_length)
+        ## t_init = pt.safe_slice(t, 0, page_length)
+        super(PagedFunctionPlot, self).__init__(t_init, x_init, **traits)
+        self.trait_setq(page_length=page_length)
+        # xxx: probably bad form here
+        self._traces = self.static_artists
+        #self.page_in(0)
+
+    def _data_page(self):
+        start = self.page*self.page_length
+        data_page = pt.safe_slice(self.x, start, self.page_length)
+        tx_page = pt.safe_slice(self.t, start, self.page_length)
+        if self.x.ndim > 1 and self._stack_traces:
+            spacing = np.median( np.ptp(data_page, axis=0) )
+            data_page = data_page + np.arange(self.x.shape[1]) * spacing
+        return tx_page, data_page
+
+    @on_trait_change('page')
+    def page_in(self, *page):
+        if page:
+            self.trait_setq(page=page[0])
+
+        tx, data_page = self._data_page()
+        for fn, line_obj in zip(data_page.T, self._traces):
+            line_obj.set_data(tx, fn)
+        #self.trait_setq(ylim=(data_page.min(), data_page.max()))
+        self.ylim = (data_page.min(), data_page.max())
+        self.xlim = (tx[0], tx[-1])
+
+    @on_trait_change('page_length')
+    def _repage(self, x, y, old, new):
+        # try to maintain the start of the window
+        old_start = old * self.page
+        #self.trait_setq(page = old_start // new)
+        self.page_in(old_start // new)
+
+    ## def connect_live_interaction(self, *extra_connections):
+    ##     # connect a right-mouse-button triggered paging
+    ##     connections = (
+    ##         ('button_press_event', self._zoom_handler),
+    ##         ('motion_notify_event', self._zoom_handler),
+    ##         ('button_release_event', self._zoom_ender)
+    ##         )
+    ##     connections = connections + extra_connections
+    ##     super(
+    ##         PagedFunctionPlot, self
+    ##         ).connect_live_interaction(*connections)
+
+    ## def _zoom_handler(self, ev):
+    ##     if ev.button != 3 or not ev.inaxes:
+    ##         return
+    ##     if not self._zooming:
+    ##         # start zooming
+    ##         self._saved_lims = self.xlim + self.ylim
+    ##         self._x0 = (ev.xdata, ev.ydata)
+    ##         print 'saving state:', self._saved_lims, self._x0
+    ##         self._zooming = True
+    ##         return
+    ##     x0, y0 = self._x0
+    ##     dx = 4*float(ev.xdata - x0)
+    ##     dy = 4*float(ev.ydata - y0)
+    ##     x_span = self._saved_lims[1] - self._saved_lims[0]
+    ##     y_span = self._saved_lims[3] - self._saved_lims[2]
+    ##     print dx, dy
+    ##     # apply a saturating curve to the mouse motion
+    ##     new_y_span = y_span*(np.pi/2 - np.arctan(dy/y_span))
+    ##     new_x_span = x_span*(np.pi/2 - np.arctan(dx/x_span))
+    ##     print (0.5 - np.arctan(dy/y_span)/np.pi),
+    ##     print (0.5 - np.arctan(dx/x_span)/np.pi)
+    ##     ## print (y0 - new_y_span/2, y0 + new_y_span/2), 
+    ##     ## print (x0 - new_x_span/2, x0 + new_x_span/2)
+    ##     self.ylim = (y0 - new_y_span/2, y0 + new_y_span/2)
+    ##     #self.trait_setq(ylim = (y0 - new_y_span/2, y0 + new_y_span/2))
+    ##     #self.trait_setq(xlim = (x0 - new_x_span/2, x0 + new_x_span/2))
+
+    ## def _zoom_ender(self, ev):
+    ##     if ev.button != 3:
+    ##         return
+    ##     print 'ending zoom state'
+    ##     self._zooming = False
+    ##     self.xlim = self._saved_lims[:2]
+    ##     self.ylim = self._saved_lims[2:]
 ##############################################################################
 ########## Classes To Define Plot Styles #####################################
 
@@ -489,7 +609,8 @@ class ClassSegmentedPlot(ProtoPlot):
     def create_fn_image(self, x, t=None, labels=None, **line_props):
         # Caution! Returns a sequence of separate lines for each data
         # segment
-        cmap = line_props.pop('cmap', cm.jet)
+        #cmap = line_props.pop('cmap', cm.jet)
+        cmap = line_props.pop('cmap', cm.hsv)
         if t is None:
             t = np.arange(len(x))
         if not hasattr(self, 'labels'):
@@ -574,6 +695,13 @@ class StaticSegmentedPlot(StaticFunctionPlot, ClassSegmentedPlot):
             )
 
 class WindowedTimeSeriesPlot(WindowedFunctionPlot, StandardPlot):
+    """
+    A static plot that is flipped between windows.
+    """
+    # defaults for both classes
+    pass
+
+class PagedTimeSeriesPlot(PagedFunctionPlot, StandardPlot):
     """
     A static plot that is flipped between windows.
     """
