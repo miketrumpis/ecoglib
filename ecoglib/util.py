@@ -41,10 +41,16 @@ class ChannelMap(list):
                 flat_to_flat(self.geometry, self[:], col_major=False),
                 self.geometry, col_major=True
                 )
-
         return self
 
-    
+    def to_mat(self):
+        return flat_to_mat(self.geometry, self, col_major=self.col_major)
+
+    def __getslice__(self, i, j):
+        return ChannelMap(
+            super(ChannelMap, self).__getslice__(i,j),
+            self.geometry, col_major=self.col_major
+            )
 
 def flat_to_mat(mn, idx, col_major=True):
     idx = np.asarray(idx)
@@ -69,4 +75,3 @@ def flat_to_flat(mn, idx, col_major=True):
     i, j = flat_to_mat(mn, idx, col_major=col_major)
     return mat_to_flat(mn, i, j, col_major=not col_major)
     
-        
