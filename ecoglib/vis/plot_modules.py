@@ -435,14 +435,15 @@ class PagedFunctionPlot(StaticFunctionPlot):
 
     page = Int(0)
     page_length = Int
+    stack_spacing = Float
     
-    def __init__(self, t, x, page_length, stack_traces=False, **traits):
+    def __init__(self, t, x, page_length, stack_traces=True, **traits):
         self.lims = (x.min(), x.max())
         #self._spacing = np.median( np.ptp(x, axis=0) )
-        self._stack_traces = stack_traces
         self._zooming = False
         self.page_length = page_length
         self.page = 0
+        self.stack_traces = stack_traces
         self.x = x
         self.t = t
         t_init, x_init = self._data_page()
@@ -451,15 +452,20 @@ class PagedFunctionPlot(StaticFunctionPlot):
         super(PagedFunctionPlot, self).__init__(t_init, x_init, **traits)
         self.trait_setq(page_length=page_length)
         # xxx: probably bad form here
-        self._traces = self.static_artists
+        self._traces = self.static_artists[:]
         #self.page_in(0)
 
     def _data_page(self):
-        start = self.page*self.page_length
-        data_page = pt.safe_slice(self.x, start, self.page_length)
-        tx_page = pt.safe_slice(self.t, start, self.page_length)
-        if self.x.ndim > 1 and self._stack_traces:
-            spacing = np.median( np.ptp(data_page, axis=0) )
+        # page with +/- 1 page length buffer
+        start = (self.page-1)*self.page_length
+        data_page = pt.safe_slice(self.x, start, 3*self.page_length, fill=0)
+        tx_page = pt.safe_slice(self.t, start, 3*self.page_length)
+        if self.x.ndim > 1 and self.stack_traces:
+            if not self.stack_spacing:
+                window = data_page[self.page_length:2*self.page_length]
+                spacing = np.median( np.ptp(window, axis=0) )
+            else:
+                spacing = self.stack_spacing
             data_page = data_page + np.arange(self.x.shape[1]) * spacing
         return tx_page, data_page
 
@@ -472,8 +478,17 @@ class PagedFunctionPlot(StaticFunctionPlot):
         for fn, line_obj in zip(data_page.T, self._traces):
             line_obj.set_data(tx, fn)
         #self.trait_setq(ylim=(data_page.min(), data_page.max()))
-        self.ylim = (data_page.min(), data_page.max())
-        self.xlim = (tx[0], tx[-1])
+        window = data_page[self.page_length:2*self.page_length]
+        self.ylim = (np.nanmin(window), np.nanmax(window))
+        self.center_page()
+
+    def center_page(self):
+        # set axis range to the middle segment of the window
+        t = self._traces[0].get_data()[0]
+        mn = np.nanmin(t); mx = np.nanmax(t)
+        t_min = max(mn, t[self.page_length])
+        t_max = min(mx, t[2*self.page_length-1])
+        self.xlim = (t_min, t_max)
 
     @on_trait_change('page_length')
     def _repage(self, x, y, old, new):
@@ -481,6 +496,20 @@ class PagedFunctionPlot(StaticFunctionPlot):
         old_start = old * self.page
         #self.trait_setq(page = old_start // new)
         self.page_in(old_start // new)
+
+    @on_trait_change('stack_spacing')
+    def _change_stack(self):
+        self.page_in()
+
+    @property
+    def current_spacing(self):
+        if self.x.ndim < 2:
+            return 0
+        if self.stack_spacing:
+            return self.stack_spacing
+        ylim = self.ylim
+        appx_spacing = (ylim[1] - ylim[0]) / (self.x.shape[1] - 1)
+        return appx_spacing
 
     ## def connect_live_interaction(self, *extra_connections):
     ##     # connect a right-mouse-button triggered paging

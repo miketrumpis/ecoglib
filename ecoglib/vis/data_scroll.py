@@ -1,4 +1,5 @@
 import numpy as np
+from matplotlib.lines import Line2D
 
 # ETS Traits
 from traits.api import \
@@ -529,6 +530,8 @@ class ChannelScroller(DataScroller):
     draw_stims = Bool(False)
     show_zoom = Bool(False)
     _has_stim = Bool
+    channel_scale = Range(low=0.0, high=1.0, value=1.0)
+    auto_scale = Bool(True)
     
     def __init__(
             self, array_data, page_len, chans=(), exp=None,
@@ -552,6 +555,7 @@ class ChannelScroller(DataScroller):
         self.draw_events()
         self.sync_trait('page', self.ts_plot, mutual=True)
         self.sync_trait('page_length', self.ts_plot, mutual=True)
+        self._mx_spacing = self.ts_plot.current_spacing
     
     def construct_ts_plot(self, t, figsize, lim, t0, **lprops):
         if 'color' not in lprops:
@@ -579,6 +583,20 @@ class ChannelScroller(DataScroller):
             plot.ax.set_yticklabels( 
                 ['%s'%n for n in xrange(n_lines)], fontsize=8
                 )
+
+        pos = plot.ax.get_position()
+        scl_ax = plot.fig.add_axes([0.8, pos.y0, 0.08, pos.y1])
+        scl_ax.axis('off')
+        bar_len = 200e-6
+        scl_ax.add_line(
+            Line2D([0, 0], [bar_len, 2*bar_len], color='k', linewidth=3)
+            )
+        scl_ax.text(
+            50e-6, 1.5*bar_len, '200 $\mu$V', ha='left', va='baseline'
+            )
+        scl_ax.set_ylim(plot.ax.get_ylim())
+        scl_ax.set_xlim(-bar_len, bar_len)
+        self.scl_ax = scl_ax
         return plot
 
     def construct_zoom_plot(self, t, figsize, lim, **lprops):
@@ -622,6 +640,7 @@ class ChannelScroller(DataScroller):
     def _change_page(self, page):
         self.undraw_events()
         self.page = page
+        self.scl_ax.set_ylim(self.ts_plot.ax.get_ylim())
         self.draw_events()
         
     def _page_up_fired(self):
@@ -632,6 +651,30 @@ class ChannelScroller(DataScroller):
         if self.page > 0:
             self._change_page(self.page-1)
 
+    @on_trait_change('channel_scale')
+    def _change_scale(self):
+        if self.auto_scale:
+            return
+        a = self.channel_scale
+        # map from [0,1] --> 25 to mx_spacing microvolts
+        spacing = a * self._mx_spacing + (1-a) * 25e-6
+        self.undraw_events()
+        # XXX: nice to get a way to keep this from triggering a draw
+        self.ts_plot.stack_spacing = spacing
+        self.scl_ax.set_ylim(self.ts_plot.ax.get_ylim())
+        self.draw_events()
+        
+    @on_trait_change('auto_scale')
+    def _set_manual_scaling(self):
+        if self.auto_scale:
+            self.undraw_events()
+            self.ts_plot.stack_spacing = 0
+            self.scl_ax.set_ylim(self.ts_plot.ax.get_ylim())
+            self.draw_events()
+            return
+        self._mx_spacing = self.ts_plot.current_spacing
+        self._change_scale()
+        
     @on_trait_change('page_length')
     def _change_mx_page(self):
         self._mx_page = int( self.ts_arr.shape[0] // self.page_length ) + 1
@@ -682,7 +725,17 @@ class ChannelScroller(DataScroller):
                 HGroup(
                     VGroup(
                         Item('page_up', label='Page FWD', show_label=False),
-                        Item('page_dn', label='Page BWD', show_label=False)
+                        Item('page_dn', label='Page BWD', show_label=False),
+                        HGroup(
+                            Item(
+                                'auto_scale', label='Auto Scale', 
+                                show_label=False
+                                ),
+                            Item(
+                                'channel_scale', label='Scale',
+                                show_label=False, enabled_when='not auto_scale'
+                                )
+                            )
                         ),
                     VGroup(
                         Item('page', label='Page Num'),
