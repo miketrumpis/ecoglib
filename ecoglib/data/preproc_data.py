@@ -16,7 +16,7 @@ def load_preproc(f, load=True):
                 arr = pre[key]
                 pre[key] = arr.astype('i')
                 if key == 'egeo':
-                    pre[key] = tuple(arr)
+                    pre[key] = tuple(pre[key])
         # transpose
         pre.trig_coding = pre.trig_coding.T
         # convert indexing
