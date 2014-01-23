@@ -1,3 +1,5 @@
+from __future__ import division
+
 import numpy as np
 import matplotlib as mpl
 
@@ -158,17 +160,18 @@ class WedgeEvent(StimEvent):
 from ecoglib.util import Bunch
 class StimulatedExperiment(object):
 
-    def __init__(
-            self, trig_times=None, event_tables=dict(), **attrib
-            ):
+    def __init__(self, trig_times=None, event_tables=dict(), **attrib):
         self.trig_times = trig_times
-        self.__dict__.update(event_tables)
-        self.event_names = event_tables.keys()
+        self._fill_tables(**event_tables)
         self.stim_props = Bunch(**attrib)
         
     def stim_str(self, n, mpl_text=False):
         return ''
 
+    def _fill_tables(self, **tables):
+        self.__dict__.update(tables)
+        self.event_names = tables.keys()
+    
     def __getitem__(self, slicing):
         sub_tables = dict()
         if self.trig_times is not None:
@@ -185,13 +188,57 @@ class StimulatedExperiment(object):
             trig_times=sub_trigs, event_tables=sub_tables, 
             **self.stim_props
             )
+
+class FroemkeTonotopyExperiment(StimulatedExperiment):
+
+    tones_pattern = \
+      (2831, 8009, 5663, 8009, 2831, 1000, 1000, 16018, 1415, 4004, 
+       4004, 22651, 708, 1415, 500, 5663, 2000, 1000, 5663, 22651, 
+       16018, 2000, 500, 32036, 2831, 708, 500, 11326, 11326, 708, 
+       1415, 2000, 16018, 32036, 32036, 8009, 4004, 11326, 22651)
+
+    amps_pattern =  (30, 50, 30, 30, 70, 70, 50, 70, 30, 30, 70, 30, 30, 
+                     50, 50, 70, 70, 30, 50, 50, 30, 30, 30, 50, 50, 50, 
+                     70, 30, 50, 70, 70, 50, 50, 30, 70, 70, 50, 70, 70)
+
+    def __init__(self, trig_times, *args, **kwargs):
+        if trig_times is None or not len(trig_times):
+            raise ValueError('needs trig_times to proceed')
+        kwargs['trig_times'] = np.asarray(trig_times)
+        super(FroemkeTonotopyExperiment, self).__init__(*args, **kwargs)
+        self._repeat_sequences()
+
+    def _repeat_sequences(self):
+        n_trig = len(self.trig_times)
+        seq_len = len(self.tones_pattern)
+        n_rep = n_trig // seq_len + 1
+        tones = np.tile(self.tones_pattern, n_rep)[:n_trig]
+        amps = np.tile(self.amps_pattern, n_rep)[:n_trig]
+        self._fill_tables(tones=tones, amps=amps)
+
+    def stim_str(self, n, mpl_text=False):
+        tone = self.tones[n]
+        amp = self.amps[n]
+
+        tone_khz = tone // 1000
+        tone_dec = tone - tone_khz * 1000
+        tone_dec = int( float(tone_dec) / 100 + 0.5 )
+
+        s = '%d.%d KHz'%(tone_khz, tone_dec)
+        if mpl_text:
+            ctab = mpl.cm.gnuplot([0.1, 0.5, 0.9])
+            cidx = (amp - 30) // 20
+            return mpl.text.Text(text=s, color=ctab[cidx])
+        else:
+            s = s + ' (%d)'%amp
+            return s
     
 class ExpoExperiment(StimulatedExperiment):
 
     event_type = StimEvent()
     skip_blocks = ()
 
-    def __init__(self, trig_times=None, **tables):
+    def __init__(self, trig_times=None, event_tables=dict(), **attrib):
         self.trig_times = trig_times
         self.event_tables = ()
         if tables:
@@ -229,8 +276,7 @@ class ExpoExperiment(StimulatedExperiment):
         print 'got data:', data.keys()
         print [len(val) for val in data.values()]
         self.stim_props = Bunch(pix_size=pix_size, tick_len=tick_len)
-        self.__dict__.update(data)
-        self.event_tables = data.keys()
+        self._fill_tables(**data)
         self._filled = True
 
 class SparsenoiseExperiment(ExpoExperiment):
