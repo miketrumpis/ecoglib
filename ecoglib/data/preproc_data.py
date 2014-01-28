@@ -12,16 +12,18 @@ def load_preproc(f, load=True):
             pre = traverse_table(h5, load=True)
         # convert a few arrays
         for key in ('trig_coding', 'emap', 'egeo', 'orig_condition'):
-            if key in pre:
+            if key in pre and pre[key] is not None:
                 arr = pre[key]
                 pre[key] = arr.astype('i')
                 if key == 'egeo':
                     pre[key] = tuple(pre[key])
         # transpose
-        pre.trig_coding = pre.trig_coding.T
-        # convert indexing
-        pre.trig_coding[0] -= 1
-        pre.emap -= 1
+        if pre.trig_coding is not None:
+            pre.trig_coding = pre.trig_coding.T
+            # convert indexing
+            pre.trig_coding[0] -= 1
+        if pre.emap is not None:
+            pre.emap -= 1
     else:
         # this keeps the h5 file open?
         h5 = tables.open_file(f)
