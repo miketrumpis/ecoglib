@@ -531,6 +531,7 @@ class ChannelScroller(DataScroller):
     show_zoom = Bool(False)
     _has_stim = Bool
     channel_scale = Range(low=0.0, high=1.0, value=1.0)
+    window_shift = Range(low=-1.0, high=1.0, value=0.0)
     auto_scale = Bool(True)
     
     def __init__(
@@ -641,6 +642,7 @@ class ChannelScroller(DataScroller):
         self.undraw_events()
         self.page = page
         self.scl_ax.set_ylim(self.ts_plot.ax.get_ylim())
+        self.trait_setq(window_shift=0)
         self.draw_events()
         
     def _page_up_fired(self):
@@ -663,6 +665,14 @@ class ChannelScroller(DataScroller):
         self.ts_plot.stack_spacing = spacing
         self.scl_ax.set_ylim(self.ts_plot.ax.get_ylim())
         self.draw_events()
+        
+    @on_trait_change('window_shift')
+    def _change_window(self):
+        xlim = self.ts_plot.xlim
+        twin = xlim[1] - xlim[0]
+        # map from -1 to +1 twin
+        t_off = self.window_shift * twin
+        self.ts_plot.center_page(t_off)
         
     @on_trait_change('auto_scale')
     def _set_manual_scaling(self):
@@ -702,12 +712,12 @@ class ChannelScroller(DataScroller):
         HSplit(
             Item(
                 'ts_plot', editor=pm.MPLFigureEditor(), show_label=False,
-                width=400, height=1200, resizable=True
+                width=400, height=900, resizable=True
                 ),
             VSplit(
                 Item(
                     'array_scene', editor=SceneEditor(scene_class=Scene),
-                    height=600, width=500, show_label=False,
+                    height=500, width=500, show_label=False,
                     visible_when='_has_video'
                     ),
                 VSplit(
@@ -740,6 +750,7 @@ class ChannelScroller(DataScroller):
                     VGroup(
                         Item('page', label='Page Num'),
                         Item('page_length', label='Page Len'),
+                        Item('window_shift', label='Shift Win'),
                         Item('draw_stims', label='Draw Stim Events',
                              enabled_when='_has_stim>0'),
                         Item('show_zoom', label='Plot CAR')
