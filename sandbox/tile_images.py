@@ -5,7 +5,7 @@ import matplotlib.pyplot as pp
 from ecoglib.util import flat_to_mat, mat_to_flat
 from ecoglib.numutil import ndim_prctile
 
-def quick_tiles(n_frames, nrow=None, ncol=None):
+def quick_tiles(n_frames, nrow=None, ncol=None, figsize=()):
     if not (nrow or ncol):
         ncol = 4
 
@@ -16,8 +16,10 @@ def quick_tiles(n_frames, nrow=None, ncol=None):
     if ncol * nrow < n_frames:
         raise ValueError('Not enough tiles for frames')
 
+    if not figsize:
+        figsize = (ncol, nrow)
     fig, axes, _ = tiled_axes( 
-        (nrow, ncol), np.arange(n_frames), figsize=(ncol, nrow),
+        (nrow, ncol), np.arange(n_frames), figsize=figsize,
         col_major=False, fill_empty=False
         )
     return fig, axes
