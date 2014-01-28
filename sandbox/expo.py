@@ -142,6 +142,7 @@ class FlickerEvent(StimEvent):
 class SparsenoiseEvent(StimEvent):
     children = (
         ChildInfo('32', dict(cell_ht=2, cell_wd=3, cell_x=4, cell_y=5)),
+        ChildInfo('33', dict(contrast=3))
         )
 
 class RingEvent(StimEvent):
@@ -164,6 +165,54 @@ class StimulatedExperiment(object):
         self.trig_times = trig_times
         self._fill_tables(**event_tables)
         self.stim_props = Bunch(**attrib)
+        self.enum_tables = ()
+
+    def set_enum_tables(self, table_names):
+        if isinstance(table_names, str):
+            table_names = (table_names,)
+        good_tabs = filter(lambda x: x in self.event_names, table_names)
+        if len(good_tabs) < len(table_names):
+            raise ValueError('some table names not found in this exp')
+        self.enum_tables = table_names
+
+    def enumerate_conditions(self):
+        # xxx: might want to be operational in a trigger-free state
+        if self.trig_times is None:
+            return ()
+        tab_len = len(self.trig_times)
+        if not self.enum_tables:
+            return np.ones(tab_len, 'i')
+
+        all_uvals = []
+        conditions = np.zeros(len(self.trig_times), 'i')
+        for name in self.enum_tables:
+            tab = self.__dict__[name][:tab_len]
+            uvals = np.unique(tab)
+            all_uvals.append(uvals)
+            conditions *= len(uvals)
+            for n, val in enumerate(uvals):
+                conditions[ tab==val ] += n
+
+        n_vals = map(len, all_uvals)
+        for n in xrange(len(all_uvals)):
+            # first tile the current table of values to
+            # match the preceeding "most-significant" values,
+            # then repeat the tiled set to match to following
+            # "least-significant" values
+            utab = all_uvals[n]
+            if all_uvals[n+1:]:
+                rep = reduce(np.multiply, n_vals[n+1:])
+                utab = np.repeat(utab, rep)
+            if n > 0:
+                tiles = reduce(np.multiply, n_vals[:n])
+                utab = np.tile(utab, tiles)
+            all_uvals[n] = utab
+        
+        #utab = np.tile(utab, n_vals / len(utab))
+        #all_uvals[-1] = utab
+        # 1-offset or 0-offset?
+        conditions += 1
+        return conditions, Bunch(**dict(zip(self.enum_tables, all_uvals)))
         
     def stim_str(self, n, mpl_text=False):
         return ''
@@ -189,7 +238,7 @@ class StimulatedExperiment(object):
             **self.stim_props
             )
 
-class FroemkeTonotopyExperiment(StimulatedExperiment):
+class FroemkeFixedTonotopyExperiment(StimulatedExperiment):
 
     tones_pattern = \
       (2831, 8009, 5663, 8009, 2831, 1000, 1000, 16018, 1415, 4004, 
@@ -205,8 +254,9 @@ class FroemkeTonotopyExperiment(StimulatedExperiment):
         if trig_times is None or not len(trig_times):
             raise ValueError('needs trig_times to proceed')
         kwargs['trig_times'] = np.asarray(trig_times)
-        super(FroemkeTonotopyExperiment, self).__init__(*args, **kwargs)
+        super(FroemkeFixedTonotopyExperiment, self).__init__(*args, **kwargs)
         self._repeat_sequences()
+        self.enum_tables = ('tones', 'amps')
 
     def _repeat_sequences(self):
         n_trig = len(self.trig_times)
@@ -225,13 +275,26 @@ class FroemkeTonotopyExperiment(StimulatedExperiment):
         tone_dec = int( float(tone_dec) / 100 + 0.5 )
 
         s = '%d.%d KHz'%(tone_khz, tone_dec)
+        s = s + ' (%d)'%amp
         if mpl_text:
-            ctab = mpl.cm.gnuplot([0.1, 0.5, 0.9])
-            cidx = (amp - 30) // 20
+            #ctab = mpl.cm.gnuplot2([0.1, 0.5, 0.9])
+            u_amps = np.unique(self.amps)
+            ctab = mpl.cm.jet(np.linspace(0.1, 0.9, len(u_amps)))
+            cidx = u_amps.searchsorted(amp)
             return mpl.text.Text(text=s, color=ctab[cidx])
         else:
-            s = s + ' (%d)'%amp
             return s
+
+class FroemkeTonotopyExperiment(FroemkeFixedTonotopyExperiment):
+
+    def __init__(self, trig_times, tone_tab, amp_tab, *args, **kwargs):
+        tones = np.loadtxt(tone_tab)
+        self.tones_pattern = tones[1:]
+        amps = np.loadtxt(amp_tab)
+        self.amps_pattern = amps
+        super(FroemkeTonotopyExperiment, self).__init__(
+            trig_times, *args, **kwargs
+            )
     
 class ExpoExperiment(StimulatedExperiment):
 
@@ -239,17 +302,14 @@ class ExpoExperiment(StimulatedExperiment):
     skip_blocks = ()
 
     def __init__(self, trig_times=None, event_tables=dict(), **attrib):
-        self.trig_times = trig_times
-        self.event_tables = ()
-        if tables:
-            self.__dict__.update(tables)
-            self._filled = True
-        else:
-            self._filled = False
+        super(ExpoExperiment, self).__init__(
+            trig_times=trig_times, event_tables=event_tables, **attrib
+            )
+        self._filled = len(self.event_names) > 0
 
     def fill_stims(self, xml_file, ignore_skip=False):
         if self._filled:
-            for key in self.event_tables:
+            for key in self.event_names:
                 del self.__dict__[key]
         data = self.event_type.walk_events(xml_file)
         keys = data.keys()
