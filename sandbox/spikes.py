@@ -2,6 +2,7 @@ from __future__ import division
 import numpy as np
 import scipy.signal as signal
 import scipy.ndimage as ndimage
+from scipy.interpolate import interp1d
 import matplotlib.pyplot as pp
 
 ## def find_spikes(mn_trace, winsize, spikewidth, measure='energy'):
@@ -229,9 +230,14 @@ def simple_spikes(d, thresh, t_refractory, t_min):
     return spikes
 
 
-def delay_map(spike_vecs, arr_dims):
+def delay_map(spike_vecs, arr_dims, interp=4):
     n_spikes = spike_vecs.shape[0]
     sp_frames = spike_vecs.reshape( n_spikes, -1, arr_dims )
+    n_pts = sp_frames.shape[1]
+    tx = np.arange(n_pts)
+    tx_plot = np.linspace(tx[0], tx[-1], (n_pts-1)*interp)
+    ifun = interp1d(tx, sp_frames, kind='cubic', axis=1)
+    sp_frames = ifun(tx_plot)
     mn_spikes = np.mean(sp_frames, axis=-1)
     lag_maps = np.zeros((n_spikes, arr_dims))
     n = 0
@@ -241,8 +247,8 @@ def delay_map(spike_vecs, arr_dims):
             )
         lag_map = np.argmax(cross_corr, axis=0)
         centered_time = np.argmax(np.abs(mn_spk))
-        lag_map -= centered_time
-        lag_maps[n] = lag_map
+        #lag_map -= centered_time
+        lag_maps[n] = lag_map.astype('d') / interp
         n = n + 1
     return lag_maps
 
@@ -264,6 +270,6 @@ def plot_maps(maps, max_plot=30):
         pp.imshow(mp, interpolation='nearest', norm=norm)
         pp.gca().xaxis.set_visible(False)
         pp.gca().yaxis.set_visible(False)
-        pp.gca().set_aspect('auto')
+        pp.gca().axis('image')
     f.tight_layout()
     return f
