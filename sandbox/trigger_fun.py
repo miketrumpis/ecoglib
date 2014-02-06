@@ -3,8 +3,20 @@ import pyfftw
 import pyfftw.interfaces.numpy_fft as nfft
 
 import ecoglib.util as ut
+import ecoglib.numutil as nut
+from sandbox.expo import StimulatedExperiment
+import sandbox.array_split as array_split
 
 # define some trigger-locked aggregating utilities
+def trigs_and_conds(trig_code):
+    if isinstance(trig_code, np.ndarray) or \
+      isinstance(trig_code, tuple) or \
+      isinstance(trig_code, list):
+        trigs, conds = trig_code
+    elif isinstance(trig_code, StimulatedExperiment):
+        trigs = trig_code.trig_times
+        conds, _ = trig_code.enumerate_conditions()
+    return trigs, conds
 
 def fenced_out(samps, quantiles=(25,75), thresh=2.0, axis=None, low=True):
 
@@ -36,7 +48,7 @@ def fenced_out(samps, quantiles=(25,75), thresh=2.0, axis=None, low=True):
 
 
 def ep_trigger_avg(
-        x, trig_code, pre=0, post=-1, sum_limit=-1, iqr_thresh=-1
+        x, trig_code, pre=0, post=None, sum_limit=-1, iqr_thresh=-1
         ):
     """
     Average response to 1 or more experimental conditions
@@ -46,10 +58,11 @@ def ep_trigger_avg(
 
     x: data (nchan, npts)
 
-    trig_code: array (2, stim)
-      First row is the trigger indices, second
-      row is a condition ID (integer). Condition
-      ID -1 codes for a flagged trial to be skipped
+    trig_code: sequence-type (2, stim) or StimulatedExperiment
+      First row is the trigger indices, second row is a condition 
+      ID (integer). Condition ID -1 codes for a flagged trial to 
+      be skipped. If a StimulatedExperiment, then triggers and
+      conditions are available from this object.
 
     pre, post: ints
       Number of pre- and post-stim samples in interval. post + pre > 0
@@ -77,13 +90,14 @@ def ep_trigger_avg(
     """
     (pre, post) = map(int, (pre, post))
     x.shape = (1,) + x.shape if x.ndim == 1 else x.shape
-    pos_edge = trig_code[0]; conds = trig_code[1]
+    #pos_edge = trig_code[0]; conds = trig_code[1]
+    pos_edge, conds = trigs_and_conds(trig_code)
     epoch_len = int( np.round(np.median(np.diff(pos_edge))) )
 
     n_cond = conds.max()
     n_pt = x.shape[1]
 
-    if post < 0:
+    if post is None:
         post = epoch_len
 
     epoch_len = post + pre
@@ -116,7 +130,7 @@ def ep_trigger_avg(
     x.shape = filter(lambda x: x > 1, x.shape)
     return avg, n_avg
 
-def extract_epochs(x, trig_code, selected=(), pre=0, post=-1):
+def extract_epochs(x, trig_code, selected=(), pre=0, post=None):
     """
     Extract an array of epochs pivoted at the specified triggers.
 
@@ -144,15 +158,15 @@ def extract_epochs(x, trig_code, selected=(), pre=0, post=-1):
     """
     (pre, post) = map(int, (pre, post))
     x.shape = (1,) + x.shape if x.ndim == 1 else x.shape
-    pos_edge = trig_code[0]
+    pos_edge, conds = trigs_and_conds(trig_code)
     epoch_len = int( np.median(np.diff(pos_edge)) )
 
-    if post < 0:
+    if post is None:
         post = epoch_len
 
     epoch_len = post + pre
     if len(selected):
-        pos_edge = pos_edge[selected]
+        pos_edge = np.take(pos_edge, selected)
 
     epochs = np.empty( (x.shape[0], len(pos_edge), epoch_len), x.dtype )
     epochs.fill(np.nan)
@@ -164,26 +178,30 @@ def extract_epochs(x, trig_code, selected=(), pre=0, post=-1):
     x.shape = filter(lambda x: x > 1, x.shape)
     return epochs
 
+from array_split_test import mtm_lite
 
 def psd_trigger_avg(
         x, trig_code, plan, Fs,
         pre=0, post=0, ntaper=2, induced=1, stats=False, units='V^2'
         ):
     
-    if pre < 10:
+    if abs(pre) < 10:
         pre = int( round(pre*Fs) )
-    if post < 10:
+    if abs(post) < 10:
         post = int( round(post*Fs) )
     ncond= plan.n_conds
     nvar = plan.n_var
     nchan = x.shape[0]
-    nfft = ut.nextpow2(pre+post)
+    nfft = nut.nextpow2(pre+post)
     spectra = ut.Bunch()
     for name in plan.var_names:
         spectra[name] = np.empty( (nchan, ncond, nfft/2+1), 'd' )
         
-    # want to write routine like this
+    tapers, eigs = ntalg.dpss_windows(pre+post, (ntaper+1)/2., ntaper)
     
+    mx_epochs = max([max(map(len, p)) for p in plan.maps])
+    #epochs = array_split.shared_ndarray((nchan, mx_epochs, 
+
     for c, cond_spec in enumerate(plan.walk_conditions()):
         maps = cond_spec.maps
         for n, var in enumerate(maps):
@@ -195,9 +213,12 @@ def psd_trigger_avg(
                 mn = np.mean(epochs, axis=1)
                 epochs -= mn[:,None,:]
             # do mtm_psd on var
-            pf, f = mtm_wrap(
+            # XXX: parallel tasks psd broken
+            ## pf = mtm_lite(epochs, tapers, eigs, nfft)
+            pf = mtm_wrap(
                 epochs,
-                NFFT=nfft, jackknife=False, NW=(ntaper+1)/2., Fs=Fs
+                NFFT=nfft, jackknife=False, adaptive=False,
+                NW=(ntaper+1)/2., Fs=Fs
                 )
             # take average over trials
             name = plan.var_names[n]
@@ -215,17 +236,19 @@ def psd_trigger_avg(
             pass
         print 'proc cond', c
     
-    spectra.fx = f
+    spectra.fx = np.linspace(0, Fs/2, nfft/2+1)
     spectra.units = units
         
     return spectra
 
 
 import nitime.algorithms as ntalg
+#@array_split.splits
 def mtm_wrap(x, **kwargs):
     r = ntalg.multi_taper_psd(x, **kwargs)
     fx, pxx = r[:2]
-    return pxx, fx
+    # array splitting is restricted to single output currently
+    return pxx
 
 ## XXX: keep this for notes, but it's not very fast
 ## def par_mtm_factory(view, x, **kwargs):
