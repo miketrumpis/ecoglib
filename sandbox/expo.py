@@ -153,19 +153,19 @@ class RingEvent(StimEvent):
 
 class WedgeEvent(StimEvent):
     children = (
-        ChildInfo('32', dict(rotation=1)),
+        ChildInfo('32', dict(rotation=1, radius=2)),
         )
 
 
 ## XXX: the following section deserves better organization
 from ecoglib.util import Bunch
 class StimulatedExperiment(object):
-
+    enum_tables = ()
+    
     def __init__(self, trig_times=None, event_tables=dict(), **attrib):
         self.trig_times = trig_times
         self._fill_tables(**event_tables)
         self.stim_props = Bunch(**attrib)
-        self.enum_tables = ()
 
     def set_enum_tables(self, table_names):
         if isinstance(table_names, str):
@@ -178,10 +178,10 @@ class StimulatedExperiment(object):
     def enumerate_conditions(self):
         # xxx: might want to be operational in a trigger-free state
         if self.trig_times is None:
-            return ()
+            return (), Bunch()
         tab_len = len(self.trig_times)
         if not self.enum_tables:
-            return np.ones(tab_len, 'i')
+            return np.ones(tab_len, 'i'), Bunch()
 
         all_uvals = []
         conditions = np.zeros(len(self.trig_times), 'i')
@@ -343,6 +343,7 @@ class SparsenoiseExperiment(ExpoExperiment):
 
     event_type = SparsenoiseEvent()
     skip_blocks = (0,)
+    enum_tables = ('cell_x', 'cell_y', 'contrast')
 
     def stim_str(self, n, mpl_text=False):
         if not self._filled:
@@ -376,6 +377,7 @@ class FlickerExperiment(ExpoExperiment):
 class WedgeExperiment(ExpoExperiment):
 
     event_type = WedgeEvent
+    enum_tables = ('rotation',)
 
     def stim_str(self, n, mpl_text=False):
         rot = self.rotation[n]
@@ -390,6 +392,7 @@ class WedgeExperiment(ExpoExperiment):
 class RingExperiment(ExpoExperiment):
 
     event_type = RingEvent
+    enum_tables = ('inner_rad',)
 
     def stim_str(self, n, mpl_text=False):
         i_rad = self.inner_rad[n]
