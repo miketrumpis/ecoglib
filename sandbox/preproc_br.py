@@ -122,6 +122,9 @@ def quick_load_br(test, notches=(), downsamp=15, page_size=10):
     # notch filtering after downsampling
     (b, a) = butter_bp(lo=2, Fs=Fs, ord=4)
     filtfilt(subdata, b, a)
+    for nfreq in notches:
+        (b, a) = notch(nfreq, Fs=Fs, ftype='cheby2')
+        filtfilt(subdata, b, a)
     
     dset = ut.Bunch(
         data=subdata, ground_chans=gndchan, 
