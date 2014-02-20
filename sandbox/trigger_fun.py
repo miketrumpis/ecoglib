@@ -48,7 +48,7 @@ def fenced_out(samps, quantiles=(25,75), thresh=2.0, axis=None, low=True):
 
 
 def ep_trigger_avg(
-        x, trig_code, pre=0, post=None, sum_limit=-1, iqr_thresh=-1
+        x, trig_code, pre=0, post=0, sum_limit=-1, iqr_thresh=-1
         ):
     """
     Average response to 1 or more experimental conditions
@@ -88,7 +88,6 @@ def ep_trigger_avg(
     skipped: (nskip, nchan, epoch_length) epochs that were not averaged
 
     """
-    (pre, post) = map(int, (pre, post))
     x.shape = (1,) + x.shape if x.ndim == 1 else x.shape
     #pos_edge = trig_code[0]; conds = trig_code[1]
     pos_edge, conds = trigs_and_conds(trig_code)
@@ -97,16 +96,19 @@ def ep_trigger_avg(
     n_cond = conds.max()
     n_pt = x.shape[1]
 
-    if post is None:
+    if not (post or pre):
         post = epoch_len
 
+    (pre, post) = map(int, (pre, post))
     epoch_len = post + pre
 
     # edit trigger list to exclude out-of-bounds epochs
     while pos_edge[0] - pre < 0:
         pos_edge = pos_edge[1:]
+        conds = conds[1:]
     while pos_edge[-1] + post >= n_pt:
         pos_edge = pos_edge[:-1]
+        conds = conds[:-1]
 
     avg = np.zeros( (x.shape[0], n_cond, epoch_len), x.dtype )
     n_avg = np.zeros( (x.shape[0], n_cond), 'i' )
@@ -115,7 +117,9 @@ def ep_trigger_avg(
         trials = np.where(conds == c)[0]
         if not len(trials):
             continue
-        epochs = extract_epochs(x, trig_code, trials, pre, post)
+        epochs = extract_epochs(
+            x, np.row_stack((pos_edge, conds)), trials, pre, post
+            )
         if iqr_thresh > 0:
             pwr = np.sqrt(np.sum(epochs**2, axis=-1))
             # analyze outlier trials per channel
@@ -130,7 +134,7 @@ def ep_trigger_avg(
     x.shape = filter(lambda x: x > 1, x.shape)
     return avg, n_avg
 
-def extract_epochs(x, trig_code, selected=(), pre=0, post=None):
+def extract_epochs(x, trig_code, selected=(), pre=0, post=0):
     """
     Extract an array of epochs pivoted at the specified triggers.
 
@@ -156,14 +160,14 @@ def extract_epochs(x, trig_code, selected=(), pre=0, post=None):
     epochs : array (n_chan, n_epoch, epoch_len)
 
     """
-    (pre, post) = map(int, (pre, post))
     x.shape = (1,) + x.shape if x.ndim == 1 else x.shape
     pos_edge, conds = trigs_and_conds(trig_code)
     epoch_len = int( np.median(np.diff(pos_edge)) )
 
-    if post is None:
+    if not (post or pre):
         post = epoch_len
-
+    
+    (pre, post) = map(int, (pre, post))
     epoch_len = post + pre
     if len(selected):
         pos_edge = np.take(pos_edge, selected)
