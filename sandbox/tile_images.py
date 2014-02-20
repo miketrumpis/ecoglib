@@ -146,7 +146,7 @@ def tile_traces(
         
         # get the (i,j) of this map
         (i, j) = flat_to_mat(geo, p[n])
-        print 'plotting ', i, j
+        #print 'plotting ', i, j
         ## ax = pp.subplot2grid( geo, (i, j) )
         ax = plotted[n]
         if plot_style=='sample' and chan_t.ndim==2:
@@ -160,6 +160,7 @@ def tile_traces(
         else: #elif plot_style=='all':
             ax.plot(tx, chan_t.T)
         ax.set_ylim(yl)
+        ax.set_xlim(twin)
         if twin[0] < 0:
             ax.axvline(x=0, color='k', linestyle='--')
         
