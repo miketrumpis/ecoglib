@@ -182,15 +182,20 @@ if __name__ == '__main__':
         for tdms in all_tdms:
             (_, tf) = os.path.split(tdms)
             (tf, ext) = os.path.splitext(tf)
-            all_h5.append( os.path.join(hp, pf+tf+'.h5') )
+            conv_file = os.path.join(hp, pf+tf+'.h5')
+            if not os.path.exists(conv_file):
+                all_h5.append( conv_file )
+            else:
+                all_h5.append( None )
     else:
         all_tdms = args.tdms_file
         all_h5 = args.h5_file
 
     for tf, hf in zip(all_tdms, all_h5):
-        print tf, '\t', hf
-        tdms_to_hdf5(
-            tf, hf, chan_map=args.permutation, memmap=args.memmap,
-            compression_level=args.compression
-            )
+        if hf:
+            print tf, '\t', hf
+            tdms_to_hdf5(
+                tf, hf, chan_map=args.permutation, memmap=args.memmap,
+                compression_level=args.compression
+                )
 
