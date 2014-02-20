@@ -9,6 +9,8 @@ class Bunch(dict):
 
     def __repr__(self):
         k_rep = self.keys()
+        if not len(k_rep):
+            return 'an empty Bunch'
         v_rep = [str(type(self[k])) for k in k_rep]
         mx_c1 = max([len(s) for s in k_rep])
         mx_c2 = max([len(s) for s in v_rep])
@@ -45,6 +47,12 @@ class ChannelMap(list):
 
     def to_mat(self):
         return flat_to_mat(self.geometry, self, col_major=self.col_major)
+
+    def lookup(self, i, j):
+        flat_idx = mat_to_flat(self.geometry, i, j, col_major=self.col_major)
+        if np.iterable(flat_idx):
+            return np.array([self.index(fi) for fi in flat_idx])
+        return self.index(flat_idx)
 
     def __getslice__(self, i, j):
         return ChannelMap(
