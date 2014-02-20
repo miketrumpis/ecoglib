@@ -57,12 +57,16 @@ def tdms_to_hdf5(
             SamplingRate='sampRate', nrRows='numRow', nrColumns='numCol',
             OverSampling='OSR'
             )
-
         h5_info = h5_file.create_group(h5_file.root, 'info')
         for (key, val) in g_obj.properties.items():
             if type(val) == unicode:
                 # HDF5 doesn't support unicode
-                val = str(val)
+                try:
+                    val = str(val)
+                except:
+                    print '**** Cannot convert this value:'
+                    print val
+                    continue
             val = np.array([val])
             h5_file.create_array(h5_info, key, obj=val)
             if key in special_conversion:
