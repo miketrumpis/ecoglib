@@ -156,6 +156,9 @@ class WedgeEvent(StimEvent):
         ChildInfo('32', dict(rotation=1, radius=2)),
         )
 
+class TickEvent(StimEvent):
+    tag = 'tick'
+    attr_keys = ('start', 'end', 'flush')
 
 ## XXX: the following section deserves better organization
 from ecoglib.util import Bunch
@@ -355,23 +358,6 @@ class FroemkeTonotopyExperiment(StimulatedExperiment):
             return mpl.text.Text(text=s, color=ctab[cidx])
         else:
             return s
-
-## class FroemkeTonotopyExperiment(FroemkeFixedTonotopyExperiment):
-
-##     def __init__(self, trig_times, tone_tab, amp_tab, *args, **kwargs):
-##         if not isinstance(tone_tab, np.ndarray):
-##             tones = np.loadtxt(tone_tab)
-##             self.tones_pattern = tones[1:]
-##         else:
-##             self.tones_pattern = tone_tab
-##         if not isinstance(amp_tab, np.ndarray):
-##             amps = np.loadtxt(amp_tab)
-##             self.amps_pattern = amps
-##         else:
-##             self.amps_pattern = amp_tab
-##         super(FroemkeTonotopyExperiment, self).__init__(
-##             trig_times, *args, **kwargs
-##             )
     
 class ExpoExperiment(StimulatedExperiment):
 
@@ -388,7 +374,13 @@ class ExpoExperiment(StimulatedExperiment):
         if self._filled:
             for key in self.event_names:
                 del self.__dict__[key]
+        # get tick events for good measure
+        ticks = TickEvent.walk_events(xml_file)
+        for attrib in TickEvent.attr_keys:
+            val = ticks.pop(attrib)
+            ticks['tick_'+attrib] = val
         data = self.event_type.walk_events(xml_file)
+        data.update(ticks)
         keys = data.keys()
         if ignore_skip or not self.skip_blocks:
             keep_idx = slice(None)
