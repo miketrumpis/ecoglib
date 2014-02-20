@@ -238,33 +238,104 @@ class StimulatedExperiment(object):
             **self.stim_props
             )
 
-class FroemkeFixedTonotopyExperiment(StimulatedExperiment):
+    def extend(self, experiment, offset):
+        if type(self) != type(experiment):
+            raise TypeError('Can only join experiments of the same type')
+        first_trigs = self.trig_times
+        second_trigs = experiment.trig_times + offset
+        trigs = np.r_[first_trigs, second_trigs]
 
-    tones_pattern = \
+        new_tables = dict()
+        for name in self.event_names:
+            tab1 = eval('self.%s'%name)
+            tab2 = eval('experiment.%s'%name)
+            new_tables[name] = np.r_[tab1, tab2]
+
+        new_props = self.stim_props # ??? 
+
+        return type(self)(
+            trig_times=trigs, event_tables=new_tables, **new_props
+            )
+
+def repeat_tonotopy_sequences(trig_times, tones_pattern, amps_pattern):
+    n_trig = len(trig_times)
+    seq_len = len(tones_pattern)
+    n_rep = n_trig // seq_len + 1
+    tones = np.tile(tones_pattern, n_rep)[:n_trig]
+    amps = np.tile(amps_pattern, n_rep)[:n_trig]
+    #self._fill_tables(tones=tones, amps=amps)
+    return tones, amps
+
+    
+class FroemkeTonotopyExperiment(StimulatedExperiment):
+
+    ## These patterns were used in one set of exps..
+    fixed_tones_pattern = \
       (2831, 8009, 5663, 8009, 2831, 1000, 1000, 16018, 1415, 4004, 
        4004, 22651, 708, 1415, 500, 5663, 2000, 1000, 5663, 22651, 
        16018, 2000, 500, 32036, 2831, 708, 500, 11326, 11326, 708, 
        1415, 2000, 16018, 32036, 32036, 8009, 4004, 11326, 22651)
 
-    amps_pattern =  (30, 50, 30, 30, 70, 70, 50, 70, 30, 30, 70, 30, 30, 
-                     50, 50, 70, 70, 30, 50, 50, 30, 30, 30, 50, 50, 50, 
-                     70, 30, 50, 70, 70, 50, 50, 30, 70, 70, 50, 70, 70)
+    fixed_amps_pattern =  (30, 50, 30, 30, 70, 70, 50, 70, 30, 30, 70, 30, 30, 
+                           50, 50, 70, 70, 30, 50, 50, 30, 30, 30, 50, 50, 50, 
+                           70, 30, 50, 70, 70, 50, 50, 30, 70, 70, 50, 70, 70)
 
-    def __init__(self, trig_times, *args, **kwargs):
+    def __init__(self, trig_times=None, tone_tab='', amp_tab='', **kwargs):
+        # * trig_times is the sequence of trial event timestamps
+        # * tone_tab is 
+        #     1) a path to a table with the tone pattern sequence
+        #     2) a tone pattern sequence 
+        # * amp_tab is like tone tab, specifying the corresponding 
+        #   amplitude sequence
+        # given tables are over-ridden by the 'event_tables' dictionary
+        
+        
         if trig_times is None or not len(trig_times):
-            raise ValueError('needs trig_times to proceed')
-        kwargs['trig_times'] = np.asarray(trig_times)
-        super(FroemkeFixedTonotopyExperiment, self).__init__(*args, **kwargs)
-        self._repeat_sequences()
-        self.enum_tables = ('tones', 'amps')
+            #raise ValueError('needs trig_times to proceed')
+            trig_times = np.array([])
 
-    def _repeat_sequences(self):
-        n_trig = len(self.trig_times)
-        seq_len = len(self.tones_pattern)
-        n_rep = n_trig // seq_len + 1
-        tones = np.tile(self.tones_pattern, n_rep)[:n_trig]
-        amps = np.tile(self.amps_pattern, n_rep)[:n_trig]
-        self._fill_tables(tones=tones, amps=amps)
+        #super(FroemkeFixedTonotopyExperiment, self).__init__(**kwargs)
+
+        # The tone/amp tables may be given in the event_tables 
+        # dictionary, which should be preferred to 'tone_tab'
+        # and 'amp_tab' keyword args.
+
+        # The tone/amp tables can come in fully specified (i.e. 
+        # with the same length as the trigger times. If not,
+        # then repeat the tables to match the number of trials
+
+        event_tables = kwargs.pop('event_tables', None)
+        if not event_tables:
+        
+            if tone_tab == '' or amp_tab == '':
+                tones = np.array(self.fixed_tones_pattern)
+                amps = np.array(self.fixed_amps_pattern)
+            else:
+                if not isinstance(tone_tab, np.ndarray):
+                    # treat it as a text table
+                    tones = np.loadtxt(tone_tab)
+                else:
+                    tones = tone_tab
+                if tones[0] == 0:
+                    tones= tones[1:]
+                if not isinstance(amp_tab, np.ndarray):
+                    # treat it as a text table
+                    amps = np.loadtxt(amp_tab)
+                else:
+                    amps = amp_tab
+
+            if len(tones) != len(trig_times):
+                tones, amps = repeat_tonotopy_sequences(
+                    trig_times, tones, amps
+                    )
+            event_tables = dict(tones=tones, amps=amps)
+                
+        super(FroemkeTonotopyExperiment, self).__init__(
+            trig_times=trig_times, event_tables=event_tables, **kwargs
+            )
+            
+        self.set_enum_tables( ('tones', 'amps') )
+
 
     def stim_str(self, n, mpl_text=False):
         tone = self.tones[n]
@@ -285,16 +356,22 @@ class FroemkeFixedTonotopyExperiment(StimulatedExperiment):
         else:
             return s
 
-class FroemkeTonotopyExperiment(FroemkeFixedTonotopyExperiment):
+## class FroemkeTonotopyExperiment(FroemkeFixedTonotopyExperiment):
 
-    def __init__(self, trig_times, tone_tab, amp_tab, *args, **kwargs):
-        tones = np.loadtxt(tone_tab)
-        self.tones_pattern = tones[1:]
-        amps = np.loadtxt(amp_tab)
-        self.amps_pattern = amps
-        super(FroemkeTonotopyExperiment, self).__init__(
-            trig_times, *args, **kwargs
-            )
+##     def __init__(self, trig_times, tone_tab, amp_tab, *args, **kwargs):
+##         if not isinstance(tone_tab, np.ndarray):
+##             tones = np.loadtxt(tone_tab)
+##             self.tones_pattern = tones[1:]
+##         else:
+##             self.tones_pattern = tone_tab
+##         if not isinstance(amp_tab, np.ndarray):
+##             amps = np.loadtxt(amp_tab)
+##             self.amps_pattern = amps
+##         else:
+##             self.amps_pattern = amp_tab
+##         super(FroemkeTonotopyExperiment, self).__init__(
+##             trig_times, *args, **kwargs
+##             )
     
 class ExpoExperiment(StimulatedExperiment):
 
@@ -428,3 +505,15 @@ def get_expo_experiment(xml_file, trig_times, filled=True):
     if filled:
         ex.fill_stims(xml_file)
     return ex
+
+def join_experiments(exps, offsets):
+    if len(exps) < 1 or not len(offsets):
+        raise ValueError('Empty experiment or offset list')
+    if len(exps) < 2:
+        return exps[0]
+    if len(offsets) < len(exps) - 1:
+        raise ValueError('Not enough offset points given to join experiments')
+    new_exp = exps[0].extend(exps[1], offsets[0])
+    for n in xrange(2, len(exps)):
+        new_exp = new_exp.extend(exps[n], offsets[n-1])
+    return new_exp
