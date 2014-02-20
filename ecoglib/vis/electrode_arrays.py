@@ -60,7 +60,7 @@ def make_rectangles(
         )
 
 
-def draw_array(arr_name, p, colors=None, chan_set=(), zoom=1, **patch_kws):
+def draw_array(arr_name, p, colors=None, chan_set=None, zoom=1, **patch_kws):
     # first get the locations for the given array
     aspec = _array_features[arr_name]
 
@@ -118,7 +118,10 @@ def draw_array(arr_name, p, colors=None, chan_set=(), zoom=1, **patch_kws):
         '%d x %d %s'%(bar_len, bar_len, units),
         ha='center', fontsize=14
         )
-    
+
+    if chan_set is None:
+        return fig
+
     # Now go and add the channel names
     p = p.as_row_major()
     if not len(chan_set):
