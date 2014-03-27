@@ -281,11 +281,11 @@ def tile_traces(
             )
         )
     ma.text(
-        -10, y_calib_size*1e-6/2, r"%d $\mu V$"%y_calib_size, 
+        x0-10, y_calib_size*1e-6/2, r"%d $\mu V$"%y_calib_size, 
         ha='right', va='center', rotation='vertical'
         )
     ma.text(
-        x_calib_size*2/3., -y_calib_size*1e-6/10, '%d ms'%x_calib_size, 
+        x0*1/3 + twin[-1]*2/3., -y_calib_size*1e-6/10, '%d ms'%x_calib_size, 
         ha='center', va='top'
         )
     
