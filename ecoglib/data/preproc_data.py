@@ -5,11 +5,13 @@ import tables
 import os
 
 from ecoglib.util import Bunch
+from sandbox.array_split import shared_ndarray
 
-def load_preproc(f, load=True):
+def load_preproc(f, load=True, sharedmem=True):
+    shared_paths = ('/data',) if sharedmem else ()
     if load:
         with tables.open_file(f) as h5:
-            pre = traverse_table(h5, load=True)
+            pre = traverse_table(h5, load=True, shared_paths=shared_paths)
         # convert a few arrays
         for key in ('trig_coding', 'emap', 'egeo', 'orig_condition'):
             if key in pre and pre[key] is not None:
@@ -30,7 +32,7 @@ def load_preproc(f, load=True):
         pre = traverse_table(h5, load=False)
     return pre
 
-def traverse_table(f, path='/', load=True):
+def traverse_table(f, path='/', load=True, shared_paths=()):
     # Walk nodes and stuff arrays into the bunch.
     # If we encouter a group, then loop back into this method
     if isinstance(f, str):
@@ -44,13 +46,18 @@ def traverse_table(f, path='/', load=True):
     for n in nlist:
         if isinstance(n, tables.Array):
             if load:
-                arr = n.read()
-                if arr.shape == (1,1):
-                    arr = arr[0,0]
-                    if arr==0:
-                        arr = None
+                if os.path.join(path, n.name) in shared_paths:
+                    arr = shared_ndarray(n.shape)
+                    arr[:] = n.read()
                 else:
-                    arr = arr.squeeze()
+                    arr = n.read()
+                if n.shape:
+                    if arr.shape == (1,1):
+                        arr = arr[0,0]
+                        if arr==0:
+                            arr = None
+                    else:
+                        arr = arr.squeeze()
             else:
                 arr = n
             gbunch[n.name] = arr

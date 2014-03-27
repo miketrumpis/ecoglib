@@ -54,6 +54,12 @@ class ChannelMap(list):
             return np.array([self.index(fi) for fi in flat_idx])
         return self.index(flat_idx)
 
+    def subset(self, sub):
+        return ChannelMap(
+            [self[i] for i in sub],
+            self.geometry, col_major=self.col_major
+            )
+
     def __getslice__(self, i, j):
         return ChannelMap(
             super(ChannelMap, self).__getslice__(i,j),

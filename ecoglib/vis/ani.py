@@ -52,10 +52,12 @@ def write_anim(
             writer.grab_frame()
 
 def dynamic_frames_and_series(
-        frames, series, tx=None, title='Array Movie',
-        xlabel='Epoch (s)', ylabel='$\mu V$', 
+        frames, series, 
+        tx=None, frame_times=None,
+        xlabel='Epoch (s)', ylabel='V', 
         stack_traces=True, interp=1,
-        imshow_kw={}, line_props={}
+        imshow_kw={}, line_props={},
+        title='Array Movie'
         ):
     # returns a function that can be used to step through
     # figure frames
@@ -90,18 +92,23 @@ def dynamic_frames_and_series(
     
     ## Set up array frames
     f_img = frame_ax.imshow(frames[0], **imshow_kw)
-    frame_ax.axis('image'); frame_ax.axis('off')
+    frame_ax.axis('image'); #frame_ax.axis('off')
     frame_ax.set_title(title, fontsize=18)
     
-    def _step_time(num, tx, frames, frame_img, tm):
-        #tsp.time = tx[num]
-        #tsp.draw_dynamic()
-        x = tx[num]
+    def _step_time(num, tx, frames, frame_img, tm, f_idx=None):
+        # frame index array f_idx encodes possible offsets and skips
+        # of the frame times with respect to the time axis
+        if f_idx is None:
+            x = tx[num]
+        else:
+            x = tx[ f_idx[num] ]
         tm.set_data(( [x, x], [0, 1] ))
         frame_img.set_data(frames[num])
         return (frame_img, tm)
 
-    func = lambda x: _step_time(x, tx, frames, f_img, time_mark)
+    func = lambda x: _step_time(
+        x, tx, frames, f_img, time_mark, f_idx=frame_times
+        )
     fig.tight_layout()
     return fig, func
         

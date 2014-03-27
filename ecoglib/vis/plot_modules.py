@@ -71,7 +71,8 @@ class BlitPlot(HasTraits):
     def __init__(self, figure=None, figsize=(6,4), axes=None, **traits):
         self.fig = figure or Figure(figsize=figsize)
         if axes:
-            self.fig.add_axes(axes)
+            if not axes in self.fig.axes:
+                self.fig.add_axes(axes)
             self.ax = axes
         else:
             self.ax = self.fig.add_axes([.15, .12, .8, .85])

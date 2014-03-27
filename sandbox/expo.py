@@ -241,6 +241,12 @@ class StimulatedExperiment(object):
             **self.stim_props
             )
 
+    def subexp(self, indices):
+        if hasattr(indices, 'dtype') and indices.dtype.char == '?':
+            indices = np.where(indices)[0]
+        # take advantage of fancy indexing?
+        return self.__getitem__(indices)
+
     def extend(self, experiment, offset):
         if type(self) != type(experiment):
             raise TypeError('Can only join experiments of the same type')

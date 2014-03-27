@@ -7,14 +7,14 @@ import scipy.signal as signal
 
 def _bandpass_params(lo, hi):
     (lo, hi) = map(float, (lo, hi))
-    if not (lo or hi):
+    if not (lo > 0 or hi > 0):
         raise ValueError('no cutoff frequencies set')
-    if lo and not hi:
+    if lo and not hi > 0:
         return lo, 'highpass'
         ## return sig.filter_design.butter(
         ##     ord, 2 * lo / Fs, btype='highpass'
         ##     )
-    if hi and not lo:
+    if hi and not lo > 0:
         return hi, 'lowpass'
         ## return sig.filter_design.butter(
         ##     ord, 2 * hi / Fs, btype='lowpass'

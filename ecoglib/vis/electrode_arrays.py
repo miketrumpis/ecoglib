@@ -17,6 +17,11 @@ _array_features = dict(
     psv_32 = Bunch(
         edge=400e-3, spacing=3, geo=(6,6),
         missing_locs=( (0,0), (0,5), (1,0), (1,5) )
+        ),
+
+    psv_61 = Bunch(
+        edge=200e-3, spacing=600e-3, geo=(8,8),
+        missing_locs=( (0,0), (0,7), (7,0), (7,7) )
         )
     )
 
@@ -60,7 +65,7 @@ def make_rectangles(
         )
 
 
-def draw_array(arr_name, p, colors=None, chan_set=None, zoom=1, **patch_kws):
+def draw_array(arr_name, p, colors=None, chan_set=(), zoom=1, **patch_kws):
     # first get the locations for the given array
     aspec = _array_features[arr_name]
 
@@ -126,14 +131,15 @@ def draw_array(arr_name, p, colors=None, chan_set=None, zoom=1, **patch_kws):
     p = p.as_row_major()
     if not len(chan_set):
         chan_set = range(1, len(p)+1)
-        
-    for chan_idx, chan_name in zip(p, chan_set):
+
+    yy, xx = p.to_mat()
+    for y, x, chan_name in zip(yy, xx, chan_set):
         chan_name = str(chan_name)
-        y, x = flat_to_mat(geo, chan_idx, col_major=False)
+        #y, x = flat_to_mat(geo, chan_idx, col_major=False)
         x *= spacing
         y = (geo[0] - y - 1 + 0.25) * spacing
         ax.text(
-            x, y, chan_name, ha='center', va='baseline', fontsize=14
+            x, y, chan_name, ha='center', va='baseline', fontsize=10
             )
     return fig
         

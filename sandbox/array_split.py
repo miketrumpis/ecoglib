@@ -4,6 +4,8 @@ import ctypes
 from contextlib import closing
 import numpy as np
 
+SPLIT_DISABLED = False
+
 def shared_ndarray(shape):
     N = reduce(np.multiply, shape)
     shm = mp.Array(ctypes.c_double, N)
@@ -11,7 +13,7 @@ def shared_ndarray(shape):
 
 def splits(method, split=0, off=False):
     # split not yet impelemented
-    if off:
+    if off or SPLIT_DISABLED:
         return method
     def split_method(x, *args, **kwargs):
         shm = mp.sharedctypes.synchronized(
@@ -20,7 +22,7 @@ def splits(method, split=0, off=False):
         # create a pool and map the shared memory array over the method
         init_args = (shm, x.shape, method, args, kwargs)
         with closing(mp.Pool(
-                processes=6, initializer=_init_globals,
+                processes=8, initializer=_init_globals,
                 initargs=init_args
                 )) as p:
             n_div = estimate_chunks(x.size, len(p._pool))
@@ -46,7 +48,7 @@ def splits(method, split=0, off=False):
             for dims in job_dims:
                 job_slices.extend( [slice(n, n+dims)] )
                 n += dims
-                
+            print job_slices
             res = p.map_async( _global_method_wrap, job_slices )
 
         p.join()
@@ -99,11 +101,11 @@ def _global_method_wrap(aslice):
     arr = tonumpyarray(shared_arr_)
     info = mp.get_logger().info
     info('applying method %s to slice %s'%(method_, aslice))
-    info('in norm: %f'%np.linalg.norm(np.ravel(arr[aslice])))
+    #info('in norm: %f'%np.linalg.norm(np.ravel(arr[aslice])))
     #return method_(arr[aslice], *args_, **kwdict_)
     r = method_(arr[aslice], *args_, **kwdict_)
-    info('out norm 1: %f'%np.linalg.norm(np.ravel(arr[aslice])))
-    arr = tonumpyarray(shared_arr_)
-    info('out norm 2: %f'%np.linalg.norm(np.ravel(arr[aslice])))    
+    #info('out norm 1: %f'%np.linalg.norm(np.ravel(arr[aslice])))
+    #arr = tonumpyarray(shared_arr_)
+    #info('out norm 2: %f'%np.linalg.norm(np.ravel(arr[aslice])))    
     return r
 
