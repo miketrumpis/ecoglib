@@ -25,7 +25,12 @@ def filtfilt(arr, b, a, bsize=10000):
 
 root_pth = '/Users/mike/experiment_data/AnimalExperiment-2013-11-01/blackrock'
 bkp_pth = '/Users/mike/experiment_data/AnimalExperiment-2013-11-01/blackrock_offline'
+
 root_exp = 'm645r4#'
+
+preproc_pth = '/Users/mike/experiment_data/AnimalExperiment-2013-11-01/proc_data'
+
+
 xml_pth = '/Users/mike/experiment_data/AnimalExperiment-2013-11-01/expo_xml'
 xml_exp = 'm645r3#'
 
@@ -44,53 +49,90 @@ def quick_load_br(test, notches=(), downsamp=15, page_size=10):
         'psv_244_daq1', connectors=connections
         )
 
-    ## Default Lowpass Filter
-    (ord, wn) = signal.cheb2ord(2*700/3e4, 2*1000/3e4, 0.1, 60)
-    (b, a) = cheby2_bp(60, hi=wn, Fs=2, ord=ord)
-
+    # try preproc path first to see if this run has already been downsampled
     try:
-        test_file = p.join(root_pth, root_exp) + '%03d.h5'%test
+        test_file = p.join(preproc_pth, root_exp) + '%03d_Fs2000.h5'%test
         h5f = tables.open_file(test_file)
+        downsamp = 1
     except IOError:
-        test_file = p.join(bkp_pth, root_exp) + '%03d.h5'%test
-        h5f = tables.open_file(test_file)
+        print 'Warning: forcing downsampling to 2000 Hz'
+        downsamp = 15
+    
+    if downsamp > 1:
+        ## Default Lowpass Filter
+        (ord, wn) = signal.cheb2ord(2*700/3e4, 2*1000/3e4, 0.1, 60)
+        (b, a) = cheby2_bp(60, hi=wn, Fs=2, ord=ord)
+
+        try:
+            test_file = p.join(root_pth, root_exp) + '%03d.h5'%test
+            h5f = tables.open_file(test_file)
+        except IOError:
+            test_file = p.join(bkp_pth, root_exp) + '%03d.h5'%test
+            h5f = tables.open_file(test_file)
+
+        save_file = p.join(preproc_pth, root_exp) + '%03d_Fs2000.h5'%test
+        h5_save = tables.open_file(save_file, mode='w')
+        h5_save.create_array(h5_save.root, 'Fs', 3e4 / downsamp)
 
     dlen, nchan = h5f.root.data.shape
     sublen = dlen / downsamp
     if dlen - sublen*downsamp > 0:
         sublen += 1
 
-    #subdata = np.empty((len(chan_map), sublen), 'd')
+    # set up arrays for loaded data and ground chans
     subdata = array_split.shared_ndarray((len(chan_map), sublen))
     if len(chan_map) < nchan:
         gndchan = np.empty((len(disconnected), sublen), 'd')
     else:
         gndchan = None
+
+    # if saving downsampled results, set up H5 table
+    if downsamp > 1:
+        atom = tables.Float64Atom()
+        filters = tables.Filters(complevel=5, complib='zlib')
+        ## saved_array = h5_save.create_carray(
+        ##     h5_save.root, 'data', atom=atom, shape=(sublen, nchan),
+        ##     filters=filters
+        ##     )
+        saved_array = h5_save.create_earray(
+            h5_save.root, 'data', atom=atom, shape=(sublen, 0),
+            filters=filters, expectedrows=nchan
+            )
+        
     peel = array_split.shared_ndarray( (page_size, h5f.root.data.shape[0]) )
     n = 0
-    dchan_corr = 0
+    dstop = 0
     while n < nchan:
         start = n
         stop = min(nchan, n+page_size)
         print 'processing BR channels %03d - %03d'%(start, stop-1)
         peel[0:stop-n] = h5f.root.data[:,start:stop].T.astype('d', order='C')
-        peel *= 8e-3 / 2**15
-        print 'parfilt',
-        sys.stdout.flush()
-        filtfilt(peel[0:stop-n], b, a)
-        print 'done'
-        sys.stdout.flush()
+        if downsamp > 1:
+            peel *= 8e-3 / 2**15
+            print 'parfilt',
+            sys.stdout.flush()
+            filtfilt(peel[0:stop-n], b, a)
+            print 'done'
+            sys.stdout.flush()
+            print 'saving chans', 
+            sys.stdout.flush()
+            saved_array.append(peel[:,::downsamp].T)
+            print 'done'
+            sys.stdout.flush()
+
         data_chans = np.setdiff1d(np.arange(start,stop), disconnected)
         if len(data_chans):
-            dstart = data_chans[0] - dchan_corr
+            dstart = dstop
             dstop = dstart + len(data_chans)
         if len(data_chans) == (stop-start):
             # if all data channels, peel off in a straightforward way
+            #print (dstart, dstop)
             subdata[dstart:dstop,:] = peel[0:stop-n,::downsamp]
         else:
             if len(data_chans):
                 # get data channels first
                 raw_data = peel[data_chans-n, :]
+                #print (dstart, dstop), data_chans-n
                 subdata[dstart:dstop, :] = raw_data[:, ::downsamp]
             # Now filter for ground channels within this set of channels:
             gnd_chans = filter(
@@ -99,16 +141,21 @@ def quick_load_br(test, notches=(), downsamp=15, page_size=10):
                 )
             for g in gnd_chans:
                 gndchan[g[1], :] = peel[g[0]-n, ::downsamp]
-            dchan_corr += len(gnd_chans)
         n += page_size
 
-    Fs = h5f.root.Fs.read()[0,0] / downsamp
+    try:
+        Fs = h5f.root.Fs.read()[0,0] / downsamp
+    except TypeError:
+        Fs = h5f.root.Fs.read() / downsamp
     trigs = h5f.root.trig_idx.read().squeeze()
     if not trigs.shape:
         trigs = None
     else:
         trigs = np.round( trigs / downsamp ).astype('i')
     h5f.close()
+    if downsamp > 1:
+        h5_save.create_array(h5_save.root, 'trig_idx', trigs)
+        h5_save.close()
 
     ## Set up Expo Experiment    
     xml = glob(p.join(xml_pth, xml_exp) + '%d*'%test)

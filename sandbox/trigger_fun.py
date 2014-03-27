@@ -170,6 +170,8 @@ def extract_epochs(x, trig_code, selected=(), pre=0, post=0):
     (pre, post) = map(int, (pre, post))
     epoch_len = post + pre
     if len(selected):
+        if hasattr(selected, 'dtype') and selected.dtype.char == '?':
+            selected = np.where(selected)[0]
         pos_edge = np.take(pos_edge, selected)
 
     epochs = np.empty( (x.shape[0], len(pos_edge), epoch_len), x.dtype )
