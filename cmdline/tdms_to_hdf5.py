@@ -67,7 +67,6 @@ def tdms_to_hdf5(
                     print '**** Cannot convert this value:'
                     print val
                     continue
-            val = np.array([val])
             h5_file.create_array(h5_info, key, obj=val)
             if key in special_conversion:
                 print 'caught', key
