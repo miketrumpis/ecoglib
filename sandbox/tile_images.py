@@ -267,7 +267,7 @@ def tile_traces(
     ma = missed[-1]
     ma.set_xlim(ax.get_xlim())
     ma.set_ylim(ax.get_ylim())
-    y_calib_size = (yl[1] // 1e-4 - 1) * 1e2
+    y_calib_size = max((yl[1] // 1e-4 - 1), 1) * 1e2
     x_calib_size = 100
     # offset calib bars 50 ms after twin[0]?
     x0 = twin[0] + 50
