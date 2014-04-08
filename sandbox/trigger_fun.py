@@ -184,7 +184,7 @@ def extract_epochs(x, trig_code, selected=(), pre=0, post=0):
     x.shape = filter(lambda x: x > 1, x.shape)
     return epochs
 
-from array_split_test import mtm_lite
+## from array_split_test import mtm_lite
 
 def psd_trigger_avg(
         x, trig_code, plan, Fs,
