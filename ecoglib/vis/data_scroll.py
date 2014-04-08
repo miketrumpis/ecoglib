@@ -20,6 +20,7 @@ from mayavi.sources.api import ArraySource
 from pyface.timer.api import Timer
 
 import plot_modules as pm
+import traitsui_bridge as tb
 import ecoglib.util as ut
 
 #### Utility to prepare volumetric data for VTK without
@@ -352,13 +353,13 @@ class DataScroller(HasTraits):
                     enabled_when='_has_video'
                     ),
                 Item(
-                    'zoom_plot', editor=pm.MPLFigureEditor(),
+                    'zoom_plot', editor=tb.MPLFigureEditor(),
                     show_label=False, width=500, height=200, resizable=True
                     )
                 ),
             HGroup(
                 Item(
-                    'ts_plot', editor=pm.MPLFigureEditor(),
+                    'ts_plot', editor=tb.MPLFigureEditor(),
                     show_label=False, width=600, height=100, resizable=True
                     ),
                 Item('fps', label='FPS'),
@@ -711,7 +712,7 @@ class ChannelScroller(DataScroller):
     view = View(
         HSplit(
             Item(
-                'ts_plot', editor=pm.MPLFigureEditor(), show_label=False,
+                'ts_plot', editor=tb.MPLFigureEditor(), show_label=False,
                 width=400, height=900, resizable=True
                 ),
             VSplit(
@@ -722,7 +723,7 @@ class ChannelScroller(DataScroller):
                     ),
                 VSplit(
                     Item(
-                        'zoom_plot', editor=pm.MPLFigureEditor(), 
+                        'zoom_plot', editor=tb.MPLFigureEditor(), 
                         show_label=False,
                         width=400, height=150, resizable=True
                         ),

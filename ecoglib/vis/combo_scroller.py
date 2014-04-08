@@ -31,7 +31,7 @@ class ComboScroller(DataScroller):
         super(ComboScroller, self).__init__(
             d_array, ts_array, rowcol=rowcol, Fs=Fs, **traits
             )
-        self.zoom_plot = dummy_plot1([0.0])
+        self.zoom_plot = dummy_plot1(np.array([0.0]))
         trail_length = int(
             np.round(trailing * self.Fs / scatter_time_scale)
             )
@@ -63,8 +63,8 @@ class ComboScroller(DataScroller):
                     )
                 ),
             Item(
-                'ts_plot', editor=pm.MPLFigureEditor(),
-                show_label=False, width=600, height=100, resizable=True
+                'ts_plot', editor=tb.MPLFigureEditor(),
+                show_label=False, width=600, height=200, resizable=True
                 ),
             HGroup(
                 Item('time', label='Time Slice', style='custom'),
@@ -96,7 +96,7 @@ class ClassCodedComboScroller(ClassCodedDataScroller):
         super(ClassCodedComboScroller, self).__init__(
             d_array, ts_array, labels, rowcol=rowcol, Fs=Fs, **traits
             )
-        self.zoom_plot = dummy_plot2([0.0], [0], 1)
+        self.zoom_plot = dummy_plot2(np.array([0.0]), np.array([0]), 1)
         trail_length = int(
             np.round(trailing * self.Fs / scatter_time_scale)
             )
@@ -130,8 +130,8 @@ class ClassCodedComboScroller(ClassCodedDataScroller):
                     )
                 ),
             Item(
-                'ts_plot', editor=pm.MPLFigureEditor(),
-                show_label=False, width=600, height=100, resizable=True
+                'ts_plot', editor=tb.MPLFigureEditor(),
+                show_label=False, width=600, height=200, resizable=True
                 ),
             HGroup(
                 Item('time', label='Time Slice', style='custom'),

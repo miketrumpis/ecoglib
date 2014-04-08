@@ -1,6 +1,7 @@
 import numpy as np
 
 import ecoglib.vis.plot_modules as pm
+import ecoglib.vis.traitsui_bridge as tb
 
 from traits.api import \
      HasTraits, Range, Float, on_trait_change, Instance, Button, Int, Any
@@ -256,7 +257,7 @@ class ScatterScroller(HasTraits):
                 height=600, width=600, show_label=False, resizable=True
                 ),
             Item(
-                'ts_plot', editor=pm.MPLFigureEditor(),
+                'ts_plot', editor=tb.MPLFigureEditor(),
                 show_label=False, width=600, height=200, resizable=True
                 ),
             HGroup(
