@@ -38,7 +38,7 @@ We're going to set up a FM of a sinusoid varying slowly between +/-
 """
 
 N = 60000
-awgn_sig = 5e-1
+awgn_sig = 0
 tx = np.arange(N, dtype='d')
 fm_freq = 0.1*np.cos(2*np.pi*tx * .0002)
 fm_sig = np.cos(2*np.pi*(0.15*tx + np.cumsum(fm_freq)))
@@ -91,8 +91,8 @@ carrier frequency. This is fairly computationally intense, but we have
 very good time and frequency resolution, adequate for the dynamics of
 this signal. As always, there is a complementary tradeoff between time
 and frequency resolution. The resulting bandwidth of the carrier
-signal estimation is ~ 2NW, but the time resolution scales by the
-reciprocal of 2NW. The result is a consistent power estimation for
+signal estimation is ~ 2NW, but the time resolutwion scales by the
+reciprocal of 2W. The result is a consistent power estimation for
 both region of fast and slow dynamics.
 
 By comparison, we'll try the traditional overlapping windows method of

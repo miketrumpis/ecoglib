@@ -257,10 +257,10 @@ def mtm_spectrogram(
             samp_factor=samp_factor
             )
         if freqs is None:
-            mtm_pwr = np.sqrt(2) * np.abs(mtm_pwr)
+            mtm_pwr = 2 * np.abs(mtm_pwr)**2
         else:
             f_idx = fx.searchsorted(freqs)
-            mtm_pwr = np.sqrt(2) * np.abs(mtm_pwr[f_idx])
+            mtm_pwr = 2 * np.abs(mtm_pwr[f_idx])**2
 
         ## mtm_pwr *= mtm_pwr
         if np.iterable(weighting):
@@ -280,7 +280,7 @@ def mtm_spectrogram(
     tx /= Fs
 
     # scale by freq so that total power(t) = \int{ psd(t,f) * df }
-    df = 2 * Fs / nfft 
+    df = Fs / nfft 
     psd_matrix /= df
     if freqs is not None:
         fx = freqs
