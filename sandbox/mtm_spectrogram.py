@@ -144,7 +144,7 @@ def parse_mtm_args(kw_dict):
 
 def mtm_spectrogram(
         x, n, pl=0.25, detrend='', Fs=1.0, adaptive=True, samp_factor=None,
-        **mtm_kwargs
+        freqs=None, **mtm_kwargs
         ):
     """
     Make spectrogram using the multitaper spectral estimation method at
@@ -168,12 +168,16 @@ def mtm_spectrogram(
     samp_factor: int
       Each complex demodulate has a temporal resolution of 1/2W, and will
       be resampled by default.
-      Setting samp_factor > 1 samples at that many times the temporal
+      Setting samp_factor >= 1 samples at that many times the temporal
       resolution.
       Setting samp_factor < 1 disables resampling.
       Leaving samp_factor == None will allow the algorithm to set the
       samp_factor based on the amount of overlap between windows. I.e.
       samp_factor <-- ceil(1/(1 - pl))
+
+    freqs: list
+      If given, only keep the power envelopes at these frequencies
+      (instead of the full spectrogram)
 
     mtm_args: dict
       keyword arguments for the multitaper family of methods, viz:
@@ -202,8 +206,13 @@ def mtm_spectrogram(
     NW, nfft, lb = parse_mtm_args(mtm_kwargs)
     if not nfft:
         nfft = 2**int(np.ceil(np.log2(n)))
-    nfreq = nfft//2 + 1
+    if freqs is None:
+        nfreq = nfft//2 + 1
+    else:
+        nfreq = len(freqs)
 
+    fx = np.linspace(0, Fs/2, nfft//2 + 1)
+        
     # calculate the number of psd matrix time points
     if samp_factor is None:
         samp_factor = np.ceil( 1/(1-pl) )
@@ -213,10 +222,12 @@ def mtm_spectrogram(
     else:
         n_psd_times = 2*NW*samp_factor
 
-    psd_len = int( np.ceil( len(x) * float(n_psd_times) / n ) )
-    psd_matrix = np.zeros( (nfreq, psd_len) )
+    #psd_len = int( np.ceil( len(x) * float(n_psd_times) / n ) )
+    psd_len = int( np.ceil( x.shape[-1] * float(n_psd_times) / n ) )
+    #psd_matrix = np.zeros( x.shape[:-1] + (nfreq, psd_len), 'D' )
+    psd_matrix = np.zeros( x.shape[:-1] + (nfreq, psd_len), 'd' )
     blk_psd = blocks.BlockedSignal(
-        psd_matrix, n_psd_times, overlap=pl, partial_block = False, axis=1
+        psd_matrix, n_psd_times, overlap=pl, partial_block = False, axis=-1
         )
     # this array mirrors the psd matrix blocks and counts accumulation
     n_avg = np.zeros(psd_len)
@@ -230,53 +241,50 @@ def mtm_spectrogram(
         dpss = dpss[keepers]
         eigs = eigs[keepers]
 
-    for b in xrange(blk_x.nblock):
+    for b in xrange(blk_n.nblock):
+        # it's possible to exceed the data blocks, since we're not
+        # using fractional blocks in the signal (??)
+        if b >= blk_x.nblock:
+            break
         nwin = blk_n.block(b)
         nwin[:] += 1 # just keep count of how many times we hit these points
 
         dwin = blk_x.block(b)
         if detrend:
             dwin = signal.detrend(dwin, type=detrend)
-
-        ## xk = alg.tapered_spectra(dwin, dpss, NFFT=nfft)
-        ## if adaptive:
-        ##     w, n = nt_utils.adaptive_weights(xk, eigs, sides='onesided')
-        ##     xk = xk[:, :nfreq] * w
-        ##     norm = np.sum(w**2, axis=0)[:,None] # normalization per freq
-        ## else:
-        ##     xk = xk[:, :nfreq]
-        ##     norm = float( len(eigs) ) # single normalization
-
-        ## xk *= np.sqrt(eigs[:,None])
-        ## #mtm_pwr = np.sum( xk[:,:,None] * dpss[:,None,:], axis=0 )
-        ## mtm_pwr = np.tensordot(xk, dpss, axes=(0,0))
-        ## mtm_pwr = np.sqrt(2) * np.abs(mtm_pwr)
-        ## mtm_pwr *= mtm_pwr
-        ## mtm_pwr /= norm
-
         mtm_pwr, _, weighting = mtm_complex_demodulate(
             dwin, NW, nfft=nfft, adaptive=adaptive, dpss=dpss, eigs=eigs,
             samp_factor=samp_factor
             )
-        mtm_pwr = np.sqrt(2) * np.abs(mtm_pwr)
-        mtm_pwr *= mtm_pwr
+        if freqs is None:
+            mtm_pwr = np.sqrt(2) * np.abs(mtm_pwr)
+        else:
+            f_idx = fx.searchsorted(freqs)
+            mtm_pwr = np.sqrt(2) * np.abs(mtm_pwr[f_idx])
+
+        ## mtm_pwr *= mtm_pwr
         if np.iterable(weighting):
             mtm_pwr /= weighting[:,None]
         else:
             mtm_pwr /= weighting
-
         psd_win = blk_psd.block(b)
         psd_win[:] = psd_win + mtm_pwr
 
     n_avg[n_avg==0] = 1
     psd_matrix /= n_avg
     if samp_factor < 1:
-        tx = np.arange(pmat.shape[1])
+        tx = np.arange(psd_matrix.shape[-1])
     else:
         t_res = float(n) / (2*NW) / samp_factor
-        tx = (np.arange(psd_matrix.shape[1]) + 0.5) * t_res
+        tx = (np.arange(psd_matrix.shape[-1]) + 0.5) * t_res
     tx /= Fs
-    fx = np.linspace(0, 0.5*Fs, nfreq)
+
+    # scale by freq so that total power(t) = \int{ psd(t,f) * df }
+    df = 2 * Fs / nfft 
+    psd_matrix /= df
+    if freqs is not None:
+        fx = freqs
+        
     return tx, fx, psd_matrix
 
 
@@ -306,7 +314,12 @@ def mtm_complex_demodulate(
     Returns
     -------
 
-    x_tf, weight
+    x_tf, ix, weight
+
+    ix is an array of resampled points, relative to the full indexing of
+    the input array.
+
+    weight is the matrix of weights **(why??)**
 
     """
 

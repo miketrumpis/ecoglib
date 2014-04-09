@@ -34,11 +34,11 @@ import sandbox.mtm_spectrogram as mtm_spec
 
 """
 We're going to set up a FM of a sinusoid varying slowly between +/-
-0.1. This signal will hover around a carrier frequency at 0.15.
+0.1. This signal will hover around a center frequency at 0.15.
 """
 
 N = 60000
-awgn_sig = 1e-2
+awgn_sig = 5e-1
 tx = np.arange(N, dtype='d')
 fm_freq = 0.1*np.cos(2*np.pi*tx * .0002)
 fm_sig = np.cos(2*np.pi*(0.15*tx + np.cumsum(fm_freq)))
@@ -55,21 +55,32 @@ default.
 bsize = 512
 lag = 128
 pl = float(bsize-lag)/bsize
-NW = 4
+NW = 6
 
 tx, fx, pmat = mtm_spec.mtm_spectrogram(
     fm_sig, bsize, pl=pl, detrend='linear',
     NW=NW, low_bias=True, adaptive=True
     )
 
-pp.figure(figsize=(10,4))
+# power / Hz should be spread across 2NW spectral width
+mx_power = 0.5 / fx[1] / (2*NW)
+
+f = pp.figure(figsize=(10,5))
 pp.subplot(211)
 pp.plot(fm_freq + 0.15)
 pp.ylim(0, 0.5)
-pp.subplot(212)
-pp.imshow(pmat, interpolation='nearest', extent=[0, N-1, 0, 0.5], cmap='hot')
+ax = pp.subplot(212)
+im = pp.imshow(
+    pmat, interpolation='nearest', 
+    extent=[0, N-1, 0, 0.5], cmap='hot', clim=(0, mx_power)
+    )
 pp.axis('auto')
-pp.gcf().tight_layout()
+f.tight_layout()
+f.subplots_adjust(bottom=.25)
+pos = ax.get_position()
+cax = f.add_axes( [pos.x0, 0.125, pos.width, 0.05] )
+cbar = pp.colorbar(im, cax=cax, orientation='horizontal')
+cbar.set_label(r'spectral power ($Hz^{-1}$) clipped to theoretical max')
 
 """
 
@@ -78,36 +89,51 @@ pp.gcf().tight_layout()
 We can see the image of the modulated sinusoid varying about the
 carrier frequency. This is fairly computationally intense, but we have
 very good time and frequency resolution, adequate for the dynamics of
-this signal. 
+this signal. As always, there is a complementary tradeoff between time
+and frequency resolution. The resulting bandwidth of the carrier
+signal estimation is ~ 2NW, but the time resolution scales by the
+reciprocal of 2NW. The result is a consistent power estimation for
+both region of fast and slow dynamics.
 
 By comparison, we'll try the traditional overlapping windows method of
 specral estimation. From this method, we'll have only a single spectral
 estimate at each step of the shifting window.
 """
 
-pp.figure(figsize=(10,4))
+f = pp.figure(figsize=(10,5))
 pp.subplot(211)
 pp.plot(fm_freq + 0.15)
 pp.ylim(0, 0.5)
-pp.subplot(212)
+ax = pp.subplot(212)
 welsh_specgram, wf, wb = mlab.specgram(
-    fm_sig, bsize, detrend=mlab.detrend_linear, noverlap=bsize-lag, Fs=1.0
+    fm_sig, bsize, detrend=mlab.detrend_linear, noverlap=bsize-lag, Fs=1.0,
+    scale_by_freq=True
     )
-pp.imshow(
+im = pp.imshow(
     welsh_specgram, interpolation='nearest',
-    extent=(wb[0], wb[-1], 0, 0.5), cmap='hot'
+    extent=(wb[0], wb[-1], 0, 0.5), cmap='hot',
+    clim=(0, bsize/8.)
     )
 pp.axis('auto')
-pp.gcf().tight_layout()
+f.tight_layout()
+f.subplots_adjust(bottom=.25)
+pos = ax.get_position()
+cax = f.add_axes( [pos.x0, 0.125, pos.width, 0.05] )
+cbar = pp.colorbar(im, cax=cax, orientation='horizontal')
+cbar.set_label(r'spectral power ($Hz^{-1}$) clipped to %d'%(bsize/8.,))
+
 
 """
 
 .. image:: fig/demo_specgram_02.png
 
-Here we have a much coarser grain temporal resolution. The estimated
-power density suffers between the peaks of the sinusoid, where the
-derivative in frequency with respect to time is highest. This could
-probably be overcome with even shorter block shifts.
+Here we have a much coarser grain temporal resolution. By comparison,
+the spectral concentration of signal power is better in the
+slow-moving regions (near the flats of the sinusoid carrier). However,
+the windowed periodogram estimate of power density suffers between the
+peaks of the sinusoid, where the derivative in frequency with respect
+to time is highest. This could probably be overcome with even shorter
+block shifts. 
 
 """
 
