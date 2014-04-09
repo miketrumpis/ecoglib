@@ -30,10 +30,14 @@ help:
 	@echo "  linkcheck  to check all external links for integrity"
 	@echo "  doctest    to run all doctests embedded in the documentation (if enabled)"
 
-clean:
-	-rm -rf $(BUILDDIR)/*
+
+rstclean: 
 	-rm -rf demos/fig/*
 	-rm -rf demos/*.rst
+	-rm -rf notes/fig/*
+
+clean: rstclean
+	-rm -rf $(BUILDDIR)/*
 
 htmlonly:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
