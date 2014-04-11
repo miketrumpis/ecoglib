@@ -41,7 +41,8 @@ def save_bunch(f, path, b, mode='a', compress_arrays=0):
             return save_bunch(f, path, b)
 
     p, node = os.path.split(path)
-    f.create_group(p, node, createparents=True)
+    if node:
+        f.create_group(p, node, createparents=True)
 
     sub_bunches = list()
     items = b.iteritems()
