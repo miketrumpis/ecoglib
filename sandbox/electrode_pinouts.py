@@ -5,11 +5,11 @@ def _rev(n, coords):
     return [ n - c - 1 for c in coords ]
 
 ## PSV 244 Array
-# **** DAQ 1 ****
+# **** MUX 1 ****
 # each entry is a list of row or column coordinates, in order of
 # the demultiplexed channels of inner (x.1) and outer (x.2) FCI
 # connectors
-psv_244_daq1 = {
+psv_244_mux1 = {
     'geometry' : (16, 16),
     'rows1.1' : [0, 1, 1, 3, 1, 2, 0, 4, 5, 3, 1, 2, 0, 4, 5, 
                  3, 1, 2, 0, 4, 5, 3, 1, 2, 0, 4, 6, 3, 1, 2, 0, 1],
@@ -52,11 +52,11 @@ psv_244_daq1 = {
                  15, 13, 14, -1]
     }
 
-# **** DAQ 1 ****
+# **** MUX 1 ****
 # Each entry is a list of row or column coordinates associated with
 # a single MUX. For each quadrant "x", the MUXes are identified by 
 # the line label of an op-amp output {x.1-, x.1+, x.3-, x.3+}. 
-psv_244_daq3 = {
+psv_244_mux3 = {
     'geometry' : (16, 16),
 
     'rows1.1-' : [-1, 1, 2, 0, 6, 7, 3, 1, 2, 0, 4, 5, 3, 1, 2, 0],
@@ -146,11 +146,11 @@ psv_61_afe = dict(
     )
 
 electrode_maps = dict(
-    psv_244_daq1=psv_244_daq1, 
+    psv_244_mux1=psv_244_mux1, 
     psv_32=psv_32, 
     psv_61=psv_61,
     psv_61_afe=psv_61_afe,
-    psv_244_daq3=psv_244_daq3
+    psv_244_mux3=psv_244_mux3
     )
 
 def get_electrode_map(name, connectors=()):
