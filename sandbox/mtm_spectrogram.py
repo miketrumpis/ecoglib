@@ -220,7 +220,9 @@ def mtm_spectrogram(
     if samp_factor < 1:
         n_psd_times = n
     else:
-        n_psd_times = 2*NW*samp_factor
+        n_psd_times = min(n, 2*NW*samp_factor)
+        if 2*NW*samp_factor >= n:
+            samp_factor = 0
 
     #psd_len = int( np.ceil( len(x) * float(n_psd_times) / n ) )
     psd_len = int( np.ceil( x.shape[-1] * float(n_psd_times) / n ) )
@@ -264,16 +266,18 @@ def mtm_spectrogram(
 
         ## mtm_pwr *= mtm_pwr
         if np.iterable(weighting):
-            mtm_pwr /= weighting[:,None]
+            mtm_pwr /= weighting[...,None]
         else:
             mtm_pwr /= weighting
         psd_win = blk_psd.block(b)
         psd_win[:] = psd_win + mtm_pwr
 
     n_avg[n_avg==0] = 1
+    n_avg = np.convolve(n_avg, np.ones(3)/3, mode='same')
+    #print n_avg
     psd_matrix /= n_avg
     if samp_factor < 1:
-        tx = np.arange(psd_matrix.shape[-1])
+        tx = np.arange(psd_matrix.shape[-1], dtype='d')
     else:
         t_res = float(n) / (2*NW) / samp_factor
         tx = (np.arange(psd_matrix.shape[-1]) + 0.5) * t_res
@@ -360,7 +364,7 @@ def mtm_complex_demodulate(
         dpss_sub = dpss
         ix = np.arange(N)
     else:
-        t_res = float(N) / (2*NW) / samp_factor
+        t_res = float(N-1) / (2*NW) / samp_factor
         ix = (np.arange(2*NW*samp_factor) + 0.5) * t_res
         dpss_interp = interpolate.interp1d(np.arange(N), dpss, axis=-1)
         dpss_sub = dpss_interp(ix)
