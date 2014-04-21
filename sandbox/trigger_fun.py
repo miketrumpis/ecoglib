@@ -19,6 +19,7 @@ def trigs_and_conds(trig_code):
         conds, _ = trig_code.enumerate_conditions()
     return trigs, conds
 
+@array_split.split_at(splice_at=(0,1))
 def ep_trigger_avg(
         x, trig_code, pre=0, post=0, 
         sum_limit=-1, iqr_thresh=-1,
