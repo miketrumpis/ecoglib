@@ -1,6 +1,7 @@
 import numpy as np
 import pyfftw
 import pyfftw.interfaces.numpy_fft as nfft
+import scipy.signal as signal
 
 import ecoglib.util as ut
 import ecoglib.numutil as nut
@@ -104,9 +105,17 @@ def ep_trigger_avg(
         else:
             n_avg[:,c-1] = len(trials)
 
+        if envelope:
+            epochs = signal.hilbert(
+                epochs, N=nut.nextpow2(epoch_len), axis=-1
+                )
+            epochs = np.abs(epochs[..., :epoch_len])**2
+        
         avg[:,c-1,:] = np.sum(epochs, axis=1) / n_avg[:,c-1][:,None]
 
     x.shape = filter(lambda x: x > 1, x.shape)
+    if envelope:
+        np.sqrt(avg, avg)
     return avg, n_avg
 
 def extract_epochs(x, trig_code, selected=(), pre=0, post=0):
