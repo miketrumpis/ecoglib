@@ -2,27 +2,30 @@ import multiprocessing as mp
 import multiprocessing.sharedctypes
 import ctypes
 from contextlib import closing
+import gc
+from decorator import decorator
 import numpy as np
-
-SPLIT_DISABLED = False
 
 def shared_ndarray(shape):
     N = reduce(np.multiply, shape)
     shm = mp.Array(ctypes.c_double, N)
     return tonumpyarray(shm, shape)
 
-def splits(method, split=0, off=False):
-    # split not yet impelemented
-    if off or SPLIT_DISABLED:
-        return method
-    def split_method(x, *args, **kwargs):
+def split_at(split_arg=0, splice_at=(0,)):
+    if not np.iterable(splice_at):
+        splice_at = (splice_at,)
+    @decorator
+    def inner_split_method(method, *args, **kwargs):
+        x = args[split_arg]
+        kwargs['_split_arg_'] = split_arg
+        static_args = args[:split_arg] + args[split_arg+1:]
         shm = mp.sharedctypes.synchronized(
             np.ctypeslib.as_ctypes(x)
             )
         # create a pool and map the shared memory array over the method
-        init_args = (shm, x.shape, method, args, kwargs)
+        init_args = (shm, x.shape, method, static_args, kwargs)
         with closing(mp.Pool(
-                processes=8, initializer=_init_globals,
+                processes=mp.cpu_count(), initializer=_init_globals,
                 initargs=init_args
                 )) as p:
             n_div = estimate_chunks(x.size, len(p._pool))
@@ -53,26 +56,36 @@ def splits(method, split=0, off=False):
 
         p.join()
         if res.successful():
-            res = splice_results(res.get())
+            res = splice_results(res.get(), splice_at)
+            #res = res.get()
         else:
             # raises exception ?
             res.get()
+        gc.collect()
         return res
 
-    return split_method
-
-def pow2(x):
-    return x*x
+    return inner_split_method
     
 def estimate_chunks(arr_size, nproc):
     # do nothing now
     return nproc
 
-def splice_results(map_list):
+def splice_results(map_list, splice_at):
     if filter(lambda x: x is None, map_list):
         return
-    # for now only supporting single return in ndarray form
-    return np.concatenate(map_list, axis=0)
+    splice_at = sorted(splice_at)
+
+    res = tuple()
+    pres = 0
+    res = tuple()
+    for sres in splice_at:
+        res = res + map_list[0][pres:sres]
+        arr_list = [m[sres] for m in map_list]
+        res = res + (np.concatenate(arr_list, axis=0),)
+        pres = sres + 1
+    res = res + map_list[0][pres:]
+        
+    return res
 
 def tonumpyarray(mp_arr, shape=None):
     if shape is None:
@@ -99,13 +112,12 @@ def _init_globals(shm, shm_shape, method, args, kwdict):
     
 def _global_method_wrap(aslice):
     arr = tonumpyarray(shared_arr_)
+    split_arg = kwdict_.pop('_split_arg_')
     info = mp.get_logger().info
-    info('applying method %s to slice %s'%(method_, aslice))
-    #info('in norm: %f'%np.linalg.norm(np.ravel(arr[aslice])))
-    #return method_(arr[aslice], *args_, **kwdict_)
-    r = method_(arr[aslice], *args_, **kwdict_)
-    #info('out norm 1: %f'%np.linalg.norm(np.ravel(arr[aslice])))
-    #arr = tonumpyarray(shared_arr_)
-    #info('out norm 2: %f'%np.linalg.norm(np.ravel(arr[aslice])))    
+    info('applying method %s to slice %s at position %d'%(method_, aslice, split_arg))
+    # assemble argument order correctly
+    args = args_[:split_arg] + (arr[aslice],) + args_[split_arg:]
+    info(repr(map(type, args)))
+    r = method_(*args, **kwdict_)
     return r
 
