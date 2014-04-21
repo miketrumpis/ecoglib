@@ -165,8 +165,11 @@ from ecoglib.util import Bunch
 class StimulatedExperiment(object):
     enum_tables = ()
     
-    def __init__(self, trig_times=None, event_tables=dict(), **attrib):
-        self.trig_times = trig_times
+    def __init__(self, trig_times=(), event_tables=dict(), **attrib):
+        if trig_times is None:
+            self.trig_times = ()
+        else:
+            self.trig_times = trig_times
         self._fill_tables(**event_tables)
         self.stim_props = Bunch(**attrib)
 
@@ -180,7 +183,7 @@ class StimulatedExperiment(object):
 
     def enumerate_conditions(self):
         # xxx: might want to be operational in a trigger-free state
-        if self.trig_times is None:
+        if not len(self.trig_times):
             return (), Bunch()
         tab_len = len(self.trig_times)
         if not self.enum_tables:
@@ -226,7 +229,7 @@ class StimulatedExperiment(object):
     
     def __getitem__(self, slicing):
         sub_tables = dict()
-        if self.trig_times is not None:
+        if len(self.trig_times):
             sub_trigs = self.trig_times[slicing].copy()
         else:
             sub_trigs = None
@@ -240,6 +243,9 @@ class StimulatedExperiment(object):
             trig_times=sub_trigs, event_tables=sub_tables, 
             **self.stim_props
             )
+
+    def __len__(self):
+        return len(self.trig_times)
 
     def subexp(self, indices):
         if hasattr(indices, 'dtype') and indices.dtype.char == '?':
