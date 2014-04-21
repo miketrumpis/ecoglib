@@ -18,37 +18,10 @@ def trigs_and_conds(trig_code):
         conds, _ = trig_code.enumerate_conditions()
     return trigs, conds
 
-def fenced_out(samps, quantiles=(25,75), thresh=2.0, axis=None, low=True):
-
-    oshape = samps.shape
-
-    if axis is None:
-        # do pooled distribution
-        samps = samps.ravel()
-    else:
-        # roll axis of interest to the end
-        samps = np.rollaxis(samps, axis, samps.ndim)
-
-    quantiles = map(float, quantiles)
-    qr = np.percentile(samps, quantiles, axis=-1)
-    extended_range = thresh * (qr[1] - qr[0])
-    high_cutoff = qr[1] + extended_range/2
-    low_cutoff = qr[0] - extended_range/2
-    if not low:
-        out_mask = samps < high_cutoff[...,None]
-    else:
-        out_mask = (samps < high_cutoff[...,None]) & \
-          (samps > low_cutoff[...,None])
-
-    if axis is None:
-        out_mask.shape = oshape
-    else:
-        out_mask = np.rollaxis(out_mask, samps.ndim-1, axis)
-    return out_mask
-
-
 def ep_trigger_avg(
-        x, trig_code, pre=0, post=0, sum_limit=-1, iqr_thresh=-1
+        x, trig_code, pre=0, post=0, 
+        sum_limit=-1, iqr_thresh=-1,
+        envelope=False
         ):
     """
     Average response to 1 or more experimental conditions
@@ -123,7 +96,9 @@ def ep_trigger_avg(
         if iqr_thresh > 0:
             pwr = np.sqrt(np.sum(epochs**2, axis=-1))
             # analyze outlier trials per channel
-            out_mask = fenced_out(pwr, thresh=iqr_thresh, axis=1, low=False)
+            out_mask = nut.fenced_out(
+                pwr, thresh=iqr_thresh, axis=1, low=False
+                )
             epochs = epochs * out_mask[:,:,None]
             n_avg[:,c-1] = np.sum(out_mask, axis=1)
         else:
