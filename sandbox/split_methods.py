@@ -18,7 +18,7 @@ multi_taper_psd = array_split.split_at(splice_at=(1,2))(ntalg.multi_taper_psd)
 
 
 ### Convenience wrappers
-@array_split.split_at()
+#@array_split.split_at()
 def filtfilt(arr, b, a, bsize=10000):
     """
     Docstring
