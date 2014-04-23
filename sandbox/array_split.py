@@ -73,6 +73,9 @@ def estimate_chunks(arr_size, nproc):
 def splice_results(map_list, splice_at):
     if filter(lambda x: x is None, map_list):
         return
+    if isinstance(map_list[0], np.ndarray):
+        res = np.concatenate(map_list, axis=0)
+        return res
     splice_at = sorted(splice_at)
 
     res = tuple()
