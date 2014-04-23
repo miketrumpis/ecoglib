@@ -143,7 +143,7 @@ def parse_mtm_args(kw_dict):
 
 
 def mtm_spectrogram(
-        x, n, pl=0.25, detrend='', Fs=1.0, adaptive=True, samp_factor=None,
+        x, n, pl=0.25, detrend='', Fs=1.0, adaptive=True, samp_factor=1,
         freqs=None, **mtm_kwargs
         ):
     """
@@ -167,14 +167,12 @@ def mtm_spectrogram(
 
     samp_factor: int
       Each complex demodulate has a temporal resolution of 1/2W, and will
-      be resampled by default.
-      Setting samp_factor >= 1 samples at that many times the temporal
-      resolution.
-      Setting samp_factor < 1 disables resampling.
-      Leaving samp_factor == None will allow the algorithm to set the
-      samp_factor based on the amount of overlap between windows. I.e.
-      samp_factor <-- ceil(1/(1 - pl))
-
+      be resampled by default. The time resolution will be calculated
+      to ensure that shifting windows overlap correctly (i.e. the 
+      window step time will be ensured to be a multiple of the time 
+      resolution). Set samp_factor to compute complex demodulates within
+      a window at a higher time resolution.
+      
     freqs: list
       If given, only keep the power envelopes at these frequencies
       (instead of the full spectrogram)
@@ -191,9 +189,31 @@ def mtm_spectrogram(
     tx, fx, psd_matrix
     """
 
+    NW, nfft, lb = parse_mtm_args(mtm_kwargs)
     if pl > 1:
         # re-specify in terms of a fraction
         pl = float(pl) / n
+
+    # set up time-resolution and adjust overlap to a more
+    # convenient number if necessary
+    K = 2*NW
+    user_delta = float(n) / K / samp_factor
+    m = int( (1-pl) * n )
+    if m < user_delta:
+        delta = m
+    else:
+        p = np.ceil(m / user_delta)
+        if (m//p) * p < m:
+            m = p * (m//p)
+            print 'resetting pl from %0.2f'%pl,
+            pl = 1 - float(m)/n
+            print ' to %0.2f'%pl
+        delta = m//p
+        delta -= delta % 2
+
+    print user_delta, delta, m
+
+    # check contiguous    
     if not x.flags.c_contiguous:
         x = x.copy(order='C')
     blk_x = blocks.BlockedSignal(
@@ -203,7 +223,6 @@ def mtm_spectrogram(
     nblock = blk_x.nblock
 
     # going to compute the family of complex demodulates for each block
-    NW, nfft, lb = parse_mtm_args(mtm_kwargs)
     if not nfft:
         nfft = 2**int(np.ceil(np.log2(n)))
     if freqs is None:
@@ -213,29 +232,26 @@ def mtm_spectrogram(
 
     fx = np.linspace(0, Fs/2, nfft//2 + 1)
         
-    # calculate the number of psd matrix time points
-    if samp_factor is None:
-        samp_factor = np.ceil( 1/(1-pl) )
-    samp_factor = int(samp_factor)
-    if samp_factor < 1:
-        n_psd_times = n
-    else:
-        n_psd_times = min(n, 2*NW*samp_factor)
-        if 2*NW*samp_factor >= n:
-            samp_factor = 0
-
-    #psd_len = int( np.ceil( len(x) * float(n_psd_times) / n ) )
-    psd_len = int( np.ceil( x.shape[-1] * float(n_psd_times) / n ) )
-    #psd_matrix = np.zeros( x.shape[:-1] + (nfreq, psd_len), 'D' )
+    # calculate the number of psd matrix time points        
+    # total size of time-frequency array
+    pts_per_block = n // delta
+    overlap = pts_per_block - m // delta
+    psd_len = nblock * pts_per_block - (nblock-1)*overlap
+    psd_pl = float(overlap) / pts_per_block
     psd_matrix = np.zeros( x.shape[:-1] + (nfreq, psd_len), 'd' )
+    print pts_per_block, overlap, psd_len
+    # need to make sure psd overlap is
     blk_psd = blocks.BlockedSignal(
-        psd_matrix, n_psd_times, overlap=pl, partial_block = False, axis=-1
+        psd_matrix, pts_per_block, overlap=psd_pl, 
+        partial_block = False, axis=-1
         )
     # this array mirrors the psd matrix blocks and counts accumulation
     n_avg = np.zeros(psd_len)
     blk_n = blocks.BlockedSignal(
-        n_avg, n_psd_times, overlap=pl, partial_block = False
+        n_avg, pts_per_block, overlap=psd_pl, partial_block = False
         )
+
+    print blk_n.nblock, blk_x.nblock
 
     dpss, eigs = alg.dpss_windows(n, NW, 2*NW)
     if lb:
@@ -246,7 +262,7 @@ def mtm_spectrogram(
     for b in xrange(blk_n.nblock):
         # it's possible to exceed the data blocks, since we're not
         # using fractional blocks in the signal (??)
-        if b >= blk_x.nblock:
+        if b >= nblock:
             break
         nwin = blk_n.block(b)
         nwin[:] += 1 # just keep count of how many times we hit these points
@@ -254,9 +270,9 @@ def mtm_spectrogram(
         dwin = blk_x.block(b)
         if detrend:
             dwin = signal.detrend(dwin, type=detrend)
-        mtm_pwr, _, weighting = mtm_complex_demodulate(
+        mtm_pwr, ix, weighting = mtm_complex_demodulate(
             dwin, NW, nfft=nfft, adaptive=adaptive, dpss=dpss, eigs=eigs,
-            samp_factor=samp_factor
+            samp_factor=1.0/delta
             )
         if freqs is None:
             mtm_pwr = 2 * np.abs(mtm_pwr)**2
@@ -276,11 +292,10 @@ def mtm_spectrogram(
     n_avg = np.convolve(n_avg, np.ones(3)/3, mode='same')
     #print n_avg
     psd_matrix /= n_avg
-    if samp_factor < 1:
+    if samp_factor == 0:
         tx = np.arange(psd_matrix.shape[-1], dtype='d')
     else:
-        t_res = float(n) / (2*NW) / samp_factor
-        tx = (np.arange(psd_matrix.shape[-1]) + 0.5) * t_res
+        tx = (np.arange(psd_matrix.shape[-1]) + 0.5) * delta
     tx /= Fs
 
     # scale by freq so that total power(t) = \int{ psd(t,f) * df }
@@ -307,7 +322,10 @@ def mtm_complex_demodulate(
     samp_factor: int
       By default, the complex demodulate will be resampled to its temporal
       resolution of 1/2W. Setting samp_factor > 1 samples at that many times
-      the temporal resolution. Setting samp_factor < 1 disables resampling.
+      the temporal resolution. 
+      If a specific (integer) sample-resolution is desired, then set
+      samp_factor = 1.0 / sample_resolution.
+      Setting samp_factor == 0 disables resampling.
 
     dpss: array
       pre-computed Slepian sequences
@@ -328,7 +346,7 @@ def mtm_complex_demodulate(
     """
 
     N = x.shape[-1]
-
+    
     if dpss is None:
         dpss, eigs = alg.dpss_windows(N, NW, 2*NW)
         if low_bias:
@@ -360,12 +378,22 @@ def mtm_complex_demodulate(
 
     # XXX: the interpolated tensor product is the same as
     # the tensor product with an interpolated sequence?
-    if samp_factor < 1:
+    if samp_factor == 0:
         dpss_sub = dpss
         ix = np.arange(N)
+    elif samp_factor < 1:
+        t_res = max(2, int(1/samp_factor))
+        # force t_res to be even??
+        t_res -= t_res%2
+        ix = (np.arange( N//t_res ) + 0.5) * t_res
+        #ix = np.arange(0, N, t_res) + t_res/2
+        dpss_sub = np.take(dpss, ix.astype('i'), axis=1)
     else:
-        t_res = float(N-1) / (2*NW) / samp_factor
+        samp_factor = min(samp_factor, float(N)/(4*NW))
+        t_res = np.floor(float(N) / (2*NW) / samp_factor)
+        t_res = max(2.0, t_res)
         ix = (np.arange(2*NW*samp_factor) + 0.5) * t_res
+        #ix = np.arange(0, N, t_res) + t_res/2
         dpss_interp = interpolate.interp1d(np.arange(N), dpss, axis=-1)
         dpss_sub = dpss_interp(ix)
 
