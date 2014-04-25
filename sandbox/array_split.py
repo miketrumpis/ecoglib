@@ -11,9 +11,12 @@ def shared_ndarray(shape):
     shm = mp.Array(ctypes.c_double, N)
     return tonumpyarray(shm, shape)
 
-def split_at(split_arg=0, splice_at=(0,)):
+# XXX: for all spliced results, should set up shared memory
+def split_at(split_arg=0, splice_at=(0,), n_jobs=-1, concurrent=False):
     if not np.iterable(splice_at):
         splice_at = (splice_at,)
+    if n_jobs < 0:
+        n_jobs = mp.cpu_count()
     @decorator
     def inner_split_method(method, *args, **kwargs):
         x = args[split_arg]
@@ -25,7 +28,7 @@ def split_at(split_arg=0, splice_at=(0,)):
         # create a pool and map the shared memory array over the method
         init_args = (shm, x.shape, method, static_args, kwargs)
         with closing(mp.Pool(
-                processes=mp.cpu_count(), initializer=_init_globals,
+                processes=n_jobs, initializer=_init_globals,
                 initargs=init_args
                 )) as p:
             n_div = estimate_chunks(x.size, len(p._pool))
@@ -52,7 +55,10 @@ def split_at(split_arg=0, splice_at=(0,)):
                 job_slices.extend( [slice(n, n+dims)] )
                 n += dims
             print job_slices
-            res = p.map_async( _global_method_wrap, job_slices )
+            if concurrent:
+                res = p.map_async( _global_method_acquire, job_slices )
+            else:
+                res = p.map_async( _global_method_wrap, job_slices )
 
         p.join()
         if res.successful():
@@ -112,6 +118,10 @@ def _init_globals(shm, shm_shape, method, args, kwdict):
     kwdict_ = kwdict
     info = mp.get_logger().info
     info('applied global variables')
+
+def _global_method_acquire(aslice):
+    with shared_arr_.get_lock():
+        return _global_method_wrap(aslice)
     
 def _global_method_wrap(aslice):
     arr = tonumpyarray(shared_arr_)
