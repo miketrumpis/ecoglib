@@ -1,6 +1,4 @@
 import numpy as np
-import pyfftw
-import pyfftw.interfaces.numpy_fft as nfft
 import scipy.signal as signal
 
 import ecoglib.util as ut
