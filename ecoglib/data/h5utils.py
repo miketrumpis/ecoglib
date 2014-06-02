@@ -65,7 +65,10 @@ def save_bunch(f, path, b, mode='a', compress_arrays=0):
             
 
         elif type(val) in _h5_seq_types:
-            f.create_array(path, key, val)
+            try:
+                f.create_array(path, key, val)
+            except TypeError:
+                pickle_bunch[key] = val
 
         elif isinstance(val, Bunch):
             sub_bunches.append( (key, val) )
