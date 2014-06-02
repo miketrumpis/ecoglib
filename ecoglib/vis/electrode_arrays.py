@@ -5,28 +5,9 @@ import matplotlib.pyplot as pp
 import numpy as np
 from ecoglib.util import Bunch, mat_to_flat, flat_to_mat
 
-# array features given in mm units
-
-_array_features = dict(
-    psv_244 = Bunch(
-        edge=200e-3, spacing=750e-3, geo=(16,16),
-        missing_locs=( (0,0), (0,1), (0,14), (0,15),
-                       (1,0), (1,15), (14,0), (14,15),
-                       (15,0), (15,1), (15,14), (15,15) )
-        ),
-    psv_32 = Bunch(
-        edge=400e-3, spacing=3, geo=(6,6),
-        missing_locs=( (0,0), (0,5), (1,0), (1,5) )
-        ),
-
-    psv_61 = Bunch(
-        edge=200e-3, spacing=600e-3, geo=(8,8),
-        missing_locs=( (0,0), (0,7), (7,0), (7,7) )
-        )
-    )
 
 def make_rectangles(
-        locs, xy_size, facecolor='black', edgecolor='none', alpha=1,
+        locs, xy_size, facecolors='black', edgecolor='none', alpha=1,
         **patch_kws
         ):
     # locs should be an N x 2 matrix of (x,y) rectangle centers, or a
@@ -58,14 +39,57 @@ def make_rectangles(
     codes[4::5] = Path.CLOSEPOLY
 
     rectpath = Path(verts, codes)
-    
+    # colors ducked here
     return patches.PathPatch(
-        rectpath, facecolor=facecolor, edgecolor=edgecolor,
+        rectpath, facecolor=facecolors, edgecolor=edgecolor,
         alpha=alpha, **patch_kws
         )
 
+def make_circles(
+        locs, diameter, facecolors='black', edgecolor='none', alpha=1,
+        **patch_kws
+        ):
 
-def draw_array(arr_name, p, colors=None, chan_set=(), zoom=1, **patch_kws):
+    if isinstance(facecolors, str):
+        facecolors = [facecolors] * len(locs)
+    ellipses = list()
+    for loc, fc in zip(locs, facecolors):
+        ell = patches.Arc(
+            loc, diameter[0], diameter[1], fc=fc, ec=edgecolor
+            )
+        ell.set_fill(True)
+        ellipses.append(ell)
+            
+    return ellipses
+                 
+
+# array features given in mm units
+
+_array_features = dict(
+    psv_244 = Bunch(
+        edge=200e-3, spacing=750e-3, geo=(16,16),
+        missing_locs=( (0,0), (0,1), (0,14), (0,15),
+                       (1,0), (1,15), (14,0), (14,15),
+                       (15,0), (15,1), (15,14), (15,15) ),
+        patch_method=make_rectangles
+        ),
+    psv_32 = Bunch(
+        edge=400e-3, spacing=3, geo=(6,6),
+        missing_locs=( (0,0), (0,5), (1,0), (1,5) ),
+        patch_method=make_rectangles
+        ),
+
+    # these should be circles not squares 
+    psv_61 = Bunch(
+        edge=200e-3, spacing=406e-3, geo=(8,8),
+        missing_locs=( (0,0), (0,7), (7,0), (7,7) ),
+        patch_method=make_circles
+        )
+    )
+
+def draw_array(
+        arr_name, chan_map, colors='black', chan_set=(), zoom=1, **patch_kws
+        ):
     # first get the locations for the given array
     aspec = _array_features[arr_name]
 
@@ -93,17 +117,32 @@ def draw_array(arr_name, p, colors=None, chan_set=(), zoom=1, **patch_kws):
         xy_size = (aspec['edge'], aspec['edge'])
 
     # make the compound patch
-    patches = make_rectangles(np.c_[x,y], xy_size, **patch_kws)
+    e_patches = aspec.patch_method(
+        np.c_[x, y], xy_size, facecolors=colors, **patch_kws
+        )
+    #patches = make_rectangles(np.c_[x,y], xy_size, **patch_kws)
 
     # make the fig and axes, and add the patch
+    ## figsize = map(
+    ##     lambda x: (22/100. * x * spacing)*zoom,
+    ##     geo
+    ##     )
     figsize = map(
-        lambda x: round(22/100. * x * spacing)*zoom,
+        lambda x: (0.5 * x * spacing)*zoom,
         geo
         )
+
+    figsize = (geo[0] * spacing * zoom + 0.5, 
+               geo[1] * spacing * zoom)
     fig = pp.figure(figsize=figsize[::-1], dpi=100)
 
-    ax = fig.add_subplot(111)
-    ax.add_patch(patches)
+    ax = fig.add_subplot(111, aspect='equal')
+    fig.subplots_adjust(right=0.98, bottom=0, left=0.2, top=1.0)
+    if isinstance(e_patches, patches.Patch):
+        ax.add_patch(e_patches)
+    elif isinstance(e_patches, (list, tuple)):
+        for ep in e_patches:
+            ax.add_patch(ep)
     xl = map(lambda x: x*spacing, (-0.5, geo[1]-0.5))
     yl = map(lambda x: x*spacing, (-0.5, geo[0]-0.5))
     ax.set_xlim(xl)
@@ -128,18 +167,18 @@ def draw_array(arr_name, p, colors=None, chan_set=(), zoom=1, **patch_kws):
         return fig
 
     # Now go and add the channel names
-    p = p.as_row_major()
+    chan_map = chan_map.as_row_major()
     if not len(chan_set):
-        chan_set = range(1, len(p)+1)
+        chan_set = range(len(chan_map))
 
-    yy, xx = p.to_mat()
+    yy, xx = chan_map.to_mat()
     for y, x, chan_name in zip(yy, xx, chan_set):
         chan_name = str(chan_name)
         #y, x = flat_to_mat(geo, chan_idx, col_major=False)
         x *= spacing
         y = (geo[0] - y - 1 + 0.25) * spacing
         ax.text(
-            x, y, chan_name, ha='center', va='baseline', fontsize=10
+            x, y, chan_name, ha='center', va='bottom', fontsize=10
             )
     return fig
         
