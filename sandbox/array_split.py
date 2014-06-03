@@ -41,12 +41,6 @@ def split_at(split_arg=0, splice_at=(0,), shared_args=(), n_jobs=-1, concurrent=
         n_jobs = mp.cpu_count()
     @decorator
     def inner_split_method(method, *args, **kwargs):
-        #x = args[split_arg]
-        kwargs['_split_arg_'] = split_arg
-        kwargs['_shared_args_'] = shared_args
-
-        #static_args = args[:split_arg] + args[split_arg+1:]
-
         pop_args = sorted( (split_arg,) + shared_args )
         sh_args = list()
         n = 0
@@ -65,7 +59,10 @@ def split_at(split_arg=0, splice_at=(0,), shared_args=(), n_jobs=-1, concurrent=
         sh_args = tuple(sh_args)
             
         # create a pool and map the shared memory array over the method
-        init_args = (shm, split_x.shape, method, static_args, sh_args, kwargs)
+        init_args = (split_arg, shm, split_x.shape,
+                     shared_args, sh_args,
+                     method, static_args, kwargs)
+        mp.freeze_support()
         with closing(mp.Pool(
                 processes=n_jobs, initializer=_init_globals,
                 initargs=init_args
@@ -154,11 +151,26 @@ def tonumpyarray(mp_arr, dtype=float, shape=None):
     info('reshaping %s'%repr(shape))
     return np.frombuffer(mp_arr.get_obj(), dtype=dtype).reshape(shape)
 
-def _init_globals(shm, shm_shape, method, args, shared_args, kwdict):
+def _init_globals(
+        split_arg, shm, shm_shape,
+        shared_args, sh_arg_mem,
+        method, args, kwdict
+        ):
+    # globals for primary shared array
     global shared_arr_
     shared_arr_ = shm
     global shape_
     shape_ = shm_shape
+    global split_arg_
+    split_arg_ = split_arg
+
+    # globals for secondary shared memory arguments
+    global shared_args_
+    shared_args_ = shared_args
+    global shared_args_mem_
+    shared_args_mem_ = tuple( [ shared_readonly(mm) for mm in sh_arg_mem ] )
+
+    # globals for pickled method and other arguments
     global method_
     method_ = method
     global args_
@@ -169,13 +181,6 @@ def _init_globals(shm, shm_shape, method, args, shared_args, kwdict):
     global kwdict_
     kwdict_ = kwdict
 
-    global shared_args_
-    shared_args_ = tuple( [ shared_readonly(mm) for mm in shared_args ] )
-    
-    ## for n, shargspec in enumerate(shared_args):
-    ##     sharg, shape = shargspec
-    ##     globals()['_ro_sharg_%d_'%n] = shargspec
-    
     info = mp.get_logger().info
     info('applied global variables')
 
@@ -184,20 +189,12 @@ def _global_method_acquire(aslice):
         return _global_method_wrap(aslice)
     
 def _global_method_wrap(aslice):
-    #arr = tonumpyarray(shared_arr_)
     arr = shared_arr_.get_ndarray()
-    split_arg = kwdict_.pop('_split_arg_')
-    shared_arg = tuple(kwdict_.pop('_shared_args_'))
+    
     info = mp.get_logger().info
     
-    # get any read-only arrays and positions
-    ## ro_arrays = list()
-    ## for n in xrange(len(shared_arg)):
-    ##     shspec = globals()['_ro_sharg_%d_'%n]
-    ##     ro_arrays.append(shared_readonly(*shspec))
-    
     spliced_in = zip( 
-        (split_arg,)+shared_arg, (arr[aslice],) + shared_args_
+        (split_arg_,)+shared_args_, (arr[aslice],) + shared_args_mem_
         )
     spliced_in = sorted(spliced_in, key=lambda x: x[0])
     # assemble argument order correctly
@@ -215,7 +212,7 @@ def _global_method_wrap(aslice):
     args = tuple(args)
     #info(repr(map(type, args)))
 
-    info('applying method %s to slice %s at position %d'%(method_, aslice, split_arg))
+    info('applying method %s to slice %s at position %d'%(method_, aslice, split_arg_))
     r = method_(*args, **kwdict_)
     return r
 
