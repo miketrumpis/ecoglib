@@ -10,8 +10,11 @@ from glob import glob
 
 def build_experiment_report(pth, ext='h5'):
 
-    glob_ext = '*.'+ext
-    all_h5 = glob(os.path.join(pth, glob_ext))
+    if os.path.isfile(pth):
+        all_h5 = [pth]
+    else:
+        glob_ext = '*.'+ext
+        all_h5 = glob(os.path.join(pth, glob_ext))
     config = ConfigParser.RawConfigParser()
 
     for f in all_h5:
