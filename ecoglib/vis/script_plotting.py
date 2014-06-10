@@ -45,7 +45,7 @@ class ScriptPlotter(object):
         self.saving = saving
         self.www = www
         if www and 'png' not in self.formats:
-            self.formats = self.formats + ('png',)
+            self.formats.append('png')
 
     def savefig(self, f, name, rst_text=''):
         """Append a figure reference and a figure name to the
@@ -78,15 +78,72 @@ class ScriptPlotter(object):
         prev = rst_source[:cstart+len(context)]
         cstart += len(context)
         post = rst_source[cstart:]
+        post_lines = post.split('\n')
+        # We may be in the middle of a literal block or a hidden-code
+        # block, so scan ahead until we're out of the block. Since
+        # multiple script-plotter managers could be within this block,
+        # we'll have to check for the end of the sequence of fixed-up
+        # ReST.
 
-        magic_str = '\n\n.. post-hoc images\n'
+        ## fig_names = [os.path.join(self.fig_path, n[1])
+        ##              for n in self.fig_cache]
+        ## fig_hash = '.. %s\n'%str(hash(tuple(fig_names)))
+        fig_names = [n[1] for n in self.fig_cache]
+        fig_hash = '.. %s\n'%str(tuple(fig_names))
+        
+        magic_str = '\n.. post-hoc images\n'
+        magic_end = '.. post-hoc images finished\n\n'
 
         if post.find(magic_str)==0:
             print 'already fixed'
             return
         
-        new_str = [prev, magic_str]
+        new_str = [prev]
 
+        inside_fixup = False
+        inside_markup = False
+        save_line = ''
+        for line in post_lines:
+            if not inside_markup:
+                if not line.startswith('   '):
+                    inside_markup = True
+                new_str.append(line+'\n')
+                cstart += len(line) + 1
+                continue
+            
+            # now we're into markup
+            if line == magic_str.strip():
+                save_line = line+'\n'
+                inside_fixup = True
+                continue
+            if inside_fixup:
+                # we hit a magic string, check if it's ours
+                if line == fig_hash.strip():
+                    print 'already fixed'
+                    return
+                # if not, put back that last line (if not already done)
+                if save_line:
+                    new_str.append(save_line)
+                    cstart += len(save_line)
+                    save_line = ''
+                new_str.append(line+'\n')
+                cstart += len(line) + 1
+                if line == magic_end.strip():
+                    inside_fixup = False
+            else:
+                if line.strip():
+                    # if we've gotten here, then these conditions are true
+                    # * not inside block-quotes or code-block
+                    # * the previous line was not a magic start str
+                    # * the next non-empty line is not a magic start str
+                    break
+                else:
+                    # play out empties and see what comes along
+                    new_str.append(line+'\n')
+                    cstart += len(line) + 1
+        post = rst_source[cstart:]
+        new_str.extend( [magic_str, fig_hash] )
+        
         pth, _ = os.path.split(fname)
         relpath = os.path.relpath(self.fig_path, pth)
         for (f, name), text in zip(self.fig_cache, self.fig_text):
@@ -94,6 +151,7 @@ class ScriptPlotter(object):
             if text:
                 new_str.extend(['\n', text+'\n'])
             new_str.append(image_lines)
+        new_str.extend(['\n', fig_hash, magic_end])
         new_str.append(post)
             
         open(fname, 'w').write(''.join(new_str))
@@ -117,9 +175,12 @@ class ScriptPlotter(object):
         calling = inspect.getouterframes(inspect.currentframe())[1]
         fi = inspect.getframeinfo(calling[0], 5)
         line = fi.lineno
-        context = '    '.join(fi.code_context)
+        code_context = filter(
+            lambda s: s.strip() not in ('"""', "'''"), fi.code_context
+            )
+        # XXX: this assumes 4-space indentation like hidden-code-block
+        context = '    '+'    '.join(code_context)
         fname = fi.filename
-        #print inspect.getsource(inspect.currentframe())
         if self.saving:
             self._save_cache()
             rst_file = os.path.splitext(fname)[0] + '.rst'
