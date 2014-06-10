@@ -19,6 +19,25 @@ def rst_image_markup(relpath, name, extensions):
     lines.append(download)
     return ''.join(lines)
 
+# knicked from SO with modifications
+# http://stackoverflow.com/questions/17870544/python-find-starting-and-ending-indices-of-sublist-in-list
+def find_sub_source(sl,l):
+    # Find the context of source lines in list sl 
+    # with respect to full source lines in l (ignoring whitespace).
+    # Returned is the slicing-index of the sublist (i.e. index set 
+    # is exclusive at the upper limit).
+    # 
+    results=[]
+    sll=len(sl)
+    sl = map(lambda s: s.strip(), sl)
+    for ind in (i for i,e in enumerate(l) if e.strip()==sl[0]):
+        l_strip = map(lambda s: s.strip(), l[ind:ind+sll])
+        if l_strip==sl:
+            #results.append((ind,ind+sll-1))
+            return ind, ind+sll
+    return ()
+
+
 class ScriptPlotSkip(Exception):
     pass
 
@@ -69,16 +88,25 @@ class ScriptPlotter(object):
                 f.savefig(f_file, dpi=dpi)
 
     def _fixup_rst(self, fname, line, context):
-        rst_source = open(fname).read()
-        cstart = rst_source.find(context)
-        if cstart < 0:
+        rst_source = open(fname).readlines()
+        # xxx: line gives trouble because the embedded py-source
+        # is not guaranteed to be in the rst-source after the
+        # given line (due to skipped header material).
+        # 
+        # So let's assume the context only happens uniquely
+        # within the rst file?
+        line = 0
+        sub_idx = find_sub_source(context, rst_source[line:])
+        if not sub_idx:
             raise RuntimeError('context not found in this file')
 
+        # this is the cutoff where we're going to
+        # attempt to splice in code
+        cstart = line + sub_idx[1]
 
-        prev = rst_source[:cstart+len(context)]
-        cstart += len(context)
-        post = rst_source[cstart:]
-        post_lines = post.split('\n')
+        prev_lines = rst_source[:cstart]
+        #post_lines = rst_source[cstart:]
+
         # We may be in the middle of a literal block or a hidden-code
         # block, so scan ahead until we're out of the block. Since
         # multiple script-plotter managers could be within this block,
@@ -94,41 +122,42 @@ class ScriptPlotter(object):
         magic_str = '\n.. post-hoc images\n'
         magic_end = '.. post-hoc images finished\n\n'
 
-        if post.find(magic_str)==0:
-            print 'already fixed'
-            return
+        ## if post.find(magic_str)==0:
+        ##     print 'already fixed'
+        ##     return
         
-        new_str = [prev]
+        new_str = prev_lines[:]
 
         inside_fixup = False
         inside_markup = False
         save_line = ''
-        for line in post_lines:
+        #for line in post_lines:
+        for line in rst_source[cstart:]:
             if not inside_markup:
                 if not line.startswith('   '):
                     inside_markup = True
-                new_str.append(line+'\n')
-                cstart += len(line) + 1
+                new_str.append(line)
+                cstart += 1
                 continue
             
             # now we're into markup
-            if line == magic_str.strip():
-                save_line = line+'\n'
+            if line.strip() == magic_str.strip():
+                save_line = line
                 inside_fixup = True
                 continue
             if inside_fixup:
                 # we hit a magic string, check if it's ours
-                if line == fig_hash.strip():
+                if line.strip() == fig_hash.strip():
                     print 'already fixed'
                     return
                 # if not, put back that last line (if not already done)
                 if save_line:
                     new_str.append(save_line)
-                    cstart += len(save_line)
+                    cstart += 1
                     save_line = ''
-                new_str.append(line+'\n')
-                cstart += len(line) + 1
-                if line == magic_end.strip():
+                new_str.append(line)
+                cstart += 1
+                if line.strip() == magic_end.strip():
                     inside_fixup = False
             else:
                 if line.strip():
@@ -139,8 +168,8 @@ class ScriptPlotter(object):
                     break
                 else:
                     # play out empties and see what comes along
-                    new_str.append(line+'\n')
-                    cstart += len(line) + 1
+                    new_str.append(line)
+                    cstart += 1
         post = rst_source[cstart:]
         new_str.extend( [magic_str, fig_hash] )
         
@@ -152,10 +181,9 @@ class ScriptPlotter(object):
                 new_str.extend(['\n', text+'\n'])
             new_str.append(image_lines)
         new_str.extend(['\n', fig_hash, magic_end])
-        new_str.append(post)
+        new_str.extend(post)
             
         open(fname, 'w').write(''.join(new_str))
-                   
         
     def skip(self, explicit=None):
         # raise an exception that the exit function will skip
@@ -179,13 +207,13 @@ class ScriptPlotter(object):
             lambda s: s.strip() not in ('"""', "'''"), fi.code_context
             )
         # XXX: this assumes 4-space indentation like hidden-code-block
-        context = '    '+'    '.join(code_context)
+        #context = '    '+'    '.join(code_context)
         fname = fi.filename
         if self.saving:
             self._save_cache()
             rst_file = os.path.splitext(fname)[0] + '.rst'
             if self.www and os.path.exists(rst_file):
-                self._fixup_rst(rst_file, line, context)
+                self._fixup_rst(rst_file, line, code_context)
             
         
 
