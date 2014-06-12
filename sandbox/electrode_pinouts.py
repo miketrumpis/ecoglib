@@ -52,7 +52,7 @@ psv_244_mux1 = {
                  15, 13, 14, -1]
     }
 
-# **** MUX 1 ****
+# **** MUX 3 ****
 # Each entry is a list of row or column coordinates associated with
 # a single MUX. For each quadrant "x", the MUXes are identified by 
 # the line label of an op-amp output {x.1-, x.1+, x.3-, x.3+}. 
@@ -145,12 +145,35 @@ psv_61_afe = dict(
             0, 0, 0, 1, 1, 2, 2, 3, 3]
     )
 
+# This is the lookup from mux3 channel to ZIF pin..
+# ZIF pin counts go in zig-zag zipper order, so approximate this
+# by a (2,32) "array" shape
+_mux3_to_zif = np.array(
+    [-1, 1, 2, 4, 6, 8, 10, 12, 14, 16, 20, 22, 24, 26, 
+     28, 30, -1, 60, 58, 56, 54, 52, 50, 48, 46, 44, 42, 
+    40, 38, 36, 34, 32, -1, 61, 59, 57, 55, 53, 51, 49, 
+    47, 45, 43, 41, 39, 37, 35, 33, -1, 3, 5, 7, 9, 11, 
+    13, 15, 17, 19, 21, 23, 25, 27, 29, 31]
+    ) - 1
+_mux3_rows, _mux3_cols = map(np.copy, np.unravel_index(
+    np.clip( _mux3_to_zif, 0, 63 ), (2,32), order='F'
+    ))
+_mux3_rows[_mux3_to_zif < 0] = -1
+_mux3_cols[_mux3_to_zif < 0] = -1
+
+mux3_to_zif = dict(
+    geometry = (2, 32),
+    rows = _mux3_rows,
+    cols = _mux3_cols
+    )
+
 electrode_maps = dict(
     psv_244_mux1=psv_244_mux1, 
     psv_32=psv_32, 
     psv_61=psv_61,
     psv_61_afe=psv_61_afe,
-    psv_244_mux3=psv_244_mux3
+    psv_244_mux3=psv_244_mux3,
+    mux3_to_zif=mux3_to_zif
     )
 
 def get_electrode_map(name, connectors=()):
