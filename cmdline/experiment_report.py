@@ -4,7 +4,7 @@ from ecoglib.data.rawfiles import build_experiment_report
 
 def write_experiment_report(pth, ext='h5'):
     report = os.path.join(pth, '__Experiment_Report.txt')
-    with open(report, 'wb') as config_file:
+    with open(report, 'w') as config_file:
 
         config_file.write(
 """
@@ -19,5 +19,5 @@ def write_experiment_report(pth, ext='h5'):
 if __name__=='__main__':
     import sys
     for pth in sys.argv[1:]:
-        build_experiment_report(pth)
+        write_experiment_report(pth)
         print 'reported', pth
