@@ -1,5 +1,6 @@
 # ye olde utilities module
 import numpy as np
+import inspect
 import itertools
 import scipy.misc as spmisc
 
@@ -93,11 +94,6 @@ class ChannelMap(list):
         shape.insert(axis, self.geometry[0])
         array.shape = shape
         return array
-        
-
-        
-        
-        
 
 def flat_to_mat(mn, idx, col_major=True):
     idx = np.asarray(idx)
@@ -142,3 +138,10 @@ def channel_combinations(chan_map, scale=1.0):
         chan_combs.idx1[n] = idx1
         chan_combs.idx2[n] = idx2
     return chan_combs
+
+def get_default_args(func):
+    """
+    returns a dictionary of arg_name:default_values for the input function
+    """
+    args, varargs, keywords, defaults = inspect.getargspec(func)
+    return dict(zip(reversed(args), reversed(defaults)))
