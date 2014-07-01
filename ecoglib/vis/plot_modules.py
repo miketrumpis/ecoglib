@@ -201,7 +201,9 @@ class StaticFunctionPlot(LongNarrowPlot):
 
     def __init__(
             self, t, x,
-            t0=None, line_props=dict(),
+            t0=None, 
+            mark_line_props=dict(),
+            plot_line_props=dict(),
             **bplot_kws
             ):
         # just do BlitPlot with defaults -- this gives us a figure and axes
@@ -214,10 +216,12 @@ class StaticFunctionPlot(LongNarrowPlot):
         #self.trait_set(**bplot_kws)
         if t0 is None:
             t0 = t[0]
-        ts_line = self.create_fn_image(x, t=t, **line_props)
+        ts_line = self.create_fn_image(x, t=t, **plot_line_props)
         self.ax.xaxis.get_major_formatter().set_useOffset(False)
         self.add_static_artist(ts_line)
-        self.time_mark = self.ax.axvline(x=t0, color='r', ls='-')
+        mark_line_props['color'] = mark_line_props.get('color', 'r')
+        mark_line_props['ls'] = mark_line_props.get('ls', '-')
+        self.time_mark = self.ax.axvline(x=t0, **mark_line_props)
         self.add_dynamic_artist(self.time_mark)
 
     @on_trait_change('time')
@@ -369,10 +373,10 @@ class ScrollingFunctionPlot(StaticFunctionPlot):
     winsize = Float
     
     def __init__(
-            self, t, x, winsize, t0=None, line_props=dict(), **bplot_kws
+            self, t, x, winsize, t0=None, plot_line_props=dict(), **bplot_kws
             ):
         super(ScrollingFunctionPlot, self).__init__(
-            t, x, t0=t0, line_props=line_props, **bplot_kws
+            t, x, t0=t0, plot_line_props=plot_line_props, **bplot_kws
             )
         if t0 is None:
             t0 = t[0]
@@ -546,12 +550,12 @@ class StandardPlot(ProtoPlot):
     # * ax, an MPL Axes
 
     # this signature should be pretty generic
-    def create_fn_image(self, x, t=None, **line_props):
+    def create_fn_image(self, x, t=None, **plot_line_props):
         print 'CREATING STANDARD PLOT'
         # in this case, just a plot
         if t is None:
             t = np.arange(x.shape[0])
-        lines = self.ax.plot(t, x, **line_props)
+        lines = self.ax.plot(t, x, **plot_line_props)
         return lines
 
 class ColorCodedPlot(ProtoPlot):
@@ -564,7 +568,7 @@ class ColorCodedPlot(ProtoPlot):
     # * cx, a color-coding function
     # * cx_limits, the (possibly clipped) dynamic range of "cx"
 
-    def create_fn_image(self, x, t=None, **line_props):
+    def create_fn_image(self, x, t=None, **plot_line_props):
         print 'CREATING COLOR CODED PLOT'
         if t is None:
             t = np.arange(len(x))
@@ -583,11 +587,11 @@ class ColorCodedPlot(ProtoPlot):
             limits = self.cx_limits
         #self.norm = pp.normalize(vmin=limits[0], vmax=limits[1])
         norm = Normalize(vmin=limits[0], vmax=limits[1])
-        cmap = line_props.pop('cmap', cm.jet)
+        cmap = plot_line_props.pop('cmap', cm.jet)
         #colors = cmap( norm(cx) )
-        line_props['edgecolors'] = 'none'
+        plot_line_props['edgecolors'] = 'none'
         pc = self.ax.scatter(
-            t, x, 14.0, c=cx, norm=norm, cmap=cmap, **line_props
+            t, x, 14.0, c=cx, norm=norm, cmap=cmap, **plot_line_props
             )
         return pc
 
@@ -604,11 +608,11 @@ class ClassSegmentedPlot(ProtoPlot):
     # * n_classes -- total number of classes (included potentially
     #                outside this plot)
 
-    def create_fn_image(self, x, t=None, labels=None, **line_props):
+    def create_fn_image(self, x, t=None, labels=None, **plot_line_props):
         # Caution! Returns a sequence of separate lines for each data
         # segment
-        #cmap = line_props.pop('cmap', cm.jet)
-        cmap = line_props.pop('cmap', cm.hsv)
+        #cmap = plot_line_props.pop('cmap', cm.jet)
+        cmap = plot_line_props.pop('cmap', cm.hsv)
         if t is None:
             t = np.arange(len(x))
         if not hasattr(self, 'labels'):
@@ -641,7 +645,7 @@ class ClassSegmentedPlot(ProtoPlot):
             color = colors[cidx]
             ## if seg==0:
             ##     color[-1] = 0.15
-            line = self.ax.plot(t, seg_line, c=color, **line_props)
+            line = self.ax.plot(t, seg_line, c=color, **plot_line_props)
             seg_lines.extend(line)
         return seg_lines
 
@@ -662,7 +666,7 @@ class StaticColorCodedPlot(StaticFunctionPlot, ColorCodedPlot):
 
     def __init__(
             self, t, x, cx, t0=None, cx_limits=(),
-            line_props=dict(), **bplot_kws
+            plot_line_props=dict(), **bplot_kws
             ):
         self.cx = cx
         if not cx_limits:
@@ -672,7 +676,7 @@ class StaticColorCodedPlot(StaticFunctionPlot, ColorCodedPlot):
             cx_limits = (mn, mx)
         self.cx_limits = cx_limits
         super(StaticColorCodedPlot, self).__init__(
-            t, x, t0=t0, line_props=line_props, **bplot_kws
+            t, x, t0=t0, plot_line_props=plot_line_props, **bplot_kws
             )
 
 class StaticSegmentedPlot(StaticFunctionPlot, ClassSegmentedPlot):
@@ -683,13 +687,13 @@ class StaticSegmentedPlot(StaticFunctionPlot, ClassSegmentedPlot):
     """
 
     def __init__(
-            self, t, x, labels, t0=None, line_props=dict(), **bplot_kws
+            self, t, x, labels, t0=None, plot_line_props=dict(), **bplot_kws
             ):
         self.labels = labels
         unique_labels = np.unique(labels)
         self.n_classes = len( unique_labels >= 0 )
         super(StaticSegmentedPlot, self).__init__(
-            t, x, t0=t0, line_props=line_props, **bplot_kws
+            t, x, t0=t0, plot_line_props=plot_line_props, **bplot_kws
             )
 
 class WindowedTimeSeriesPlot(WindowedFunctionPlot, StandardPlot):
@@ -712,7 +716,7 @@ class WindowedColorCodedPlot(WindowedFunctionPlot, ColorCodedPlot):
     """
     def __init__(
             self, t, x, cx, t0=None, cx_limits=(),
-            line_props=dict(), **bplot_kws
+            plot_line_props=dict(), **bplot_kws
             ):
         self.cx = cx
         if not cx_limits:
@@ -722,7 +726,7 @@ class WindowedColorCodedPlot(WindowedFunctionPlot, ColorCodedPlot):
             cx_limits = (mn, mx)
         self.cx_limits = cx_limits
         super(WindowedColorCodedPlot, self).__init__(
-            t, x, t0=t0, line_props=line_props, **bplot_kws
+            t, x, t0=t0, plot_line_props=plot_line_props, **bplot_kws
             )
 
 class WindowedClassSegmentedPlot(WindowedFunctionPlot, ClassSegmentedPlot):
@@ -730,13 +734,13 @@ class WindowedClassSegmentedPlot(WindowedFunctionPlot, ClassSegmentedPlot):
     A static class-colored plot that is flipped between intervals
     """
     def __init__(
-            self, t, x, labels, t0=None, line_props=dict(), **bplot_kws
+            self, t, x, labels, t0=None, plot_line_props=dict(), **bplot_kws
             ):
         self.labels = labels
         unique_labels = np.unique(labels)
         self.n_classes = len( unique_labels >= 0 )
         super(WindowedClassSegmentedPlot, self).__init__(
-            t, x, t0=t0, line_props=line_props, **bplot_kws
+            t, x, t0=t0, plot_line_props=plot_line_props, **bplot_kws
             )
 
 class ScrollingTimeSeriesPlot(ScrollingFunctionPlot, StandardPlot):
@@ -752,7 +756,7 @@ class ScrollingColorCodedPlot(ScrollingFunctionPlot, ColorCodedPlot):
     """
     def __init__(
             self, t, x, winsize, cx, t0=None, cx_limits=(), 
-            line_props=dict(), **bplot_kws
+            plot_line_props=dict(), **bplot_kws
             ):
         # make sure to set the color code first
         self.cx = cx
@@ -762,7 +766,7 @@ class ScrollingColorCodedPlot(ScrollingFunctionPlot, ColorCodedPlot):
             cx_limits = (mn, mx)
         self.cx_limits = cx_limits
         super(ScrollingColorCodedPlot, self).__init__(
-            t, x, winsize, t0=t0, line_props=line_props, **bplot_kws
+            t, x, winsize, t0=t0, plot_line_props=plot_line_props, **bplot_kws
             )
 
 class ScrollingClassSegmentedPlot(ScrollingFunctionPlot, ClassSegmentedPlot):
@@ -772,14 +776,14 @@ class ScrollingClassSegmentedPlot(ScrollingFunctionPlot, ClassSegmentedPlot):
 
     def __init__(
             self, t, x, winsize, labels, 
-            line_props=dict(), **bplot_kws
+            plot_line_props=dict(), **bplot_kws
             ):
         # make sure to set the class code first
         self.labels = labels
         unique_labels = np.unique(labels)
         self.n_classes = len( unique_labels >= 0 )
         # hold onto these
-        self._lprops = line_props
+        self._lprops = plot_line_props
         super(ScrollingClassSegmentedPlot, self).__init__(
-            t, x, winsize, line_props=line_props, **bplot_kws
+            t, x, winsize, plot_line_props=plot_line_props, **bplot_kws
             )

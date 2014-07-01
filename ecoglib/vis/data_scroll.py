@@ -226,13 +226,13 @@ class DataScroller(HasTraits):
         return pm.WindowedTimeSeriesPlot(
             t, self.ts_arr, ylim=lim, t0=t0,
             window_length=self.ts_window_length,
-            line_props=lprops
+            plot_line_props=lprops
             )
 
     def construct_zoom_plot(self, t, figsize, lim, **lprops):
         return pm.ScrollingTimeSeriesPlot(
             t, self.ts_arr, self.tau, 
-            line_props=lprops, ylim=lim
+            plot_line_props=lprops, ylim=lim
             )
 
     def configure_traits(self, *args, **kwargs):
@@ -340,7 +340,10 @@ class DataScroller(HasTraits):
         scene.scene.interactor.interactor_style = \
           tvtk.InteractorStyleImage()
         scene.scene.background = (0, 0, 0)
-
+        mlab.axes(
+            figure=scene.mayavi_scene, z_axis_visibility=False,
+            xlabel='column', ylabel='row'
+            )
         self.array_ipw = ipw
 
 
@@ -444,7 +447,7 @@ class ColorCodedDataScroller(DataScroller):
             t, ts_arr, cx_arr,
             ylim=lim, t0=t0,
             window_length=self.ts_window_length,
-            line_props=lprops
+            plot_line_props=lprops
             )
 
     def construct_zoom_plot(self, t, figsize, lim, **lprops):
@@ -452,7 +455,7 @@ class ColorCodedDataScroller(DataScroller):
         return pm.ScrollingColorCodedPlot(
             t, self.ts_arr, self.tau, self.cx_arr,
             cx_limits=cx_lim,
-            ylim=lim, line_props=lprops
+            ylim=lim, plot_line_props=lprops
             )
 
 class ClassCodedDataScroller(DataScroller):
@@ -509,13 +512,13 @@ class ClassCodedDataScroller(DataScroller):
             t, ts_arr, labels,
             ylim=lim, t0=t0,
             window_length=self.ts_window_length,
-            line_props=lprops
+            plot_line_props=lprops
             )
 
     def construct_zoom_plot(self, t, figsize, lim, **lprops):
         return pm.ScrollingClassSegmentedPlot(
             t, self.ts_arr, self.tau, self.labels,
-            ylim=lim, line_props=lprops
+            ylim=lim, plot_line_props=lprops
             )
 
 class ChannelScroller(DataScroller):
@@ -543,8 +546,23 @@ class ChannelScroller(DataScroller):
         t_axis = np.argmax(array_data.shape)
         npts = array_data.shape[t_axis]
         ts_arr = np.rollaxis(array_data, t_axis).reshape(npts, -1)
+        # XXX: the following indexing relies on the array_data and
+        # channel mapping being in the correct relative array ordering.
+        # This indexing reverses the recording channel-to-array map 
+        # back to recording channel order
         if chans:
-            ts_arr = ts_arr[:,chans]
+            # for now, do this trick to get channels arranged as
+            # (i,j) instead of (x,y)
+            ## c_order = ut.mat_to_flat(
+            ##     chans.geometry, *chans.to_mat(), 
+            ##     col_major=not chans.col_major
+            ##     )
+            # in vtk, channel (i,j) gets plotted at cartesian (x,y)
+            # 1) swap (i,j) for (j,i)
+            # 2) stack the channels in raster-order
+
+            # get the data channels, should be in col-major order 
+            ts_arr = ts_arr[:,sorted(chans)]
         self.chans = chans
         self.page_length = int( round(Fs * page_len) )
         self._mx_page = int( npts // self.page_length ) + 1
@@ -558,7 +576,17 @@ class ChannelScroller(DataScroller):
         self.sync_trait('page', self.ts_plot, mutual=True)
         self.sync_trait('page_length', self.ts_plot, mutual=True)
         self._mx_spacing = self.ts_plot.current_spacing
-    
+
+    @staticmethod
+    def from_dataset_bunch(dset, window):
+        vtk_cmap = dset.chan_map.as_col_major()
+        vtk_cmap.col_major = False
+        scr = ChannelScroller(
+            vtk_cmap.embed(dset.data, axis=0, fill=0), 
+            window, chans=vtk_cmap, exp=dset.exp, Fs=dset.Fs
+            )
+        return scr
+        
     def construct_ts_plot(self, t, figsize, lim, t0, **lprops):
         if 'color' not in lprops:
             lprops['color'] = 'b'
@@ -566,7 +594,7 @@ class ChannelScroller(DataScroller):
         n_lines = self.ts_arr.shape[1]
         plot = pm.PagedTimeSeriesPlot(
             t, self.ts_arr, self.page_length, stack_traces=True,
-            t0=t0, line_props=lprops
+            t0=t0, plot_line_props=lprops
             )
         plot.n_yticks = n_lines
         #plot.ax.set_yticks(np.arange(n_lines) * plot._spacing)
@@ -577,8 +605,11 @@ class ChannelScroller(DataScroller):
         #plot.ax.yaxis.set_major_locator(LinearLocator(numticks=n_lines))
         if isinstance(self.chans, ut.ChannelMap):
             ii, jj = self.chans.to_mat()
+            jj, ii = zip(*sorted(zip(jj, ii)))
+            c_num = self.chans.lookup(ii, jj)
+
             plot.ax.set_yticklabels(
-                ['%d: (%d, %d)'%x for x in zip(self.chans, ii, jj)],
+                ['%d: (%d, %d)'%x for x in zip(c_num, jj, ii)],
                 fontsize=8
                 )
         else:
@@ -604,7 +635,7 @@ class ChannelScroller(DataScroller):
     def construct_zoom_plot(self, t, figsize, lim, **lprops):
         return pm.ScrollingTimeSeriesPlot(
             t, self.ts_arr.mean(axis=1), self.tau, 
-            line_props=lprops, ylim=lim
+            plot_line_props=lprops, ylim=lim
             )
             
     def draw_events(self):
