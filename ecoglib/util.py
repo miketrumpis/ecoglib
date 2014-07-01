@@ -1,4 +1,6 @@
 # ye olde utilities module
+import os
+import errno
 import numpy as np
 import inspect
 import itertools
@@ -145,3 +147,14 @@ def get_default_args(func):
     """
     args, varargs, keywords, defaults = inspect.getargspec(func)
     return dict(zip(reversed(args), reversed(defaults)))
+
+
+### From SO:
+### http://stackoverflow.com/questions/600268/mkdir-p-functionality-in-python
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc: # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else: raise
