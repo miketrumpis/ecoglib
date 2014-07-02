@@ -45,12 +45,11 @@ def assign_canvas(editor):
         mpl_fig = editor.object.fig
     if hasattr(mpl_fig, 'canvas') and mpl_fig.canvas is not None:
         # strip this canvas, and close the originating figure?
-        num = mpl_fig.number
-        Gcf.destroy(num)
+        #num = mpl_fig.number
+        #Gcf.destroy(num)
         return mpl_fig.canvas
     mpl_canvas = FigureCanvas(mpl_fig)
     return mpl_canvas
-
 
 def _embedded_qt_figure(parent, editor, toolbar=True):
     from PySide.QtGui import QVBoxLayout, QWidget
@@ -58,7 +57,7 @@ def _embedded_qt_figure(parent, editor, toolbar=True):
     print 'parent', type(parent)
     print 'editor', type(editor)
     
-    panel = QWidget()
+    panel = QWidget(parent.parentWidget())
 
     canvas = assign_canvas(editor)
     toolbar = MiniNavigationToolbar(canvas, panel)
