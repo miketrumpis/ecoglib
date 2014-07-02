@@ -38,23 +38,39 @@ def tiled_axes(
     missed_tiles = set(range(geo[0]*geo[1]))
     missed_tiles.difference_update(p)
     figsize = [geo[1]*tilesize[0], geo[0]*tilesize[1]]
+
+    subplots_bottom = subplots_left = 0.02
+    subplots_top = subplots_right = 0.98
     if title:
         figsize[1] += 1
+        subplots_top = 1 - 1.0/figsize[1]
     if calib.lower() != 'none':
         if calib in ('left', 'right', 'side'):
             figsize[0] += 1
+            if calib == 'left':
+                subplots_left = 1.0/figsize[0]
+            if calib == 'right':
+                subplots_right = 1 - 1.0/figsize[0]
         else:
             figsize[1] += 1
+            subplots_bottom = 1 - 1.0/figsize[1]
+    
     fig = pp.figure(figsize=figsize)
     plot_axes = list()
     ii, jj = p.to_mat()
+    subplot_grid = pp.GridSpec(
+        *geo, left=subplots_left, right=subplots_right,
+        bottom=subplots_bottom, top=subplots_top
+        )
     for i, j in zip(ii, jj):
-        ax = pp.subplot2grid( geo, (i, j) )
+        ax_spec = subplot_grid.new_subplotspec( (i,j) )
+        ax = fig.add_subplot(ax_spec)
         plot_axes.append(ax)
     missed_axes = list()
     for pn in missed_tiles:
         (i, j) = flat_to_mat(geo, pn, col_major=p.col_major)
-        ax = pp.subplot2grid( geo, (i, j) )
+        ax_spec = subplot_grid.new_subplotspec( (i,j) )
+        ax = fig.add_subplot(ax_spec)
         ax.axis('off')
         missed_axes.append(ax)
 
@@ -118,7 +134,7 @@ def tile_images(
 
 
     nx, ny = map(float, maps.shape[-2:])
-    tilesize = (nx/max(nx,ny), ny/max(nx,ny)) # width, height
+    tilesize = (nx/min(nx,ny), ny/min(nx,ny)) # width, height
     calib = 'none' if clabel == 'none' else 'bottom'
     fig, plotted, missed = tiled_axes(
         geo, p, title=title, tilesize=tilesize, calib=calib
@@ -187,7 +203,7 @@ def tile_traces(
     p = _build_map(p, geo, col_major)
     if not len(p):
         # no permutation
-        p = _build_map(np.arange(maps.shape[0]), p.geometry, p.col_major)
+        p = _build_map(np.arange(traces.shape[0]), p.geometry, p.col_major)
     # traces is either (n_chan, n_trial, n_pts) or (n_chan, n_pts)
     geo = p.geometry
     npt = traces.shape[-1]
@@ -197,7 +213,7 @@ def tile_traces(
             yl = np.nanmin(traces), np.nanmax(traces)
         else:
             avg = np.nanmean(traces, axis=1)
-            std = np.std(traces, axis=1)
+            std = np.nanstd(traces, axis=1)
             mn, mx = np.nanmin(avg-std), np.nanmax(avg+std)
             yl = mn, mx
     if not twin:
@@ -206,7 +222,6 @@ def tile_traces(
 
     #calib = 'right' if clabel else 'none'
     fig, plotted, missed = tiled_axes(geo, p, title=title, tilesize=tilesize)
-
     ii, jj = p.to_mat()
     for n in xrange(traces.shape[0]):
         chan_t = traces[n]
@@ -264,6 +279,8 @@ def tile_traces(
     if title:
         fig.subplots_adjust(top=0.95)
 
+    if not missed:
+        return fig
     ma = missed[-1]
     ma.set_xlim(ax.get_xlim())
     ma.set_ylim(ax.get_ylim())
