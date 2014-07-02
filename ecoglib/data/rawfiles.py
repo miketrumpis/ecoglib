@@ -18,35 +18,35 @@ def build_experiment_report(pth, ext='h5'):
     config = ConfigParser.RawConfigParser()
 
     for f in all_h5:
-        h5 = tables.open_file(f)
+        with tables.open_file(f) as h5:
 
-        try:
-            info = h5.get_node(h5.root, 'info')
-        except tables.NoSuchNodeError:
-            continue
-
-        exp_name = os.path.split(f)[-1]
-        exp_name = os.path.splitext(exp_name)[0]
-
-        config.add_section(exp_name)
-        config.set(exp_name, 'Fs', str(h5.root.Fs.read()))
-        for item in (
-                'nrColumns', 'nrRows', 'nrBNCs', 
-                'SampleStripLength', 'OverSampling', 
-                'SamplingRate', 'ColumnMixVector', 'Note'):
             try:
-                val = eval( 'info.'+item+'.read()' )
+                info = h5.get_node(h5.root, 'info')
             except tables.NoSuchNodeError:
-                val = 'ITEM NOT FOUND'
-            if not np.iterable(val):
-                val = str(val)
-            config.set(exp_name, item, val)
+                continue
 
-        trig_info = find_triggers(h5)
-        trig_fields = ('data_length', 'num_triggers', 
-                       'first_trigger', 'last_trigger')
-        for item, val in zip(trig_fields, trig_info):
-            config.set(exp_name, item, str(val))
+            exp_name = os.path.split(f)[-1]
+            exp_name = os.path.splitext(exp_name)[0]
+
+            config.add_section(exp_name)
+            config.set(exp_name, 'Fs', str(h5.root.Fs.read()))
+            for item in (
+                    'nrColumns', 'nrRows', 'nrBNCs', 
+                    'SampleStripLength', 'OverSampling', 
+                    'SamplingRate', 'ColumnMixVector', 'Note'):
+                try:
+                    val = eval( 'info.'+item+'.read()' )
+                except tables.NoSuchNodeError:
+                    val = 'ITEM NOT FOUND'
+                if not np.iterable(val):
+                    val = str(val)
+                config.set(exp_name, item, val)
+
+            trig_info = find_triggers(h5)
+            trig_fields = ('data_length', 'num_triggers', 
+                           'first_trigger', 'last_trigger')
+            for item, val in zip(trig_fields, trig_info):
+                config.set(exp_name, item, str(val))
 
     return config
 
@@ -83,7 +83,8 @@ def find_triggers(h5_file):
         return d_len, None, None, None
 
 def tdms_to_hdf5(
-        tdms_file, h5_file, chan_map='',
+        tdms_file, h5_file, 
+        load_data=True, chan_map='',
         memmap=True, compression_level=0
         ):
     """
@@ -157,6 +158,9 @@ def tdms_to_hdf5(
         h5_file.create_array(h5_file.root, 'Fs', Fs)
 
         h5_file.flush()
+
+        if not load_data:
+            return h5_file
 
         # now get down to the data
         atom = tables.Float64Atom()
