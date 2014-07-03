@@ -54,11 +54,7 @@ def assign_canvas(editor):
 def _embedded_qt_figure(parent, editor, toolbar=True):
     from PySide.QtGui import QVBoxLayout, QWidget
 
-    print 'parent', type(parent)
-    print 'editor', type(editor)
-    
     panel = QWidget(parent.parentWidget())
-
     canvas = assign_canvas(editor)
     toolbar = MiniNavigationToolbar(canvas, panel)
 
