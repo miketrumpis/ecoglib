@@ -81,6 +81,92 @@ def tiled_axes(
             )
 
     return fig, plot_axes, missed_axes
+
+def calibration_axes(ref_ax, y_scale=None, calib_ax=None):
+
+    #t_len = time[-1] - time[0]
+    xlim = ref_ax.get_xlim()
+    t_len = xlim[1] - xlim[0]
+    if t_len < 20:
+        t_len *= 1e3
+
+    time_units = 'msec'
+    time_quantum = 50
+    #print 'ref axis t-len:', t_len
+    ylim = ref_ax.get_ylim()
+    if not y_scale:
+        y_scale = ylim[1] - ylim[0]
+    if y_scale < 1:
+        y_scale *= 1e6
+
+    y_calib = np.floor( y_scale / 50 ) * 50
+    y_txt = r'%d $\mu V$'%y_calib
+
+    # find out how big our calib axes is before computing time scale
+    pos = ref_ax.get_position()
+    #print pos.x0, pos.x1, pos.y0, pos.y1
+    x0 = pos.x0; x1 = pos.x1; y0 = pos.y0; y1 = pos.y1
+
+    if not calib_ax:
+        xw = 0.98-x1
+        yw = y1 - y0
+
+        calib_ax = ref_ax.figure.add_axes([x1, y0, xw, yw])
+    else:
+        c_pos = calib_ax.get_position()
+        xw = c_pos.x1 - c_pos.x0
+        
+    # full plot width
+    xw1 = x1 - x0
+    # equivalently scaled sub-interval in new axes is this long
+    sub_t_len = (float(xw)/float(xw1)) * t_len
+
+    #print 'calib axis t-len:', sub_t_len
+    
+    t_calib = 0
+    while t_calib == 0:
+        t_calib = np.floor( sub_t_len / time_quantum ) * time_quantum
+        if abs(t_calib - sub_t_len) < 1e-6:
+            # if that's the full frame, then cut it in half
+            t_calib = t_calib // 2
+        # if that time length is too big, try half
+        time_quantum = time_quantum // 2
+    
+    print t_calib, sub_t_len
+
+    t_txt = '%d %s'%(t_calib, time_units)
+
+    ## if time_units == 'sec':
+    ##     t_calib /= 1e3
+    ##     sub_t_len /= 1e3
+    
+    # repurpose y vars
+    # start vertical bar 1/4 of the way from the bottom
+    y0 = (3/4.) * ylim[0] + (1/4.) * ylim[1]
+    if ylim[1] - ylim[0] < 1:
+        y1 = y0 + y_calib/1e6
+    else:
+        y1 = y0 + y_calib
+
+    # center the t-calibration bar
+    t0 = -t_calib/2.0
+    t1 = t_calib/2.0
+
+    calib_ax.plot([t0, t1], [y0, y0], 'k', linewidth=3)
+    calib_ax.plot([t0, t0], [y0, y1], 'k', linewidth=3)
+
+    calib_ax.text(
+        t0-0.2*sub_t_len, y0, y_txt, ha='center', va='bottom', 
+        rotation='vertical', fontsize=11
+        )
+    calib_ax.text(
+        0, y0-.25*(y1-y0), t_txt, ha='center', va='top', fontsize=11
+        )
+    calib_ax.set_ylim(ylim)
+    calib_ax.set_xlim(-sub_t_len/2.0, sub_t_len/2.0)
+    calib_ax.axis('off')
+    return calib_ax
+
          
 def fill_null(ax_list, cmap=pp.cm.gray):
     for ax in ax_list:
@@ -278,34 +364,11 @@ def tile_traces(
     fig.subplots_adjust(left=0.05, bottom=0.05, right=0.95, top=1.0)
     if title:
         fig.subplots_adjust(top=0.95)
-
+    
+    print missed
     if not missed:
         return fig
-    ma = missed[-1]
-    ma.set_xlim(ax.get_xlim())
-    ma.set_ylim(ax.get_ylim())
-    y_calib_size = max((yl[1] // 1e-4 - 1), 1) * 1e2
-    x_calib_size = 100
-    # offset calib bars 50 ms after twin[0]?
-    x0 = twin[0] + 50
-    ma.add_line(
-        pp.Line2D( [x0, x0], [0, y_calib_size*1e-4], color='k', linewidth=2 )
-        )
-    ma.add_line(
-        pp.Line2D( 
-            [x0, x0 + x_calib_size], 
-            [0, 0], color='k', linewidth=2 
-            )
-        )
-    ma.text(
-        x0-10, y_calib_size*1e-6/2, r"%d $\mu V$"%y_calib_size, 
-        ha='right', va='center', rotation='vertical'
-        )
-    ma.text(
-        x0*1/3 + twin[-1]*2/3., -y_calib_size*1e-6/10, '%d ms'%x_calib_size, 
-        ha='center', va='top'
-        )
-    
+    calibration_axes(plotted[0], calib_ax=missed[-1])
     return fig
 
 
