@@ -145,6 +145,25 @@ psv_61_afe = dict(
             0, 0, 0, 1, 1, 2, 2, 3, 3]
     )
 
+psv_61_omnetix = dict(
+    geometry = (8,8),
+    rows = [ 2, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 6, 
+             7, 5, 6, 5, 4, 4, -1, -1, 4, 4, 5, 6, 5, 7, 6, 7, 7,
+             6, 6, 5, 5, 4, -1, 4, 4, 5, 5, 6, 6, 7, 7, 1, 2, 1,
+             2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 4],
+
+    cols = _rev(8, [ 7, 7, 6, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 0, 0, 0,
+                     1, 3, 3, 0, 3, 0, -1, -1, 6, 5, 6, 5, 5, 6, 6, 4, 5,
+                     7, 4, 7, 4, 7, -1, 2, 1, 2, 1, 2, 1, 3, 2, 0, 0, 1,
+                     1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 4])
+    )
+
+psv_61_wireless_sub = dict(
+    geometry = (8,8),
+    rows = [6, 6, 3, 0, 0, 3, 3, 7],
+    cols = [4, 7, 6, 6, 3, 2, 0, 1],
+    )
+    
 # This is the lookup from mux3 channel to ZIF pin..
 # ZIF pin counts go in zig-zag zipper order, so approximate this
 # by a (2,32) "array" shape
@@ -172,8 +191,10 @@ electrode_maps = dict(
     psv_32=psv_32, 
     psv_61=psv_61,
     psv_61_afe=psv_61_afe,
+    psv_61_omnetix=psv_61_omnetix,
     psv_244_mux3=psv_244_mux3,
-    mux3_to_zif=mux3_to_zif
+    mux3_to_zif=mux3_to_zif,
+    psv_61_wireless_sub=psv_61_wireless_sub
     )
 
 def get_electrode_map(name, connectors=()):
