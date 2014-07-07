@@ -127,14 +127,14 @@ def calibration_axes(ref_ax, y_scale=None, calib_ax=None):
     t_calib = 0
     while t_calib == 0:
         t_calib = np.floor( sub_t_len / time_quantum ) * time_quantum
-        if abs(t_calib - sub_t_len) < 1e-6:
-            # if that's the full frame, then cut it in half
+        if abs(t_calib - sub_t_len) < 1e-6 or t_calib > t_len:
+            # if that's the full frame, 
+            # of if that is longer than the reference axes,
+            # then cut it in half
             t_calib = t_calib // 2
         # if that time length is too big, try half
         time_quantum = time_quantum // 2
     
-    print t_calib, sub_t_len
-
     t_txt = '%d %s'%(t_calib, time_units)
 
     ## if time_units == 'sec':
@@ -251,7 +251,7 @@ def tile_images(
 
     fig.subplots_adjust(left = 0.05, right = 0.95)
     if not clabel == 'none':
-        edge = 0.15
+        edge = 0.2
         fig.subplots_adjust(bottom=edge)
         cbar_ax = fig.add_axes([0.25, 2*edge/4, 0.5, edge/4])
         cbar = pp.colorbar(
