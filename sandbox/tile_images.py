@@ -53,15 +53,16 @@ def tiled_axes(
                 subplots_right = 1 - 1.0/figsize[0]
         else:
             figsize[1] += 1
-            subplots_bottom = 1 - 1.0/figsize[1]
+            subplots_bottom = 1.0/figsize[1]
     
     fig = pp.figure(figsize=figsize)
-    plot_axes = list()
-    ii, jj = p.to_mat()
-    subplot_grid = pp.GridSpec(
-        *geo, left=subplots_left, right=subplots_right,
+    fig.subplots_adjust(
+        left=subplots_left, right=subplots_right,
         bottom=subplots_bottom, top=subplots_top
         )
+    plot_axes = list()
+    ii, jj = p.to_mat()
+    subplot_grid = pp.GridSpec(*geo)
     for i, j in zip(ii, jj):
         ax_spec = subplot_grid.new_subplotspec( (i,j) )
         ax = fig.add_subplot(ax_spec)
