@@ -56,11 +56,12 @@ def _embedded_qt_figure(parent, editor, toolbar=True):
 
     panel = QWidget(parent.parentWidget())
     canvas = assign_canvas(editor)
-    toolbar = MiniNavigationToolbar(canvas, panel)
 
     vbox = QVBoxLayout(panel)
     vbox.addWidget(canvas)
-    vbox.addWidget(toolbar)
+    if toolbar:
+        toolbar = MiniNavigationToolbar(canvas, panel)
+        vbox.addWidget(toolbar)
     panel.setLayout(vbox)
     return panel
 
@@ -73,12 +74,15 @@ def _embedded_wx_figure(parent, editor, toolbar=True):
     fig = editor.object.figure
     panel = wx.Panel(parent, -1)
     canvas = assign_canvas(editor)
-    toolbar = MiniNavigationToolbar(canvas)
     #toolbar.Realize()
 
     sizer = wx.BoxSizer(wx.VERTICAL)
-    sizer.Add(canvas,1,wx.EXPAND|wx.ALL,1)
-    sizer.Add(toolbar,0,wx.EXPAND|wx.ALL,1)
+    if toolbar:
+        toolbar = MiniNavigationToolbar(canvas)
+        sizer.Add(canvas,1,wx.EXPAND|wx.ALL,1)
+        sizer.Add(toolbar,0,wx.EXPAND|wx.ALL,1)
+    else:
+        sizer.Add(canvas,0,wx.EXPAND|wx.ALL,1)
     panel.SetSizer(sizer)
     return panel
 
