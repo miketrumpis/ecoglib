@@ -78,7 +78,7 @@ def sphere_samples(x, axis=-1):
     y = x / norm
     return y
 
-def fenced_out(samps, quantiles=(25,75), thresh=2.0, axis=None, low=True):
+def fenced_out(samps, quantiles=(25,75), thresh=3.0, axis=None, low=True):
 
     oshape = samps.shape
 
@@ -355,3 +355,303 @@ def mpmathcdf(g,df,dps=10):
 def GtoP(g,df):
     assert g >= 0, g
     return float(1-mpmathcdf(g,df))
+
+import scipy.ndimage as ndimage
+
+def savitzky_golay(y, window_size, order, deriv=0, rate=1, axis=-1):
+    r"""Smooth (and optionally differentiate) data with a Savitzky-Golay filter.
+    The Savitzky-Golay filter removes high frequency noise from data.
+    It has the advantage of preserving the original shape and
+    features of the signal better than other types of filtering
+    approaches, such as moving averages techniques.
+
+    Parameters
+    ----------
+
+    y : array_like, shape (N,)
+        the values of the time history of the signal.
+    window_size : int
+        the length of the window. Must be an odd integer number.
+    order : int
+        the order of the polynomial used in the filtering.
+        Must be less then `window_size` - 1.
+    deriv: int
+        the order of the derivative to compute
+        (default = 0 means only smoothing)
+
+    Returns
+    -------
+
+    ys : ndarray, shape (N)
+        the smoothed signal (or it's n-th derivative).
+
+    Notes
+    -----
+
+    The Savitzky-Golay is a type of low-pass filter, particularly
+    suited for smoothing noisy data. The main idea behind this
+    approach is to make for each point a least-square fit with a
+    polynomial of high order over a odd-sized window centered at
+    the point.
+
+    Examples
+    --------
+
+    t = np.linspace(-4, 4, 500)
+    y = np.exp( -t**2 ) + np.random.normal(0, 0.05, t.shape)
+    ysg = savitzky_golay(y, window_size=31, order=4)
+    import matplotlib.pyplot as plt
+    plt.plot(t, y, label='Noisy signal')
+    plt.plot(t, np.exp(-t**2), 'k', lw=1.5, label='Original signal')
+    plt.plot(t, ysg, 'r', label='Filtered signal')
+    plt.legend()
+    plt.show()
+
+    References
+    ----------
+
+    .. [1] A. Savitzky, M. J. E. Golay, Smoothing and Differentiation of
+       Data by Simplified Least Squares Procedures. Analytical
+       Chemistry, 1964, 36 (8), pp 1627-1639.
+    .. [2] Numerical Recipes 3rd Edition: The Art of Scientific Computing
+       W.H. Press, S.A. Teukolsky, W.T. Vetterling, B.P. Flannery
+       Cambridge University Press ISBN-13: 9780521880688
+    """
+    import numpy as np
+    from math import factorial
+
+    try:
+        window_size = np.abs(np.int(window_size))
+        order = np.abs(np.int(order))
+    except ValueError, msg:
+        raise ValueError("window_size and order have to be of type int")
+    if window_size % 2 != 1 or window_size < 1:
+        raise TypeError("window_size size must be a positive odd number")
+    if window_size < order + 2:
+        raise TypeError("window_size is too small for the polynomials order")
+    order_range = range(order+1)
+    half_window = (window_size -1) // 2
+    # precompute coefficients
+    ## b = np.mat(
+    ##     [[k**i for i in order_range]
+    ##      for k in range(-half_window, half_window+1)]
+    ##     )
+    ## m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
+    ix = np.arange(-half_window, half_window+1, dtype='d')
+    bt = np.array( [np.power(ix, k) for k in order_range] )
+    if np.iterable(deriv):
+        scl = [ rate**d * factorial(d) for d in deriv ]
+        scl = np.array(scl).reshape( len(deriv), 1 )
+    else:
+        scl = rate**deriv * factorial(deriv)
+    m = np.linalg.pinv(bt.T)[deriv] * scl
+
+    if m.ndim == 2:
+        ys = [ndimage.convolve1d(y, mr[::-1], mode='constant', axis=axis)
+              for mr in m]
+        return np.array(ys)
+    
+    return ndimage.convolve1d(y, m[::-1], mode='constant', axis=axis)
+    
+    # pad the signal at the extremes with
+    # values taken from the signal itself
+    #firstvals = y[0] - np.abs( y[1:half_window+1][::-1] - y[0] )
+    #lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
+    #y = np.concatenate((firstvals, y, lastvals))
+    #return np.convolve( m[::-1], y, mode='valid')
+
+def mini_mean_shift(f, ix, m):
+    #fdens = density_normalize(f[ix-m:ix+m+1])
+    fdens = f[ix-m:ix+m+1]
+    fdens = fdens - fdens.min()
+    return (fdens * np.arange(ix-m, ix+m+1)).sum() / fdens.sum()
+
+def peak_to_peak(x, m, p=4, xwin=(), msiter=4, points=False):
+    # m is approimately the characteristic width of a peak
+    # x is 2d, n_array x n_pts
+    oshape = x.shape
+    x = x.reshape(-1, oshape[-1])
+    
+    # force m to be odd and get 1st derivatives
+    m = 2 * (m//2) + 1
+    dx = savitzky_golay(x, m, p, deriv=1, axis=-1)
+
+    if not xwin:
+        xwin = (0, dx.shape[axis])
+    xwin = map(int, xwin)
+
+    pk_dx = np.argmax(dx[:, xwin[0]:xwin[1]], axis=-1) + xwin[0]
+    # these are our starting points for peak finding
+
+    pos_pks = np.zeros(x.shape[0], 'i')
+    neg_pks = np.zeros(x.shape[0], 'i')
+    bw = m//2
+    for n in xrange(x.shape[0]):
+        trace = x[n].copy()
+        # must be all positive
+        #trace = trace - trace.min()
+        ix0 = pk_dx[n]
+        k = 0
+        while k < msiter:
+            ix = round(mini_mean_shift(trace, ix0, bw))
+            if not ix-ix0:
+                break
+            ix0 = ix
+            k += 1
+        pos_pks[n] = (ix-bw) + np.argmax(trace[ix-bw:ix+bw+1])
+
+        # grab a slice rewinding a little bit from here (in order
+        # to keep window slicing in-bounds)
+        trace = -x[n, pos_pks[n]-m:] + x[n, pos_pks[n]]
+        ix0 = m + bw
+        skip = 1
+        k = 0
+        # allow more mean-shift iterations, since the initial point
+        # is a very rough guess
+        while k < 2*msiter:
+            if ix0 > len(trace) - bw:
+                # we have no idea where we are!
+                # return global minimum
+                ix = np.argmin(trace)
+                break
+            ix = round(mini_mean_shift(trace, ix0, bw))
+            if not ix-ix0:
+                break
+            if ix < ix0:
+                # going backwards.. reset with bigger skip ahead
+                ix0 = m + skip*bw
+                skip += 1
+                k = 0
+                continue
+            ix0 = ix
+            k += 1
+
+        #neg_pks[n] = round(ix) + pos_pks[n] - m
+        neg_pks[n] = (ix-bw) + np.argmax(trace[ix-bw:ix+bw+1]) + \
+          (pos_pks[n]-m)
+
+    cx = np.arange(x.shape[0])
+    p2p = x[ (cx, pos_pks) ] - x[ (cx, neg_pks) ]
+
+    if points:
+        return map(lambda x: x.reshape(oshape[:-1]), (p2p, neg_pks, pos_pks))
+    else:
+        return p2p.reshape(oshape[:-1])
+
+    
+def peak_to_peak2(x, m, p=4, xwin=(), msiter=4, points=False):
+    # m is approimately the characteristic width of a peak
+    # x is 2d, n_array x n_pts
+    oshape = x.shape
+    x = x.reshape(-1, oshape[-1])
+    
+    # force m to be odd and get 1st derivatives
+    m = 2 * (m//2) + 1
+    if m < 2*p:
+        # m *must* satisify m > p+1
+        # but pad to 2*p - 1 for stability
+        m = 2*p - 1
+    
+    dx = savitzky_golay(x, m, p, deriv=1, axis=-1)
+
+    if not xwin:
+        xwin = (0, dx.shape[axis])
+    xwin = map(int, xwin)
+
+    pk_dx = np.argmax(dx[:, xwin[0]:xwin[1]], axis=-1) + xwin[0]
+    # these are our starting points for peak finding
+
+    pos_pks = np.zeros(x.shape[0], 'i')
+    neg_pks = np.zeros(x.shape[0], 'i')
+    bw = m//2
+    for n in xrange(x.shape[0]):
+        trace = x[n].copy()
+        # must be all positive
+        #trace = trace - trace.min()
+        ix = pk_dx[n]
+        pos_pks[n] = (ix-m) + np.argmax(trace[ix-m:ix+m+1])
+
+        # grab a slice rewinding a little bit from here (in order
+        # to keep window slicing in-bounds)
+        trace = -x[n, pos_pks[n]-m:] + x[n, pos_pks[n]]
+        ix0 = m + bw
+        skip = 1
+        k = 0
+        # allow more mean-shift iterations, since the initial point
+        # is a very rough guess
+        while k < msiter:
+            if ix0 >= len(trace) - bw:
+                # we have no idea where we are!
+                # return global minimum
+                ix = np.argmin(trace)
+                break
+            ix = round(mini_mean_shift(trace, ix0, bw))
+            if not ix-ix0:
+                break
+            if ix < ix0:
+                # going backwards.. reset with bigger skip ahead
+                ix0 = m + skip*bw
+                skip += 1
+                k = 0
+                continue
+            ix0 = ix
+            k += 1
+
+        #neg_pks[n] = round(ix) + pos_pks[n] - m
+        neg_pks[n] = (ix-bw) + np.argmax(trace[ix-bw:ix+bw+1]) + \
+          (pos_pks[n]-m)
+
+    cx = np.arange(x.shape[0])
+    p2p = x[ (cx, pos_pks) ] - x[ (cx, neg_pks) ]
+
+    if points:
+        return map(lambda x: x.reshape(oshape[:-1]), (p2p, neg_pks, pos_pks))
+    else:
+        return p2p.reshape(oshape[:-1])
+
+def peak_to_peak3(x, m, p=4, xwin=(), msiter=4, points=False):
+    # m is approimately the characteristic width of a peak
+    # x is 2d, n_array x n_pts
+    oshape = x.shape
+    x = x.reshape(-1, oshape[-1])
+    
+    # force m to be odd and get 1st derivatives
+    m = 2 * (m//2) + 1
+    if m < 2*p:
+        # m *must* satisify m > p+1
+        # but pad to 2*p - 1 for stability
+        m = 2*p - 1
+    
+    sx, dx = savitzky_golay(x, m, p, deriv=(0,1), axis=-1)
+
+    if not xwin:
+        xwin = (0, dx.shape[axis])
+    xwin = map(int, xwin)
+
+    pk_dx = np.argmax(dx[:, xwin[0]:xwin[1]], axis=-1) + xwin[0]
+    # these are our starting points for peak finding
+
+    pos_pks = np.zeros(x.shape[0], 'i')
+    neg_pks = np.zeros(x.shape[0], 'i')
+    bw = m//2
+    for n in xrange(x.shape[0]):
+        trace = x[n].copy()
+        # must be all positive
+        #trace = trace - trace.min()
+        ix = pk_dx[n]
+        rewind = max(0, int(ix-0.5*m))
+        pos_pks[n] = rewind + np.argmax(trace[rewind:int(ix+0.5*m)])
+
+        #trace = sx[n, pos_pks[n]:pos_pks[n]+5*m]
+        trace = x[n, pos_pks[n]:pos_pks[n]+3*m]
+        neg_pks[n] = np.argmin(trace) + pos_pks[n]
+
+    cx = np.arange(x.shape[0])
+    p2p = x[ (cx, pos_pks) ] - x[ (cx, neg_pks) ]
+
+    if points:
+        return map(lambda x: x.reshape(oshape[:-1]), (p2p, neg_pks, pos_pks))
+    else:
+        return p2p.reshape(oshape[:-1])
+
+    
