@@ -207,7 +207,8 @@ class StaticFunctionPlot(LongNarrowPlot):
             **bplot_kws
             ):
         # just do BlitPlot with defaults -- this gives us a figure and axes
-        bplot_kws['xlim'] = (t[0], t[-1])
+        #bplot_kws['xlim'] = (t[0], t[-1])
+        bplot_kws['xlim'] = np.nanmin(t), np.nanmax(t)
         figure = bplot_kws.pop('figure', None)
         if 'ylim' not in bplot_kws:
             bplot_kws['ylim'] = (x.min(), x.max())
@@ -420,13 +421,16 @@ class PagedFunctionPlot(StaticFunctionPlot):
         self.trait_setq(page_length=page_length)
         # xxx: probably bad form here
         self._traces = self.static_artists[:]
-        #self.page_in(0)
+        self.page_in(self.page)
 
     def _data_page(self):
         # page with +/- 1 page length buffer
         start = (self.page-1)*self.page_length
         data_page = pt.safe_slice(self.x, start, 3*self.page_length, fill=0)
-        tx_page = pt.safe_slice(self.t, start, 3*self.page_length)
+        #tx_page = pt.safe_slice(self.t, start, 3*self.page_length)
+        tx_page = pt.safe_slice(
+            self.t, start, 3*self.page_length, fill='extend'
+            )
         if self.x.ndim > 1 and self.stack_traces:
             if not self.stack_spacing:
                 window = data_page[self.page_length:2*self.page_length]
@@ -452,13 +456,16 @@ class PagedFunctionPlot(StaticFunctionPlot):
     def center_page(self, t_off=0):
         # set axis range to the middle segment of the window
         t = self._traces[0].get_data()[0]
-        mn = np.nanmin(t); mx = np.nanmax(t)
+        #mn = np.nanmin(t); mx = np.nanmax(t)
+        mn = self.t[self.page_length * self.page]
         # ??
         twid = self.t[self.page_length] - self.t[0]
         t0 = t[int(1.5*self.page_length)]
         t0 = t0 + t_off
-        t_min = max(mn, t0 - twid/2)
-        t_max = min(mx, t0 + twid/2)
+        #t_min = max(mn, t0 - twid/2)
+        #t_max = min(mx, t0 + twid/2)
+        t_min = t0 - twid/2
+        t_max = t0 + twid/2
         ## t_min = max(mn, t[self.page_length])
         ## t_max = min(mx, t[2*self.page_length-1])
         self.xlim = (t_min, t_max)

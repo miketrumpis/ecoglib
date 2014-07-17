@@ -221,6 +221,8 @@ class StimulatedExperiment(object):
         return conditions, Bunch(**dict(zip(self.enum_tables, all_uvals)))
         
     def stim_str(self, n, mpl_text=False):
+        if mpl_text:
+            return mpl.text.Text(text='')
         return ''
 
     def _fill_tables(self, **tables):

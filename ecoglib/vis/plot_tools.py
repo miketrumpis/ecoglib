@@ -33,13 +33,24 @@ def safe_slice(x, start, num, fill=np.nan):
             # range is entirely outside
             return sx
         if start < 0:
-            # fill beginning ( where i < 0 ) with NaN
-            sx[:-start, ...] = fill
+            if fill == 'extend':
+                # extend time back
+                sx[:-start, ...] = x[0] - x[1:-start+1][::-1]
+            else:
+                # fill beginning ( where i < 0 ) with NaN
+                sx[:-start, ...] = fill
+
             # fill the rest with x
             sx[-start:, ...] = x[:(num + start), ...]
         else:
             sx[:(lx-start), ...] = x[start:, ...]
-            sx[(lx-start):, ...] = fill
+            if fill == 'extend':
+                # extend range with this many points
+                n_fill = num - (lx - start)
+                x_template = x[1:n_fill+1] - x[0]
+                sx[(lx-start):, ...] = x[-1] + x_template
+            else:
+                sx[(lx-start):, ...] = fill
     else:
         sx = x[start:start+num, ...]
     return sx

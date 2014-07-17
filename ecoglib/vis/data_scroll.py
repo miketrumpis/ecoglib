@@ -565,7 +565,7 @@ class ChannelScroller(DataScroller):
             ts_arr = ts_arr[:,sorted(chans)]
         self.chans = chans
         self.page_length = int( round(Fs * page_len) )
-        self._mx_page = int( npts // self.page_length ) + 1
+        self._mx_page = int( npts // self.page_length )
         self.exp = exp
         traits_n_kw['tau'] = page_len
         DataScroller.__init__(
