@@ -109,7 +109,10 @@ class BlitPlot(HasTraits):
             artist.set_visible(True)
         self.fig.canvas.draw()
         #self.fig.canvas.draw_idle() # thread-safe??
-        self._old_size = (self.fig.canvas.width(), self.fig.canvas.height())
+        try:
+            self._old_size = (self.fig.canvas.width(), self.fig.canvas.height())
+        except AttributeError:
+            pass
 
     # this method only pushes out the old background, and renders the
     # dynamic artists (which have presumably changed)
@@ -558,7 +561,6 @@ class StandardPlot(ProtoPlot):
 
     # this signature should be pretty generic
     def create_fn_image(self, x, t=None, **plot_line_props):
-        print 'CREATING STANDARD PLOT'
         # in this case, just a plot
         if t is None:
             t = np.arange(x.shape[0])
@@ -576,7 +578,6 @@ class ColorCodedPlot(ProtoPlot):
     # * cx_limits, the (possibly clipped) dynamic range of "cx"
 
     def create_fn_image(self, x, t=None, **plot_line_props):
-        print 'CREATING COLOR CODED PLOT'
         if t is None:
             t = np.arange(len(x))
         if not hasattr(self, 'cx'):
