@@ -23,6 +23,8 @@ import plot_modules as pm
 import traitsui_bridge as tb
 import ecoglib.util as ut
 
+import devices.units as units_tools
+
 #### Utility to prepare volumetric data for VTK without
 #### resorting to mem copying (if possible)
 def volumetric_data(data, rowcol):
@@ -540,7 +542,7 @@ class ChannelScroller(DataScroller):
     
     def __init__(
             self, array_data, page_len, chans=(), exp=None,
-            Fs=1.0, **traits_n_kw
+            Fs=1.0, units='', **traits_n_kw
             ):
 
         t_axis = np.argmax(array_data.shape)
@@ -567,6 +569,7 @@ class ChannelScroller(DataScroller):
         self.page_length = int( round(Fs * page_len) )
         self._mx_page = int( npts // self.page_length )
         self.exp = exp
+        self.units = units
         traits_n_kw['tau'] = page_len
         DataScroller.__init__(
             self, array_data, ts_arr, Fs=Fs, _has_stim = (exp is not None),
@@ -579,11 +582,13 @@ class ChannelScroller(DataScroller):
 
     @staticmethod
     def from_dataset_bunch(dset, window):
+        # this trick is for the x,y indexing convention of VTK
         vtk_cmap = dset.chan_map.as_col_major()
         vtk_cmap.col_major = False
         scr = ChannelScroller(
             vtk_cmap.embed(dset.data, axis=0, fill=0), 
-            window, chans=vtk_cmap, exp=dset.exp, Fs=dset.Fs
+            window, chans=vtk_cmap, exp=dset.exp, Fs=dset.Fs,
+            units=dset.units
             )
         return scr
         
@@ -604,8 +609,11 @@ class ChannelScroller(DataScroller):
         #from matplotlib.ticker import LinearLocator
         #plot.ax.yaxis.set_major_locator(LinearLocator(numticks=n_lines))
         if isinstance(self.chans, ut.ChannelMap):
+            # these indices are potentially transposed due to VTk hack
+            # <but impossible to know!!>
             ii, jj = self.chans.to_mat()
-            jj, ii = zip(*sorted(zip(jj, ii)))
+            #jj, ii = zip(*sorted(zip(jj, ii)))
+            ii, jj = zip(*sorted(zip(ii, jj)))
             c_num = self.chans.lookup(ii, jj)
 
             plot.ax.set_yticklabels(
@@ -616,20 +624,31 @@ class ChannelScroller(DataScroller):
             plot.ax.set_yticklabels( 
                 ['%s'%n for n in xrange(n_lines)], fontsize=8
                 )
+        if self.units:
+            units = self.units
+            pos = plot.ax.get_position()
+            scl_ax = plot.fig.add_axes([0.8, pos.y0, 0.08, pos.y1-pos.y0])
+            scl_ax.axis('off')
 
-        pos = plot.ax.get_position()
-        scl_ax = plot.fig.add_axes([0.8, pos.y0, 0.08, pos.y1])
-        scl_ax.axis('off')
-        bar_len = 200e-6
-        scl_ax.add_line(
-            Line2D([0, 0], [bar_len, 2*bar_len], color='k', linewidth=3)
-            )
-        scl_ax.text(
-            50e-6, 1.5*bar_len, '200 $\mu$V', ha='left', va='baseline'
-            )
-        scl_ax.set_ylim(plot.ax.get_ylim())
-        scl_ax.set_xlim(-bar_len, bar_len)
-        self.scl_ax = scl_ax
+            ylim = plot.ax.get_ylim()
+            y_scale = 2*float(ylim[1] - ylim[0]) / len(self.chans)
+            scale_step, scaling, units = \
+              units_tools.best_scaling_step(y_scale, units, allow_up=True)
+            bar_len = np.floor( scaling*y_scale / scale_step ) * scale_step
+            bar_text = '%d %s'%(bar_len, units_tools.nice_unit_text(units))
+            bar_len /= scaling
+            #bar_len = 200e-6
+            scl_ax.add_line(
+                Line2D([0, 0], [bar_len, 2*bar_len], color='k', linewidth=3)
+                )
+            scl_ax.text(
+                .25*bar_len, 1.5*bar_len, bar_text, ha='left', va='center'
+                )
+            scl_ax.set_ylim(ylim)
+            scl_ax.set_xlim(-bar_len, bar_len)
+            self.scl_ax = scl_ax
+        else:
+            self.scl_ax = None
         return plot
 
     def construct_zoom_plot(self, t, figsize, lim, **lprops):
@@ -673,7 +692,8 @@ class ChannelScroller(DataScroller):
     def _change_page(self, page):
         self.undraw_events()
         self.page = page
-        self.scl_ax.set_ylim(self.ts_plot.ax.get_ylim())
+        if self.scl_ax:
+            self.scl_ax.set_ylim(self.ts_plot.ax.get_ylim())
         self.trait_setq(window_shift=0)
         self.draw_events()
         
@@ -695,7 +715,8 @@ class ChannelScroller(DataScroller):
         self.undraw_events()
         # XXX: nice to get a way to keep this from triggering a draw
         self.ts_plot.stack_spacing = spacing
-        self.scl_ax.set_ylim(self.ts_plot.ax.get_ylim())
+        if self.scl_ax:
+            self.scl_ax.set_ylim(self.ts_plot.ax.get_ylim())
         self.draw_events()
         
     @on_trait_change('window_shift')
@@ -711,7 +732,8 @@ class ChannelScroller(DataScroller):
         if self.auto_scale:
             self.undraw_events()
             self.ts_plot.stack_spacing = 0
-            self.scl_ax.set_ylim(self.ts_plot.ax.get_ylim())
+            if self.scl_ax:
+                self.scl_ax.set_ylim(self.ts_plot.ax.get_ylim())
             self.draw_events()
             return
         self._mx_spacing = self.ts_plot.current_spacing

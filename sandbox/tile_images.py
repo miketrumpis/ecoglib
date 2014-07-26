@@ -5,6 +5,8 @@ import matplotlib.pyplot as pp
 from ecoglib.util import ChannelMap, flat_to_mat, mat_to_flat
 from ecoglib.numutil import ndim_prctile
 
+from devices import units
+
 def _build_map(p, geometry, col_major):
     if isinstance(p, ChannelMap):
         return p
@@ -83,8 +85,10 @@ def tiled_axes(
 
     return fig, plot_axes, missed_axes
 
-def calibration_axes(ref_ax, y_scale=None, calib_ax=None):
-
+def calibration_axes(
+        ref_ax, y_scale=None, calib_ax=None, calib_unit='V'
+        ):
+    
     #t_len = time[-1] - time[0]
     xlim = ref_ax.get_xlim()
     t_len = xlim[1] - xlim[0]
@@ -94,25 +98,27 @@ def calibration_axes(ref_ax, y_scale=None, calib_ax=None):
     time_units = 'msec'
     time_quantum = 50
     #print 'ref axis t-len:', t_len
+
     ylim = ref_ax.get_ylim()
     if not y_scale:
-        y_scale = ylim[1] - ylim[0]
-    if y_scale < 1:
-        y_scale *= 1e6
+        y_scale = (ylim[1] - ylim[0]) / 2.0
+    y_step, scaling, calib_unit = units.best_scaling_step(y_scale, calib_unit)
+    y_scale *= scaling
+    scale_back = 1/scaling
+    calib_label = units.nice_unit_text(calib_unit)
 
-    y_calib = np.floor( y_scale / 50 ) * 50
-    y_txt = r'%d $\mu V$'%y_calib
-
+    y_calib = np.floor( y_scale / y_step ) * y_step
+    y_txt = r'%d %s'%(y_calib, calib_label)
+    
     # find out how big our calib axes is before computing time scale
     pos = ref_ax.get_position()
-    #print pos.x0, pos.x1, pos.y0, pos.y1
     x0 = pos.x0; x1 = pos.x1; y0 = pos.y0; y1 = pos.y1
 
     if not calib_ax:
-        xw = 0.98-x1
+        xw = 0.96-x1
         yw = y1 - y0
 
-        calib_ax = ref_ax.figure.add_axes([x1, y0, xw, yw])
+        calib_ax = ref_ax.figure.add_axes([x1+0.02, y0, xw, yw])
     else:
         c_pos = calib_ax.get_position()
         xw = c_pos.x1 - c_pos.x0
@@ -143,11 +149,13 @@ def calibration_axes(ref_ax, y_scale=None, calib_ax=None):
     
     # repurpose y vars
     # start vertical bar 1/4 of the way from the bottom
-    y0 = (3/4.) * ylim[0] + (1/4.) * ylim[1]
-    if ylim[1] - ylim[0] < 1:
-        y1 = y0 + y_calib/1e6
-    else:
-        y1 = y0 + y_calib
+    # y0 = (3/4.) * ylim[0] + (1/4.) * ylim[1]
+    y0 = 0.5 * (ylim[0] + ylim[1] - y_calib * scale_back)
+    y1 = y0 + y_calib * scale_back
+    ## if ylim[1] - ylim[0] < 1:
+    ##     y1 = y0 + y_calib/1e6
+    ## else:
+    ##     y1 = y0 + y_calib
 
     # center the t-calibration bar
     t0 = -t_calib/2.0
@@ -285,7 +293,7 @@ def tile_images(
 def tile_traces(
         traces, geo=(), p=(), yl=(), twin=(), plot_style='sample',
         border_axes=False, col_major=True, title='', clabel=None,
-        tilesize=(1,1)
+        tilesize=(1,1), calib_unit='V'
         ):
     p = _build_map(p, geo, col_major)
     if not len(p):
@@ -366,10 +374,9 @@ def tile_traces(
     if title:
         fig.subplots_adjust(top=0.95)
     
-    print missed
     if not missed:
         return fig
-    calibration_axes(plotted[0], calib_ax=missed[-1])
+    calibration_axes(plotted[0], calib_ax=missed[-1], calib_unit=calib_unit)
     return fig
 
 
