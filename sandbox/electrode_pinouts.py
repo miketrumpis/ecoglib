@@ -131,18 +131,26 @@ psv_61 = dict(
 
     )
 
+psv_61_afe_encoded = """D5, A5, D6, A6, D7, A7, D8, C8, E7, E6, F7, F6, G7, G6, H7, G8, H6, H5, G5, F8, F5, E8, E5, B8, C7, B7, C6, B6, C5, B5, ~A8, ~H8, ~H1, C4, B4, C3, B3, C2, B2, C1, B1, E3, E2, F3, F2, G3, H3, H4, G2, H2, G4, G1, F4, F1, E4, E1, D1, ~A1, D2, A2, D3, A3, D4, A4"""
+def unzip_encoded(coord_list):
+    coord_list = [c.strip() for c in coord_list.strip().split(',')]
+    coords = [ (c[-2], c[-1]) for c in coord_list ]
+    coords_i = set( [c[-2] for c in coords] )
+    coords_j = set( [c[-1] for c in coords] )
+    i_lookup = dict([ (c, n) for (n, c) in enumerate(sorted(list(coords_i))) ])
+    j_lookup = dict([ (c, n) for (n, c) in enumerate(sorted(list(coords_j))) ])
+    ij_coords = [ (i_lookup[c[-2]], j_lookup[c[-1]]) for c in coords ]
+    i_list, j_list = map(list, zip( *ij_coords ))
+    for n, c in enumerate(coord_list):
+        if len(c) > 2:
+            i_list[n] = -1
+            j_list[n] = -1
+    return i_list, j_list
+
 psv_61_afe = dict(
     geometry = (8, 8),
-
-    rows = [3, 0, 3, 0, 3, 0, 3, 2, 4, 4, 5, 5, 6, 6, 7, 6, 7, 7, 6, 
-            5, 5, 4, 4, 1, 2, 1, 2, 1, 2, 1, -2, -2, -2, 2, 1, 2, 
-            1, 2, 1, 2, 1, 4, 4, 5, 5, 6, 7, 7, 6, 7, 6, 6, 5, 5, 4, 
-            4, 3, 0, 3, 0, 3, 0, 3, 0],
-
-    cols = _rev(8, [4, 4, 5, 5, 6, 6, 7, 7, 6, 5, 6, 5, 6, 5, 6, 7, 5, 4, 4, 
-                    7, 4, 7, 4, 7, 6, 6, 5, 5, 4, 4, -2, -2, -2, 3, 3, 2, 
-                    2, 1, 1, 0, 0, 2, 1, 2, 1, 2, 2, 3, 1, 1, 3, 0, 3, 0, 3, 
-                    0, 0, 0, 1, 1, 2, 2, 3, 3])
+    rows = unzip_encoded(psv_61_afe_encoded)[0],
+    cols = _rev(8, unzip_encoded(psv_61_afe_encoded)[1])
     )
 
 psv_61_omnetix = dict(
