@@ -2,6 +2,7 @@ import multiprocessing as mp
 import multiprocessing.sharedctypes
 import ctypes
 from contextlib import closing
+import warnings
 import gc
 from decorator import decorator
 import numpy as np
@@ -213,6 +214,8 @@ def _global_method_wrap(aslice):
     #info(repr(map(type, args)))
 
     info('applying method %s to slice %s at position %d'%(method_, aslice, split_arg_))
-    r = method_(*args, **kwdict_)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        r = method_(*args, **kwdict_)
     return r
 
