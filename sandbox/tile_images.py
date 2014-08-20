@@ -33,6 +33,27 @@ def tiled_axes(
         geo, p, tilesize=(1,1), col_major=True, 
         title='', calib='none'
     ):
+    """
+    Creates a tiling of axes in a grid with given geometry.
+
+    Parameters
+    ----------
+
+    geo : (nrow, ncol)
+        Dimension of axes grid
+
+    p : sequence, ChannelMap
+        Flat index into the grid. Subplot axes are returned corresonding
+        to this order
+
+    Returns
+    -------
+
+    fig, plot_axes, missed_axes
+        The i) Figure, ii) sequence of axes in the order specified by "p",
+        and iii) any grid positions not specified by "p"
+
+    """
 
     p = _build_map(p, geo, col_major)
     assert p.geometry == geo, 'Provided channel map has different geometry'
@@ -88,6 +109,37 @@ def tiled_axes(
 def calibration_axes(
         ref_ax, y_scale=None, calib_ax=None, calib_unit='V'
         ):
+
+    """
+    Automated drawing of calibration bars in abscissa and ordinate.
+    The strategy is to try to infer the appropriate scales from a
+    referrence Axes object, and draw calibration bars either into
+    the space already provided in the Figure, or in the Axes object
+    provided in the parameters.
+
+    Parameters
+    ----------
+
+    ref_ax : Axes
+        An Axes object whose abscissa and ordinate are used to determine
+        the appropriate scales
+
+    y_scale : float, optional
+        This parameter is used to fix the ordinate scale.
+
+    calib_ax : Axes, optional
+        Draw calibration bars into this object.
+
+    calib_units : str
+        The units of the ordinate, by default Volts.
+
+    Returns
+    -------
+
+    calib_ax
+    
+    """
+    
     
     #t_len = time[-1] - time[0]
     xlim = ref_ax.get_xlim()
