@@ -42,6 +42,9 @@ def split_at(split_arg=0, splice_at=(0,), shared_args=(), n_jobs=-1, concurrent=
         n_jobs = mp.cpu_count()
     @decorator
     def inner_split_method(method, *args, **kwargs):
+        # make available short-cut to not use subprocesses:
+        if kwargs.get('skip_parallel', False):
+            return method(*args, **kwargs)
         pop_args = sorted( (split_arg,) + shared_args )
         sh_args = list()
         n = 0
