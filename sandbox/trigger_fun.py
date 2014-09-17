@@ -72,7 +72,7 @@ def ep_trigger_avg(
     if not (post or pre):
         post = epoch_len
 
-    (pre, post) = map(int, (pre, post))
+    (pre, post) = map(round, (pre, post))
     epoch_len = post + pre
 
     # edit trigger list to exclude out-of-bounds epochs
@@ -150,7 +150,7 @@ def extract_epochs(x, trig_code, selected=(), pre=0, post=0):
     if not (post or pre):
         post = epoch_len
     
-    (pre, post) = map(int, (pre, post))
+    (pre, post) = map(round, (pre, post))
     epoch_len = post + pre
     if len(selected):
         if hasattr(selected, 'dtype') and selected.dtype.char == '?':
