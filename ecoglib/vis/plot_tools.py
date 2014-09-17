@@ -29,8 +29,21 @@ def safe_slice(x, start, num, fill=np.nan):
     if start < 0 or start + num > lx:
         sx = np.empty(sub_shape, dtype=x.dtype)
         if start <= -num or start >= lx:
-            sx.fill(np.nan)
+            sx.fill(fill)
             # range is entirely outside
+            return sx
+        if start < 0 and start + num > lx:
+            # valid data is in the middle of the range
+            if fill == 'extend':
+                # only makes sense for regularly spaced pts
+                dx = x[1] - x[0]
+                bwd = np.arange(1, -start+1)
+                sx[:-start, ...] = x[0] - bwd[::-1]*dx
+                fwd = np.arange(1, num-lx+start+1)                
+                sx[-start+lx:num, ...] = x[-1] + fwd*dx
+            else:
+                sx.fill(fill)
+            sx[-start:-start+lx] = x
             return sx
         if start < 0:
             if fill == 'extend':
