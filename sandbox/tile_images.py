@@ -402,7 +402,7 @@ def tile_traces(
             ax.plot(tx, mn, color='k', linewidth=2)
             
         else: #elif plot_style=='all':
-            ax.plot(tx, chan_t.T, 'b', linewidth=0.5)
+            ax.plot(tx, chan_t.T, 'b', linewidth=0.1)
         ax.set_ylim(yl)
         ax.set_xlim(twin)
         if twin[0] < 0:
@@ -431,4 +431,217 @@ def tile_traces(
     calibration_axes(plotted[0], calib_ax=missed[-1], calib_unit=calib_unit)
     return fig
 
+from matplotlib.collections import LineCollection, PolyCollection, PatchCollection
 
+from matplotlib.patches import Polygon
+
+def tile_traces_1ax(
+        traces, geo=(), p=(), yl=(), twin=(), plot_style='sample',
+        col_major=True, title='', tilesize=(1,1), calib_unit='V',
+        x_labels=(), y_labels=(), table_style='matrix'
+        ):
+
+    """
+
+    Parameters
+    ----------
+
+    traces : ndarray 2,3-D
+
+    geo : (rows, cols)
+
+    p : flat index or ChannelMap
+
+    col_major : bool
+        indicates how p indexes into the table (ignored if p is ChannelMap)
+
+    yl : y-limits for each trace
+
+    twin : t-limits for each trace
+
+    plot_style : str
+        "sample" plots mean and interquartile range margins
+
+        "sem" plot means and its standard error margins
+
+        "stdev" plots mean and +/- sigma margins
+
+        "all" plots all samples per grid location
+
+        "single" plots mean-only
+
+    x_labels : sequence
+        labels for x-span
+
+    y_labels : sequence
+        labels for y-span
+
+    table_style : str
+        "matrix" puts cell (0,0) in the top-left corner, the 
+        corresponding y_labels sequence downwards (direction of
+        increasing row index)
+
+        "cartesian" puts cell (0,0) in the bottom-left corner, the 
+        corresponding y_labels sequence upwards (direction of 
+        increasing y-value)
+
+
+    """
+
+    if traces.ndim == 2:
+        traces = traces[:,None,:]
+    p = _build_map(p, geo, col_major)
+    if not len(p):
+        # no permutation
+        p = _build_map(np.arange(traces.shape[0]), p.geometry, p.col_major)
+    # traces is either (n_chan, n_trial, n_pts) or (n_chan, n_pts)
+    geo = p.geometry
+    npt = traces.shape[-1]
+    if not yl:
+        #yl = tuple(ndim_prctile(traces.ravel(), (0.1, 99.9)))
+        if plot_style=='all':
+            yl = np.nanmin(traces), np.nanmax(traces)
+        else:
+            avg = np.nanmean(traces, axis=1)
+            std = np.nanstd(traces, axis=1)
+            mn, mx = np.nanmin(avg-std), np.nanmax(avg+std)
+            yl = mn, mx
+    if not twin:
+        twin = (0, npt-1)
+
+    # make calculations for axes limits
+    tpad = 0.05 * (twin[1] - twin[0])
+    twid = twin[1] - twin[0] + tpad
+    ywid = yl[1] - yl[0]
+
+    # leave space of ~ 5% for text
+    txtgap_x = geo[1] * (twid+tpad) * 0.02 if len(y_labels) else 0
+    txtgap_y = geo[0] * ywid * 0.02 if len(x_labels) else 0
+
+    def vert_xform(v):
+        if table_style == 'matrix':
+            return geo[0] - v - 1
+        else:
+            return v
+    
+    # calculate fig size, given geometry and presence of title
+    figsize = ( geo[1] * tilesize[1], geo[0] * tilesize[0] + (len(title)>0) )
+    fig = pp.figure(figsize=figsize)
+
+    bottom = left = 0.02
+    top = 0.98
+    right = 0.85
+    if title:
+        top = 1 - 1.0/figsize[1]
+
+    ax = fig.add_axes( [left, bottom, right-left, top-bottom] )
+    ax.set_ylim( yl[0] - txtgap_y, yl[0] + geo[0] * ywid )
+    ax.set_xlim( twin[0] - tpad - txtgap_x, twin[0] + geo[1] * twid )
+
+    # make a line collection of all traces, use the channel map to 
+    # apply the appropriate offsets
+    tx = np.linspace(twin[0], twin[1], npt)
+
+    chan_offsets = list()
+    chan_means = np.nanmean(traces, axis=1)
+    for i, j in zip(*p.to_mat()):
+        chan_offsets.append( ( j * twid, vert_xform(i) * ywid ) )
+
+    # first make a line collection for any margins to be drawn in
+    if plot_style not in ('all', 'single') and traces.shape[1] > 1:
+        if plot_style == 'sem':
+            mwid = np.nanstd(traces, axis=1) / np.sqrt(traces.shape[1])
+            margins = np.array( 
+                [ [mn-mw, mn+mw] for mn, mw in zip(chan_means, mwid) ] 
+                )
+        elif plot_style == 'stdev':
+            mwid = np.nanstd(traces, axis=1)
+            margins = np.array( 
+                [ [mn-mw, mn+mw] for mn, mw in zip(chan_means, mwid) ] 
+                )
+        else:
+            margins = np.array(np.percentile(traces, [25, 75], axis=1))
+            margins = margins.transpose(1,0,2)
+
+        lines = [ np.c_[ np.r_[tx, tx[::-1]], np.r_[m[0], m[1][::-1]] ]
+                  for m in margins ]
+        fills = PatchCollection(
+            [ Polygon(line, closed=True) for line in lines ], 
+            match_original=False, edgecolors='none',
+            facecolors=(0.6, 0.6, 0.6)
+            )
+        fills.set_offset_position('data')
+        fills.set_offsets(chan_offsets)
+
+        ax.add_collection(fills)
+
+    # now plot the single timeseries traces
+    if plot_style != 'all':
+        # else, chan_means already defined
+        lines = [ np.c_[tx, mn] for mn in chan_means ]
+        lw = 2 if plot_style == 'single' else 1
+        lc = dict(sem='r', stdev='k', sample='k', single='b')[plot_style]
+    else:
+        lines = list()
+        for chan_samps in traces:
+            lines.extend( [ np.c_[tx, samp] for samp in chan_samps ] )
+        # repeat offsets enough times for each group of traces
+        chan_offsets = [ [offset for i in xrange(traces.shape[1])]
+                         for offset in chan_offsets ]
+        lw = 0.1
+        lc = 'b'
+
+    lines = LineCollection(
+        lines, offsets=chan_offsets, #transOffset=ax.transData,
+        colors=lc, linewidths=lw
+        )
+    ax.add_collection(lines)
+
+    if twin[0] < 0:
+        vert_line = np.array( [ [0, yl[0]], [0, yl[1]] ] )
+        trig_lines = LineCollection(
+            [ vert_line ] * traces.shape[0],
+            offsets=chan_offsets, colors='k', linestyles='--'
+            )
+        ax.add_collection(trig_lines)
+
+    ax.axis('off')
+    #ax.axis('auto')
+
+    if title:
+        fig.text(
+            0.5, .95, title, fontsize=18, 
+            va='baseline', ha='center'
+            )
+    calibration_axes(ax, y_scale=ywid, calib_unit=calib_unit)
+
+    if len(x_labels) == geo[1]:
+        y0 = yl[0] - txtgap_y
+        step = twid# + tpad
+        for i, lab in enumerate(x_labels):
+            ax.text( 
+                (i + 0.5)*step + twin[0] - tpad/2.0, 
+                y0, lab, va='top', ha='center',
+                fontsize=8
+                )
+    if len(y_labels) == geo[0]:
+        # y-labels drawn down in matrix style
+        t0 = twin[0] - tpad - txtgap_x
+        step = ywid
+        for i, lab in enumerate(y_labels):
+            ax.text( 
+                t0, 
+                (vert_xform(i) + 0.5)*step + yl[0], 
+                lab, va='center', ha='center',
+                fontsize=8
+                )
+    
+    return fig
+
+def tile_images_1ax(
+    maps, geo=(), p=(), col_major=True,
+    border_axes=False, title='', 
+    fill_empty=False, fill_cmap=pp.cm.gray, 
+    clabel='none', **imkw
+    ):
+    pass
