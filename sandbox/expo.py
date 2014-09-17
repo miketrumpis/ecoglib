@@ -182,7 +182,23 @@ class StimulatedExperiment(object):
         self.enum_tables = table_names
 
     def enumerate_conditions(self):
-        # xxx: might want to be operational in a trigger-free state
+        """
+        Return the map of condition labels (counting numbers, beginning
+        at 1), as well as tables to decode the labels into multiple
+        stimulation parameters.
+
+        Returns
+        -------
+
+        conditions : ndarray, len(experiment)
+            The condition label (1 <= c <= n_conditions) at each stim event
+
+        cond_table : Bunch
+            This Bunch contains an entry for every stimulation parameter.
+            The entries are lookup tables for the parameter values.
+
+        """
+        
         if not len(self.trig_times):
             return (), Bunch()
         tab_len = len(self.trig_times)
@@ -219,7 +235,13 @@ class StimulatedExperiment(object):
         # 1-offset or 0-offset?
         conditions += 1
         return conditions, Bunch(**dict(zip(self.enum_tables, all_uvals)))
-        
+
+    def rolled_conditions_shape(self):
+        _, ctab = self.enumerate_conditions()
+        return tuple(
+            [len(np.unique(ctab[tab])) for tab in self.enum_tables]
+            )
+    
     def stim_str(self, n, mpl_text=False):
         if mpl_text:
             return mpl.text.Text(text='')
@@ -523,3 +545,45 @@ def join_experiments(exps, offsets):
     for n in xrange(2, len(exps)):
         new_exp = new_exp.extend(exps[n], offsets[n-1])
     return new_exp
+
+def ordered_epochs(exptab, fixed_vals, group_sizes=False):
+    """
+    Returns an index into the StimulatedExperiment tables that fixes
+    all but one parameter, and returns the floating parameter in sorted
+    order.
+
+    Parameters
+    ----------
+
+    exptab : StimulatedExperiment
+
+    fixed_vals : sequence
+        A sequence of parameter names and fixed values:
+        ( (param1, val1), (param2, val2), ... )
+
+    group_sizes : bool
+        Indicate whether to return the number of events found for
+        each value of the floating parameter.
+    
+    """
+    
+    event_labels, ctab = exptab.enumerate_conditions()
+    ## if len(fixed_vals) != len(ctab) - 1:
+    ##     raise ValueError('must fix all but one of the stim parameters')
+
+    n_conds = len( np.unique(event_labels) )
+    
+    c_mask = np.ones(n_conds, dtype='?')
+    for param, val in fixed_vals:
+        c_mask = c_mask & (ctab[param] == val)
+
+    ordered_conds = np.where(c_mask)[0] + 1
+
+    events = [ np.where(event_labels==c)[0] for c in ordered_conds ]
+    sizes = [len(ev) for ev in events]
+    events = np.concatenate(events)
+    if group_sizes:
+        return events, sizes
+    return events
+
+    
