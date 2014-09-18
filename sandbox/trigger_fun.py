@@ -72,8 +72,11 @@ def ep_trigger_avg(
     if not (post or pre):
         post = epoch_len
 
-    (pre, post) = map(round, (pre, post))
-    epoch_len = post + pre
+    # this formula should provide consistent epoch lengths, 
+    # no matter the offset
+    epoch_len = int( round(post + pre) )
+    pre = int( round(pre) )
+    post = epoch_len - pre
 
     # edit trigger list to exclude out-of-bounds epochs
     while pos_edge[0] - pre < 0:
@@ -150,8 +153,10 @@ def extract_epochs(x, trig_code, selected=(), pre=0, post=0):
     if not (post or pre):
         post = epoch_len
     
-    (pre, post) = map(round, (pre, post))
-    epoch_len = post + pre
+    epoch_len = int( round(post + pre) )
+    pre = int( round(pre) )
+    post = epoch_len - pre
+
     if len(selected):
         if hasattr(selected, 'dtype') and selected.dtype.char == '?':
             selected = np.where(selected)[0]
