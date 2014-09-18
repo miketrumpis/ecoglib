@@ -107,7 +107,7 @@ def tiled_axes(
     return fig, plot_axes, missed_axes
 
 def calibration_axes(
-        ref_ax, y_scale=None, calib_ax=None, calib_unit='V'
+        ref_ax, y_scale=None, t_scale=None, calib_ax=None, calib_unit='V'
         ):
 
     """
@@ -126,6 +126,9 @@ def calibration_axes(
 
     y_scale : float, optional
         This parameter is used to fix the ordinate scale.
+
+    t_scale : float, optional
+        This parameter is used to fix the abscissa scale.
 
     calib_ax : Axes, optional
         Draw calibration bars into this object.
@@ -181,17 +184,19 @@ def calibration_axes(
     sub_t_len = (float(xw)/float(xw1)) * t_len
 
     #print 'calib axis t-len:', sub_t_len
-    
-    t_calib = 0
-    while t_calib == 0:
-        t_calib = np.floor( sub_t_len / time_quantum ) * time_quantum
-        if abs(t_calib - sub_t_len) < 1e-6 or t_calib > t_len:
-            # if that's the full frame, 
-            # of if that is longer than the reference axes,
-            # then cut it in half
-            t_calib = t_calib // 2
-        # if that time length is too big, try half
-        time_quantum = time_quantum // 2
+    if t_scale is None:
+        t_calib = 0
+        while t_calib == 0:
+            t_calib = np.floor( sub_t_len / time_quantum ) * time_quantum
+            if abs(t_calib - sub_t_len) < 1e-6 or t_calib > t_len:
+                # if that's the full frame, 
+                # of if that is longer than the reference axes,
+                # then cut it in half
+                t_calib = t_calib // 2
+            # if that time length is too big, try half
+            time_quantum = time_quantum // 2
+    else:
+        t_calib = t_scale
     
     t_txt = '%d %s'%(t_calib, time_units)
 

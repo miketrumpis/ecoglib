@@ -460,9 +460,9 @@ class PagedFunctionPlot(StaticFunctionPlot):
         # set axis range to the middle segment of the window
         t = self._traces[0].get_data()[0]
         #mn = np.nanmin(t); mx = np.nanmax(t)
-        mn = self.t[self.page_length * self.page]
+        #mn = self.t[self.page_length * self.page]
         # ??
-        twid = self.t[self.page_length] - self.t[0]
+        twid = t[self.page_length] - t[0]
         t0 = t[int(1.5*self.page_length)]
         t0 = t0 + t_off
         #t_min = max(mn, t0 - twid/2)
