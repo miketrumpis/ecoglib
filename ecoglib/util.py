@@ -1,5 +1,6 @@
 # ye olde utilities module
 import os
+import copy
 import errno
 import numpy as np
 import inspect
@@ -26,6 +27,9 @@ class Bunch(dict):
         
         table = reduce(lambda x,y: x+y, table)
         return table.strip()
+
+    def deepcopy(self):
+        return Bunch( **copy.deepcopy(self) )
 
 class ChannelMap(list):
     def __init__(self, chan_map, geo, col_major=True):
