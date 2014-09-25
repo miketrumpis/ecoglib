@@ -61,3 +61,29 @@ def bdetrend(x, bsize=0, **kwargs):
     del xc
     del x_blk
 
+def remove_modes(x, bsize=0, axis=-1, modetype='dense', n=1):
+
+    # remove chronos modes discovered by SVD
+    # the mode types may be:
+    # * most "dense" (scored by l1-norm of corresponding topos mode)
+    # * most "sparse" (scored by l1-norm of corresponding topos mode)
+    # * most "powerful" (scored by singular value)
+    
+    x_blk = BlockedSignal(x, bsize, axis=axis)
+
+    def _get_mode(blk, n):
+        u, s, vt = np.linalg.svd(blk, 0)
+        if modetype in ('sparse', 'dense'):
+            support = np.abs(u).sum(0)
+            ix = np.argsort(support)
+            if modetype == 'sparse':
+                m_ix = ix[:n]
+            else:
+                m_ix = ix[-n:]
+            return u[:, m_ix].dot( vt[m_ix] * s[m_ix][:, None] )
+        # else return most powerful modes
+        return u[:, :n].dot( vt[:n] * s[:n][:, None] )
+
+    for blk in x_blk.fwd():
+        blk -= _get_mode(blk, n)
+    return x
