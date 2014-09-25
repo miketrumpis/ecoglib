@@ -4,6 +4,9 @@ Simple filter design wrappings
 import numpy as np
 import scipy.signal.filter_design as fdesign
 import scipy.signal as signal
+from scipy import poly
+
+__all__ = [ 'butter_bp', 'cheby1_bp', 'cheby2_bp', 'notch', 'plot_filt' ]
 
 def _bandpass_params(lo, hi):
     (lo, hi) = map(float, (lo, hi))
@@ -35,14 +38,21 @@ def cheby1_bp(ripple, lo=0, hi=0, Fs=2.0, ord=3):
 def cheby2_bp(rs, lo=0, hi=0, Fs=2.0, ord=3):
     freqs, btype = _bandpass_params(lo, hi)
     return fdesign.cheby2(ord, rs, 2*freqs/Fs, btype=btype)
+
+def notch(fcut, Fs=2.0, nwid=3.0, npo=None, nzo=3):
+
+    f0 = fcut * 2 / Fs
+    fw = nwid * 2 / Fs
+
+    z = [np.exp(1j*np.pi*f0), np.exp(-1j*np.pi*f0)]
     
-def notch(fcut, Fs=2.0, nwid=6.0, ftype='butter'):
-    (bn, an) = fdesign.iirdesign(
-        2*np.array([fcut-nwid/2, fcut+nwid/2], 'd')/Fs, 
-        2*np.array([fcut-nwid/5, fcut+nwid/5], 'd')/Fs,
-        0.1, 30, ftype=ftype
-    )
-    return (bn, an)
+    # find the polynomial with the specified (multiplicity of) zeros
+    b = poly( np.array( z * int(nzo) ) )
+    # the polynomial with the specified (multiplicity of) poles
+    if npo is None:
+        npo = nzo
+    a = poly( (1-fw) * np.array( z * int(npo) ) )
+    return (b, a)
 
 def plot_filt(
         b, a, Fs=2.0, n=2048, log=True, db=False, filtfilt=False, ax=None
