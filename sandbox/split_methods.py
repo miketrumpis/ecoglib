@@ -1,6 +1,6 @@
 import numpy as np
 
-from ecoglib.filt.time import *
+import ecoglib.filt.time.blocked_filter as bf
 import ecoglib.util as ut
 
 import multiprocessing as mp
@@ -13,12 +13,14 @@ import sandbox.array_split as array_split
 import nitime.algorithms as ntalg
 
 ### Parallelized re-definitions
-bfilter = array_split.split_at(split_arg=2)(bfilter)
-multi_taper_psd = array_split.split_at(splice_at=(1,2))(ntalg.multi_taper_psd)
+bfilter = array_split.split_at(split_arg=2)(bf.bfilter)
+multi_taper_psd = array_split.split_at(splice_at=(1,2))(
+    ntalg.multi_taper_psd
+    )
 
 
 ### Convenience wrappers
-#@array_split.split_at()
+#@array_split.split_at() # bfilter already split
 def filtfilt(arr, b, a, bsize=10000):
     """
     Docstring
