@@ -5,7 +5,6 @@ One-stop shopping for digital filtering of arrays
 import numpy as np
 from .design import butter_bp, cheby1_bp, cheby2_bp, notch
 from ecoglib.util import get_default_args
-from sandbox.split_methods import bfilter
 from sandbox.array_split import shared_ndarray
 
 __all__ = [ 'filter_array', 'notch_all' ]
@@ -32,7 +31,7 @@ def filter_array(
 
         
     b, a = _get_poles_zeros(ftype, **design_kwargs)
-
+    from sandbox.split_methods import bfilter
     def_args = get_default_args(bfilter)
     # reset these
     def_args['bsize'] = 10000
@@ -49,8 +48,8 @@ def filter_array(
         return arr_f
 
 def notch_all(
-        arr, Fs, lines=60.0,
-        nwid=3.0, inplace=True, nmax=-1
+        arr, Fs, lines=60.0, nzo=3,
+        nwid=3.0, inplace=True, nmax=-1, **filt_kwargs
         ):
     if not inplace:
         arr_f = shared_ndarray(arr.shape)
@@ -61,11 +60,16 @@ def notch_all(
     if isinstance(lines, float):
         # repeat lines until nmax
         nf = lines
-        lines = [ nf*i for i in xrange(1, nmax//nf + 1) ]
-        
+        lines = [ nf*i for i in xrange(1, int(nmax//nf) + 1) ]
+
+    notch_defs = get_default_args(notch)
+    notch_defs['nwid'] = nwid
+    notch_defs['nzo'] = nzo
+    notch_defs['Fs'] = Fs
     for nf in lines:
+        notch_defs['fcut'] = nf
         filter_array(
             arr_f, 'notch', inplace=True,
-            design_kwargs=dict(fcut=nf, nwid=nwid, Fs=Fs)
+            design_kwargs=notch_defs, filt_kwargs=filt_kwargs
             )
     return arr_f
