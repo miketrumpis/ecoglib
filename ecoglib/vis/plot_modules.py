@@ -567,6 +567,26 @@ class StandardPlot(ProtoPlot):
         lines = self.ax.plot(t, x, **plot_line_props)
         return lines
 
+class MaskedPlot(StandardPlot):
+    """
+    A modified mixin that applies a "mask" to certain traces
+    by plotting them with a masking color
+    """
+
+    mask_color = '#E0E0E0'
+
+    def create_fn_image(self, x, t=None, **plot_line_props):
+        channel_mask = plot_line_props.pop('channel_mask', None)
+        lines = super(MaskedPlot, self).create_fn_image(
+            x, t=t, **plot_line_props
+            )
+        if channel_mask is None or not len(channel_mask):
+            return lines
+        channel_mask = channel_mask.astype('?')
+        for i in np.where(~channel_mask)[0]:
+            lines[i].set_color(self.mask_color)
+        return lines
+
 class ColorCodedPlot(ProtoPlot):
     """
     A mixin-type whose image is a color-coded time series lines
@@ -711,7 +731,7 @@ class WindowedTimeSeriesPlot(WindowedFunctionPlot, StandardPlot):
     # defaults for both classes
     pass
 
-class PagedTimeSeriesPlot(PagedFunctionPlot, StandardPlot):
+class PagedTimeSeriesPlot(PagedFunctionPlot, MaskedPlot):
     """
     A static plot that is flipped between windows.
     """
