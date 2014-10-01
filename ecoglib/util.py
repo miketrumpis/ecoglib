@@ -28,8 +28,19 @@ class Bunch(dict):
         table = reduce(lambda x,y: x+y, table)
         return table.strip()
 
+    def __copy__(self):
+        d = dict([ (k, copy.copy(v)) for k, v in self.items() ])
+        return Bunch(**d)
+    
+    def copy(self):
+        return copy.copy(self)
+
+    def __deepcopy__(self, memo):
+        d = dict([ (k, copy.deepcopy(v)) for k, v in self.items() ])
+        return Bunch(**d)
+    
     def deepcopy(self):
-        return Bunch( **copy.deepcopy(self) )
+        return copy.deepcopy(self)
 
 class ChannelMap(list):
     def __init__(self, chan_map, geo, col_major=True):
