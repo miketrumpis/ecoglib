@@ -66,12 +66,12 @@ class ScriptPlotter(object):
         if www and 'png' not in self.formats:
             self.formats.append('png')
 
-    def savefig(self, f, name, rst_text=''):
+    def savefig(self, f, name, rst_text='', **fig_kwargs):
         """Append a figure reference and a figure name to the
         list of figures to save"""
         for fmt in self.formats:
             name = name.split('.'+fmt)[0]
-        self.fig_cache.append( (f, name) )
+        self.fig_cache.append( (f, name, fig_kwargs) )
         self.fig_text.append( rst_text )
 
     def _save_cache(self):
@@ -81,11 +81,11 @@ class ScriptPlotter(object):
             e_path = os.path.join(self.fig_path, ext)
             if not os.path.exists(e_path):
                 os.mkdir(e_path)
-            for (f, name) in self.fig_cache:
+            for (f, name, kwargs) in self.fig_cache:
                 dpi = self.dpi or f.dpi
                 f_file = os.path.join(e_path, name)+'.'+ext
                 print 'saving', f_file
-                f.savefig(f_file, dpi=dpi)
+                f.savefig(f_file, dpi=dpi, **kwargs)
 
     def _fixup_rst(self, fname, line, context):
         rst_source = open(fname).readlines()
@@ -175,7 +175,7 @@ class ScriptPlotter(object):
         
         pth, _ = os.path.split(fname)
         relpath = os.path.relpath(self.fig_path, pth)
-        for (f, name), text in zip(self.fig_cache, self.fig_text):
+        for (f, name, _), text in zip(self.fig_cache, self.fig_text):
             image_lines = rst_image_markup(relpath, name, self.formats)
             if text:
                 new_str.extend(['\n', text+'\n'])
