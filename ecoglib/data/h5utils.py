@@ -125,7 +125,7 @@ def traverse_table(f, path='/', load=True, shared_paths=()):
                     arr[:] = n.read()
                 else:
                     arr = n.read()
-                if n.shape:
+                if isinstance(n, np.ndarray) and n.shape:
                     if arr.shape == (1,1):
                         arr = arr[0,0]
                         if arr==0:
