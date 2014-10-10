@@ -7,10 +7,45 @@ import gc
 from decorator import decorator
 import numpy as np
 
-def shared_ndarray(shape):
+
+# from the "array" module docstring
+"""
+This module defines an object type which can efficiently represent
+an array of basic values: characters, integers, floating point
+numbers.  Arrays are sequence types and behave very much like lists,
+except that the type of objects stored in them is constrained.  The
+type is specified at object creation time by using a type code, which
+is a single character.  The following type codes are defined:
+
+    Type code   C Type             Minimum size in bytes 
+    'c'         character          1 
+    'b'         signed integer     1 
+    'B'         unsigned integer   1 
+    'u'         Unicode character  2 
+    'h'         signed integer     2 
+    'H'         unsigned integer   2 
+    'i'         signed integer     2 
+    'I'         unsigned integer   2 
+    'l'         signed integer     4 
+    'L'         unsigned integer   4 
+    'f'         floating point     4 
+    'd'         floating point     8 
+
+"""
+
+# can only think of booleans
+dtype_maps_to = dict([ ('?', 'b') ])
+
+def shared_ndarray(shape, typecode='d'):
     N = reduce(np.multiply, shape)
-    shm = mp.Array(ctypes.c_double, N)
-    return tonumpyarray(shm, shape=shape)
+    shm = mp.Array(typecode, N)
+    return tonumpyarray(shm, shape=shape, dtype=typecode)
+
+def shared_copy(x):
+    typecode = dtype_maps_to.get(x.dtype.char, x.dtype.char)
+    y = shared_ndarray(x.shape, typecode=typecode)
+    y[:] = x.astype(typecode)
+    return y
 
 dtype_ctype = dict( (('F', 'f'), ('D', 'd'), ('G', 'g')) )
 ctype_dtype = dict( ( (v, k) for k, v in dtype_ctype.items() ) )
