@@ -14,7 +14,7 @@ if use.lower() == 'qt4':
     from matplotlib.backends.backend_qt4agg import \
      FigureCanvasQTAgg as FigureCanvas
     from matplotlib.backends.backend_qt4agg import \
-     NavigationToolbar2QTAgg as NavigationToolbar
+     NavigationToolbar2QT as NavigationToolbar
 elif use.lower() == 'wx':
     matplotlib.use('WxAgg')
     from matplotlib.backends.backend_wxagg \
