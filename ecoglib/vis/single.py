@@ -19,7 +19,7 @@ def plot_lin_color(x, cmap='jet', tx=None):
         ax.plot(tx, trace, color=c)
     return f
 
-def subspace_scatters(x, labels=None, oneplot=False, **kwargs):
+def subspace_scatters(x, labels=None, fig=None, **kwargs):
     """
     For samples in X, plot all n-choose-2 scatter plots
     of f_i vs f_j, i != j.
@@ -44,11 +44,13 @@ def subspace_scatters(x, labels=None, oneplot=False, **kwargs):
         c = 'b'
     else:
         c = labels
-    if oneplot:
+
+    if fig:
         P1 = int( np.ceil(np.sqrt(float(n_plots))) )
         P2 = int( np.ceil(n_plots / float(P1)) )
-        f = pp.figure()
+        oneplot = True
     else:
+        oneplot = False
         plots = list()
     
     for p, ij in enumerate(itertools.combinations(range(n), 2)):
@@ -67,6 +69,6 @@ def subspace_scatters(x, labels=None, oneplot=False, **kwargs):
         #pp.gca().xaxis.set_visible(False)
         #pp.gca().yaxis.set_visible(False)
     if oneplot:
-        f.tight_layout()
-        return f
+        fig.tight_layout()
+        return fig
     return plots
