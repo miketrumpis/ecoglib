@@ -306,7 +306,7 @@ def repeat_tonotopy_sequences(trig_times, tones_pattern, amps_pattern):
     return tones, amps
 
     
-class FroemkeTonotopyExperiment(StimulatedExperiment):
+class TonotopyExperiment(StimulatedExperiment):
 
     ## These patterns were used in one set of exps..
     fixed_tones_pattern = \
@@ -332,8 +332,6 @@ class FroemkeTonotopyExperiment(StimulatedExperiment):
         if trig_times is None or not len(trig_times):
             #raise ValueError('needs trig_times to proceed')
             trig_times = np.array([])
-
-        #super(FroemkeFixedTonotopyExperiment, self).__init__(**kwargs)
 
         # The tone/amp tables may be given in the event_tables 
         # dictionary, which should be preferred to 'tone_tab'
@@ -369,7 +367,7 @@ class FroemkeTonotopyExperiment(StimulatedExperiment):
                     )
             event_tables = dict(tones=tones, amps=amps)
                 
-        super(FroemkeTonotopyExperiment, self).__init__(
+        super(TonotopyExperiment, self).__init__(
             trig_times=trig_times, event_tables=event_tables, **kwargs
             )
             
