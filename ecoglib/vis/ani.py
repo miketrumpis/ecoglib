@@ -8,13 +8,14 @@ import time
 
 def write_frames(
         frames, fname='', title='Array Movie', fps=5, 
-        quicktime=False, **imshow_kw
+        quicktime=False, axis_toggle='on', **imshow_kw
         ):
     # most simple frame writer -- no tricks
     f = pp.figure()
     ax = f.add_subplot(111)
     im = ax.imshow(frames[0], **imshow_kw)
     ax.axis('image')
+    ax.axis(axis_toggle)
     def _step_time(num, frames, frame_im):
         frame_im.set_data(frames[num])
         return (frame_im,)
