@@ -42,6 +42,15 @@ class Bunch(dict):
     def deepcopy(self):
         return copy.deepcopy(self)
 
+def map_intersection(maps):
+    geometries = set([m.geometry for m in maps])
+    if len(geometries) > 1:
+        raise ValueError('cannot intersect maps with different geometries')
+    bin_map = maps[0].embed(np.ones(len(maps[0])), fill=0)
+    for m in maps[1:]:
+        bin_map *= m.embed(np.ones(len(m)), fill=0)
+    return bin_map.astype('?')
+    
 class ChannelMap(list):
     def __init__(self, chan_map, geo, col_major=True):
         list.__init__(self)
@@ -78,6 +87,19 @@ class ChannelMap(list):
         return flat_to_mat(self.geometry, self[c], col_major=self.col_major)
 
     def subset(self, sub):
+        if isinstance(sub, type(self)):
+            # check that it's a submap
+            submap = map_intersection([self, sub])
+            if submap.sum() < len(sub):
+                raise ValueError(
+                    'The given channel map is not a subset of this map'
+                    )
+            # get the channels/indices of the subset of sites
+            sub = self.lookup(*submap.nonzero())
+        elif isinstance(sub, np.ndarray) and sub.ndim==2:
+            # get the channels/indices of the subset of sites
+            sub = self.lookup(*sub.nonzero())            
+            
         return ChannelMap(
             [self[i] for i in sub],
             self.geometry, col_major=self.col_major
@@ -173,3 +195,36 @@ def mkdir_p(path):
         if exc.errno == errno.EEXIST and os.path.isdir(path):
             pass
         else: raise
+
+def equalize_groups(x, group_sizes, axis=0, fill=np.nan, reshape=True):
+    
+    mx_size = max(group_sizes)
+    n_groups = len(group_sizes)
+    steps = np.r_[0, np.cumsum(group_sizes)]
+    if x.shape[axis] != steps[-1]:
+        raise ValueError('axis {0} in x has wrong size'.format(axis))
+    new_shape = list(x.shape)
+    new_shape[axis] = n_groups * mx_size
+    if all( [g==mx_size for g in group_sizes] ):
+        if reshape:
+            new_shape[axis] = n_groups
+            new_shape.insert(axis+1, mx_size)
+            x = x.reshape(new_shape)
+        return x
+    y = np.empty(new_shape, dtype=x.dtype)
+    new_shape[axis] = n_groups
+    new_shape.insert(axis+1, mx_size)
+    y = y.reshape(new_shape)
+    y.fill(fill)
+    y_slice = [slice(None)] * len(new_shape)
+    x_slice = [slice(None)] * len(x.shape)
+    for g in xrange(n_groups):
+        y_slice[axis] = g
+        y_slice[axis+1] = slice(0, group_sizes[g])
+        x_slice[axis] = slice(steps[g], steps[g+1])
+        y[y_slice] = x[x_slice]
+    if not reshape:
+        new_shape[axis] *= mx_size
+        new_shape.pop(axis+1)
+        y = y.reshape(new_shape)
+    return y
