@@ -70,9 +70,14 @@ class SharedmemManager(object):
             self.shm, dtype=self.dtype, shape=self.shape
             )
 
-def split_at(split_arg=0, splice_at=(0,), shared_args=(), n_jobs=-1, concurrent=False):
+def split_at(
+        split_arg=(0,), splice_at=(0,), 
+        shared_args=(), n_jobs=-1, concurrent=False
+        ):
     if not np.iterable(splice_at):
         splice_at = (splice_at,)
+    if not np.iterable(split_arg):
+        split_arg = (split_arg,)
     if n_jobs < 0:
         n_jobs = mp.cpu_count()
     @decorator
@@ -80,25 +85,35 @@ def split_at(split_arg=0, splice_at=(0,), shared_args=(), n_jobs=-1, concurrent=
         # make available short-cut to not use subprocesses:
         if kwargs.get('skip_parallel', False):
             return method(*args, **kwargs)
-        pop_args = sorted( (split_arg,) + shared_args )
+        pop_args = sorted( split_arg + shared_args )
         sh_args = list()
         n = 0
         args = list(args)
+        shm = list()
+        split_x = list()
         for pos in pop_args:
             pos = pos - n
             a = args.pop(pos)
             x = SharedmemManager( a )
-            if pos+n == split_arg:
-                shm = x
-                split_x = a
+            if pos+n in split_arg:
+                shm.append( x )
+                split_x.append( a )
             else:
                 sh_args.append( x )
             n += 1
         static_args = tuple(args)
         sh_args = tuple(sh_args)
+
+        split_lens = set([ len(sx) for sx in split_x ])
+        if len(split_lens) > 1:
+            raise ValueError(
+                'all of the arrays to split must have the same length '
+                'on the first axis'
+                )
             
         # create a pool and map the shared memory array over the method
-        init_args = (split_arg, shm, split_x.shape,
+        init_args = (split_arg, shm, 
+                     [getattr(x, 'shape') for x in split_x],
                      shared_args, sh_args,
                      method, static_args, kwargs)
         mp.freeze_support()
@@ -106,8 +121,8 @@ def split_at(split_arg=0, splice_at=(0,), shared_args=(), n_jobs=-1, concurrent=
                 processes=n_jobs, initializer=_init_globals,
                 initargs=init_args
                 )) as p:
-            n_div = estimate_chunks(split_x.size, len(p._pool))
-            dim_size = split_x.shape[0]
+            n_div = estimate_chunks(split_x[0].size, len(p._pool))
+            dim_size = split_x[0].shape[0]
 
             # if there are less or equal dims as procs, then split it up 1 per
             # otherwise, balance it with some procs having 
@@ -195,6 +210,16 @@ def _init_globals(
         shared_args, sh_arg_mem,
         method, args, kwdict
         ):
+    """
+    split_arg : sequence of positions of argument that are split over
+    shm : the shared memory managers for these split args
+    shm_shape : the shapes of the underlying ndarrays of the split args
+    shared_args : positions for readonly, non-split shared memory args
+    sh_arg_mem : shared mem managers for any readonly shared memory arguments
+    method : the method
+    kwdict : any keyword args
+    """
+    
     # globals for primary shared array
     global shared_arr_
     shared_arr_ = shm
@@ -228,12 +253,13 @@ def _global_method_acquire(aslice):
         return _global_method_wrap(aslice)
     
 def _global_method_wrap(aslice):
-    arr = shared_arr_.get_ndarray()
+    arrs = [arr_.get_ndarray() for arr_ in shared_arr_]
     
     info = mp.get_logger().info
     
     spliced_in = zip( 
-        (split_arg_,)+shared_args_, (arr[aslice],) + shared_args_mem_
+        split_arg_+shared_args_, 
+        [arr_[aslice] for arr_ in arrs] + list(shared_args_mem_)
         )
     spliced_in = sorted(spliced_in, key=lambda x: x[0])
     # assemble argument order correctly
@@ -251,7 +277,11 @@ def _global_method_wrap(aslice):
     args = tuple(args)
     #info(repr(map(type, args)))
 
-    info('applying method %s to slice %s at position %d'%(method_, aslice, split_arg_))
+    info(
+        'applying method {0} to slice {1} at position {2}'.format(
+            method_, aslice, split_arg_
+            )
+        )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         r = method_(*args, **kwdict_)
