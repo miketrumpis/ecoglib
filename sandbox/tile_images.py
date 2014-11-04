@@ -177,10 +177,9 @@ def calibration_axes(
     x0 = pos.x0; x1 = pos.x1; y0 = pos.y0; y1 = pos.y1
 
     if not calib_ax:
-        xw = 0.96-x1
+        xw = 1 - x1 - 0.02
         yw = y1 - y0
-
-        calib_ax = ref_ax.figure.add_axes([x1+0.02, y0, xw, yw])
+        calib_ax = ref_ax.figure.add_axes([x1+0.01, y0, xw, yw])
     else:
         c_pos = calib_ax.get_position()
         xw = c_pos.x1 - c_pos.x0
@@ -204,6 +203,10 @@ def calibration_axes(
             time_quantum = time_quantum // 2
     else:
         t_calib = t_scale
+        if t_calib < 1:
+            t_calib *= 1e3
+        while t_calib > sub_t_len:
+            t_calib = t_calib // 2
     
     t_txt = '%d %s'%(t_calib, time_units)
 
@@ -228,16 +231,30 @@ def calibration_axes(
     calib_ax.plot([t0, t1], [y0, y0], 'k', linewidth=3)
     calib_ax.plot([t0, t0], [y0, y1], 'k', linewidth=3)
 
-    calib_ax.text(
-        t0-0.2*sub_t_len, y0, y_txt, ha='center', va='bottom', 
-        rotation='vertical', fontsize=11
-        )
-    calib_ax.text(
-        0, y0-.25*(y1-y0), t_txt, ha='center', va='top', fontsize=11
-        )
     calib_ax.set_ylim(ylim)
     calib_ax.set_xlim(-sub_t_len/2.0, sub_t_len/2.0)
     calib_ax.axis('off')
+    try:
+        pp.draw()
+        # offset left by 5 pts
+        dx = calib_ax.transData.inverted().get_matrix()[0,0]
+        dy = calib_ax.transData.inverted().get_matrix()[1,1]
+    except:
+        # try to approximate by figure settings
+        f = ref_ax.figure
+        pos = calib_ax.get_position()
+        fh = f.get_figheight() * f.dpi
+        fw = f.get_figwidth() * f.dpi
+        dy = np.diff(ylim)[0] / ( fh * (pos.y1-pos.y0) )
+        dx = sub_t_len / ( fw * (pos.x1-pos.x0) )
+        
+    calib_ax.text(
+        t0 - 10*dx, y0, y_txt, ha='center', va='bottom', 
+        rotation='vertical', fontsize=11
+        )
+    calib_ax.text(
+        0, y0 - 10*dy, t_txt, ha='center', va='top', fontsize=11
+        )
     return calib_ax
 
          
@@ -253,6 +270,7 @@ def tile_images(
         maps, geo=(), p=(), col_major=True,
         border_axes=False, title='', 
         fill_empty=False, fill_cmap=pp.cm.gray, 
+        x_labels=(), y_labels=(),
         clabel='none', **imkw
         ):
 
@@ -306,6 +324,7 @@ def tile_images(
         ax = plotted[n]
         map_n = maps[n].T if maps.ndim == 3 else maps[n].transpose(1,0,2)
         ax.imshow(map_n, **imkw)
+        ax.tick_params(labelsize=10)
         if border_axes:
             ax.tick_params(labelsize=10)
             ax.yaxis.set_visible(True)
@@ -321,6 +340,16 @@ def tile_images(
         else:
             ax.axis('off')
 
+    nx, ny = map(int, (nx, ny))
+    xt = np.arange(nx-1, -1, -4)[::-1]
+    ax.set_xticks(xt)
+    if len(x_labels):
+        ax.set_xticklabels( [x_labels[t] for t in xt], size=10 )
+    yt = np.arange(ny-1, -1, -2)[::-1]
+    ax.set_yticks(yt)
+    if len(y_labels):
+        ax.set_yticklabels( [y_labels[t] for t in yt], size=10 )
+    ax.set_xlim(-0.5, nx-0.5); ax.set_ylim(-0.5, ny-0.5)
     fig.subplots_adjust(left = 0.05, right = 0.95)
     if not clabel == 'none':
         edge = 0.2
@@ -450,7 +479,7 @@ from matplotlib.patches import Polygon
 def tile_traces_1ax(
         traces, geo=(), p=(), yl=(), twin=(), plot_style='sample',
         col_major=True, title='', tilesize=(1,1), calib_unit='V',
-        x_labels=(), y_labels=(), table_style='matrix'
+        x_labels=(), y_labels=(), table_style='matrix', **line_kws
         ):
 
     """
@@ -591,22 +620,29 @@ def tile_traces_1ax(
     if plot_style != 'all':
         # else, chan_means already defined
         lines = [ np.c_[tx, mn] for mn in chan_means ]
-        lw = 2 if plot_style == 'single' else 1
-        lc = dict(sem='r', stdev='k', sample='k', single='b')[plot_style]
+        line_kws.setdefault('linewidths', 2 if plot_style == 'single' else 1)
+        line_kws.setdefault(
+            'colors', 
+            dict(sem='r', stdev='k', sample='k', single='b')[plot_style]
+            )
+        lines = LineCollection(
+            lines, offsets=chan_offsets, #transOffset=ax.transData,
+            **line_kws
+            )
     else:
         lines = list()
         for chan_samps in traces:
             lines.extend( [ np.c_[tx, samp] for samp in chan_samps ] )
         # repeat offsets enough times for each group of traces
-        chan_offsets = [ [offset for i in xrange(traces.shape[1])]
-                         for offset in chan_offsets ]
-        lw = 0.1
-        lc = 'b'
+        chan_multi_offsets = [ [offset for i in xrange(traces.shape[1])]
+                               for offset in chan_offsets ]
+        line_kws.setdefault('linewidths', 0.2)
+        line_kws.setdefault('colors', 'b')
+        lines = LineCollection(
+            lines, offsets=chan_multi_offsets, #transOffset=ax.transData,
+            **line_kws
+            )
 
-    lines = LineCollection(
-        lines, offsets=chan_offsets, #transOffset=ax.transData,
-        colors=lc, linewidths=lw
-        )
     ax.add_collection(lines)
 
     if twin[0] < 0:
@@ -625,7 +661,9 @@ def tile_traces_1ax(
             0.5, .95, title, fontsize=18, 
             va='baseline', ha='center'
             )
-    calibration_axes(ax, y_scale=ywid, calib_unit=calib_unit)
+    calibration_axes(
+        ax, y_scale=ywid, calib_unit=calib_unit, t_scale=twin[1]-twin[0]
+        )
 
     if len(x_labels) == geo[1]:
         y0 = yl[0] - txtgap_y
