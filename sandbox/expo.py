@@ -241,6 +241,26 @@ class StimulatedExperiment(object):
         return tuple(
             [len(np.unique(ctab[tab])) for tab in self.enum_tables]
             )
+
+    def iterate_for(self, tables, c_slice=False):
+        if isinstance(tables, str):
+            tables = (tables,)
+        t_vals = [ np.unique(getattr(self, t)) for t in tables ]
+        if c_slice:
+            conds, tabs = self.enumerate_conditions()
+            t_idx = [ self.enum_tables.index(t) for t in tables ]
+            slices = [slice(None)] * len(self.enum_tables)
+        for combo in itertools.product(*t_vals):
+            mask = [ getattr(self, t) == combo[i] 
+                     for i, t in enumerate(tables) ]
+            mask = np.row_stack(mask)
+            if c_slice:
+                sl = slices[:]
+                for i in xrange(len(combo)):
+                    sl[ t_idx[i] ] = t_vals[i].searchsorted(combo[i])
+                yield mask.all(axis=0), sl
+            else:
+                yield mask.all(axis=0)
     
     def stim_str(self, n, mpl_text=False):
         if mpl_text:
