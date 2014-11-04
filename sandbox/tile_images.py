@@ -55,7 +55,7 @@ def tiled_axes(
 
     """
 
-    p = _build_map(p, geo, col_major)
+    p = _build_map(p, geo, col_major).as_row_major()
     assert p.geometry == geo, 'Provided channel map has different geometry'
     n_plots = len(p)
     missed_tiles = set(range(geo[0]*geo[1]))
@@ -77,26 +77,33 @@ def tiled_axes(
         else:
             figsize[1] += 1
             subplots_bottom = 1.0/figsize[1]
-    
-    fig = pp.figure(figsize=figsize)
+
+    fig, axs = pp.subplots(
+        *geo, figsize=figsize, sharex=True, sharey=True, squeeze=False
+        )
+    ## fig = pp.figure(figsize=figsize)
     fig.subplots_adjust(
         left=subplots_left, right=subplots_right,
         bottom=subplots_bottom, top=subplots_top
         )
     plot_axes = list()
-    ii, jj = p.to_mat()
-    subplot_grid = pp.GridSpec(*geo)
-    for i, j in zip(ii, jj):
-        ax_spec = subplot_grid.new_subplotspec( (i,j) )
-        ax = fig.add_subplot(ax_spec)
-        plot_axes.append(ax)
-    missed_axes = list()
-    for pn in missed_tiles:
-        (i, j) = flat_to_mat(geo, pn, col_major=p.col_major)
-        ax_spec = subplot_grid.new_subplotspec( (i,j) )
-        ax = fig.add_subplot(ax_spec)
+    plot_axes = axs.ravel()[ p.as_row_major() ]
+    missed_axes = axs.ravel()[ list(missed_tiles) ]
+    for ax in missed_axes:
         ax.axis('off')
-        missed_axes.append(ax)
+    ## ii, jj = p.to_mat()
+    ## subplot_grid = pp.GridSpec(*geo)
+    ## for i, j in zip(ii, jj):
+    ##     ax_spec = subplot_grid.new_subplotspec( (i,j) )
+    ##     ax = fig.add_subplot(ax_spec)
+    ##     plot_axes.append(ax)
+    ## missed_axes = list()
+    ## for ax in missed_tiles:
+    ##     (i, j) = flat_to_mat(geo, pn, col_major=p.col_major)
+    ##     ax_spec = subplot_grid.new_subplotspec( (i,j) )
+    ##     ax = fig.add_subplot(ax_spec)
+    ##     ax.axis('off')
+    ##     missed_axes.append(ax)
 
     if title:
         fig.text(
