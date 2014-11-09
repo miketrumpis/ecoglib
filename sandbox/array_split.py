@@ -52,7 +52,7 @@ ctype_dtype = dict( ( (v, k) for k, v in dtype_ctype.items() ) )
 
 class SharedmemManager(object):
 
-    def __init__(self, np_array):
+    def __init__(self, np_array, use_lock=False):
         self.dtype = np_array.dtype.char
         self.shape = np_array.shape
         if self.dtype in dtype_ctype:
@@ -64,11 +64,18 @@ class SharedmemManager(object):
             self.shm = mp.sharedctypes.synchronized(
                 np.ctypeslib.as_ctypes(np_array)
                 )
-    
+        self.use_lock = use_lock
+
     def get_ndarray(self):
-        return tonumpyarray(
-            self.shm, dtype=self.dtype, shape=self.shape
-            )
+        if self.use_lock:
+            with self.shm.get_lock():
+                return tonumpyarray(
+                    self.shm, dtype=self.dtype, shape=self.shape
+                    )
+        else:
+            return tonumpyarray(
+                self.shm, dtype=self.dtype, shape=self.shape
+                )
 
 def split_at(
         split_arg=(0,), splice_at=(0,), 
@@ -94,7 +101,7 @@ def split_at(
         for pos in pop_args:
             pos = pos - n
             a = args.pop(pos)
-            x = SharedmemManager( a )
+            x = SharedmemManager( a, use_lock=concurrent )
             if pos+n in split_arg:
                 shm.append( x )
                 split_x.append( a )
@@ -144,10 +151,8 @@ def split_at(
             for dims in job_dims:
                 job_slices.extend( [slice(n, n+dims)] )
                 n += dims
-            if concurrent:
-                res = p.map_async( _global_method_acquire, job_slices )
-            else:
-                res = p.map_async( _global_method_wrap, job_slices )
+            # map the jobs
+            res = p.map_async( _global_method_wrap, job_slices )
 
         p.join()
         if res.successful():
@@ -247,10 +252,6 @@ def _init_globals(
 
     info = mp.get_logger().info
     info('applied global variables')
-
-def _global_method_acquire(aslice):
-    with shared_arr_.shm.get_lock():
-        return _global_method_wrap(aslice)
     
 def _global_method_wrap(aslice):
     arrs = [arr_.get_ndarray() for arr_ in shared_arr_]
