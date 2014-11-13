@@ -114,7 +114,8 @@ def tiled_axes(
     return fig, plot_axes, missed_axes
 
 def calibration_axes(
-        ref_ax, y_scale=None, t_scale=None, calib_ax=None, calib_unit='V'
+        ref_ax, y_scale=None, t_scale=None, calib_ax=None, 
+        calib_unit='V', fontsize=11
         ):
 
     """
@@ -157,7 +158,7 @@ def calibration_axes(
     if t_len < 20:
         t_len *= 1e3
 
-    time_units = 'msec'
+    time_units = 'ms'
     time_quantum = 50
     #print 'ref axis t-len:', t_len
 
@@ -228,8 +229,10 @@ def calibration_axes(
     t0 = -t_calib/2.0
     t1 = t_calib/2.0
 
-    calib_ax.plot([t0, t1], [y0, y0], 'k', linewidth=3)
-    calib_ax.plot([t0, t0], [y0, y1], 'k', linewidth=3)
+    calib_kws = dict(color='k', linewidth=3, solid_capstyle='butt')
+
+    calib_ax.plot([t0, t1], [y0, y0], **calib_kws)
+    calib_ax.plot([t0, t0], [y0, y1], **calib_kws)
 
     calib_ax.set_ylim(ylim)
     calib_ax.set_xlim(-sub_t_len/2.0, sub_t_len/2.0)
@@ -250,10 +253,10 @@ def calibration_axes(
         
     calib_ax.text(
         t0 - 10*dx, y0, y_txt, ha='center', va='bottom', 
-        rotation='vertical', fontsize=11
+        rotation='vertical', fontsize=fontsize
         )
     calib_ax.text(
-        0, y0 - 10*dy, t_txt, ha='center', va='top', fontsize=11
+        0, y0 - 10*dy, t_txt, ha='center', va='top', fontsize=fontsize
         )
     return calib_ax
 
