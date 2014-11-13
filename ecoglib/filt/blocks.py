@@ -3,6 +3,8 @@ import numpy as np
 
 from numpy.lib.stride_tricks import as_strided
 
+__all__ = ['BlockedSignal']
+
 class BlockedSignal(object):
     """A class that transforms an N-dimension signal into multiple
     blocks along a given axis. The resulting object can yield blocks
