@@ -5,8 +5,10 @@ from scipy.optimize import leastsq, fmin_tnc
 import scipy.stats.distributions as dists
 import scipy.stats as stats
 from scipy.integrate import simps
+import scipy.linalg as la
 
 from ecoglib.util import *
+from sandbox.array_split import split_at
 
 def nextpow2(n):
     pow = int( np.floor( np.log2(n) ) + 1 )
@@ -38,24 +40,31 @@ def unity_normalize(x, axis=None):
     x = x / (mx-mn)[slicer]
     return np.rollaxis(x, 0, axis+1)
 
-def density_normalize(x, axis=None):
-    mn = x.min(axis=axis)
-    if axis is None:
+def density_normalize(x, raxis=None):
+    if raxis is None:
+        mn = np.nanmin(x)
         x = x - mn
-        return x / x.sum()
+        return x / np.nansum(x)
 
-    x = np.rollaxis(x, axis)
-    mn = x.min(axis=-1)
-    accum = x.sum(axis=-1)
-    while mn.ndim > 1:
-        mn = mn.min(axis=-1)
-        accum = accum.sum(axis=-1)
+    if x.ndim > 2:
+        shape = x.shape
+        if raxis not in (0, -1, x.ndim-1):
+            raise ValueError('can only normalized in contiguous dimensions')
 
-    n_pt = np.prod(x.shape[1:])
-    slicer = [slice(None)] + [np.newaxis]*(x.ndim-1)
-    x = x - mn[slicer]
-    x = x / (accum-n_pt*mn)[slicer]
-    return np.rollaxis(x, 0, axis+1)
+        if raxis == 0:
+            x = x.reshape(x.shape[0], -1)
+        else:
+            raxis = -1
+            x = x.reshape(-1, x.shape[-1])
+        xn = density_normalize(x, raxis=raxis)
+        return xn.reshape(shape)
+
+    # roll repeat axis to last axis
+    x = np.rollaxis(x, raxis, start=2)
+    mn = np.nanmin(x, 0)
+    x = x - mn
+    x = x / np.nansum(x, 0)
+    return np.rollaxis(x, 1, start=raxis)
 
 def center_samples(x, axis=-1):
     # normalize samples with a "Normal" transformation
@@ -214,6 +223,51 @@ def gauss1d(x, p, jacobian=False):
     fx = alpha * np.exp(x_arg/2) + bias
     return fx.squeeze()
 
+def bump1d(x, p):
+    # bump fn is a + b * exp{ - ( 1 - (x/xw)**2 )^-1 }
+    x = x.ravel()
+    xw, b, a = map(lambda x: np.atleast_2d(x).T, p)
+
+    x_arg = 1 - (x/xw)**2
+    fx = np.zeros( (xw.shape[0], len(x)) )
+
+    x_bump = np.abs(x) <= xw
+    fx[x_bump] = np.exp(-1/x_arg[x_bump])
+    fx *= b
+    fx += a
+    return fx.squeeze()
+
+def bump_fit(y, x):
+
+    y = np.atleast_2d(y)
+    pf = np.zeros( (y.shape[0], 4) )
+    res = list()
+    if x.ndim == 1:
+        x = np.tile(x, (y.shape[0], 1))
+
+    def _costfn(p, xx, yy, resids=True):
+        errs = yy - bump1d(xx, p)
+        if resids:
+            return errs
+        else:
+            return np.sum( errs**2 )
+        
+    for xi, yi in zip(x, y):
+        mx = np.max(yi)
+        mn = np.min(yi)
+        p0 = np.array([2, mx, mn])
+
+        # parameters are width, gain, bias
+        pbnd = [ (1, xi.max()),
+                 (0, mx), (mn, mx) ]
+        #print pbnd
+        #r = leastsq(_costfn, p0, args=(xi, yi))
+        r = fmin_tnc(_costfn, p0, args=(xi, yi, False), 
+                     approx_grad=1, bounds=pbnd, messages=0)
+    
+        res.append(r[0])
+    return np.asarray(res)
+
 def gauss_fit(y, x=None):
 
     y = np.atleast_2d(y)
@@ -221,6 +275,7 @@ def gauss_fit(y, x=None):
     res = list()
     if x is None:
         x = np.arange(y.shape[-1])
+    if x.ndim == 1:
         x = np.tile(x, (y.shape[0], 1))
 
     def _costfn(p, xx, yy, resids=True, weighted=True):
@@ -237,7 +292,7 @@ def gauss_fit(y, x=None):
         mn = np.min(yi)
         p0 = np.array([np.argmax(yi), 1, mx, mn])
         
-        pbnd = [ (0, len(yi)-1), (0.1, len(yi)/3.0),
+        pbnd = [ (0, len(yi)-1), (0., len(yi)/3.0),
                  (0, mx), (mn, mx) ]
         #print pbnd
         #r = leastsq(_costfn, p0, args=(xi, yi))
@@ -453,205 +508,121 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1, axis=-1):
     
     return ndimage.convolve1d(y, m[::-1], mode='constant', axis=axis)
     
-    # pad the signal at the extremes with
-    # values taken from the signal itself
-    #firstvals = y[0] - np.abs( y[1:half_window+1][::-1] - y[0] )
-    #lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
-    #y = np.concatenate((firstvals, y, lastvals))
-    #return np.convolve( m[::-1], y, mode='valid')
 
-def mini_mean_shift(f, ix, m):
-    #fdens = density_normalize(f[ix-m:ix+m+1])
-    fdens = f[ix-m:ix+m+1]
-    fdens = fdens - fdens.min()
-    return (fdens * np.arange(ix-m, ix+m+1)).sum() / fdens.sum()
+def mahal_distance(population, test_points, tol=1-1e-2):
+    """
 
-def peak_to_peak(x, m, p=4, xwin=(), msiter=4, points=False):
-    # m is approimately the characteristic width of a peak
-    # x is 2d, n_array x n_pts
-    oshape = x.shape
-    x = x.reshape(-1, oshape[-1])
+    Parameters
+    ----------
     
-    # force m to be odd and get 1st derivatives
-    m = 2 * (m//2) + 1
-    dx = savitzky_golay(x, m, p, deriv=1, axis=-1)
+    population : ndarray (n_samps, p)
+        A collection of samples from a multivariate population in R^p
 
-    if not xwin:
-        xwin = (0, dx.shape[axis])
-    xwin = map(int, xwin)
+    test_points : ndarray ([n_tests], p)
+        A 1- or 2D collection of test samples in R^p
 
-    pk_dx = np.argmax(dx[:, xwin[0]:xwin[1]], axis=-1) + xwin[0]
-    # these are our starting points for peak finding
+    Returns
+    -------
 
-    pos_pks = np.zeros(x.shape[0], 'i')
-    neg_pks = np.zeros(x.shape[0], 'i')
-    bw = m//2
-    for n in xrange(x.shape[0]):
-        trace = x[n].copy()
-        # must be all positive
-        #trace = trace - trace.min()
-        ix0 = pk_dx[n]
-        k = 0
-        while k < msiter:
-            ix = round(mini_mean_shift(trace, ix0, bw))
-            if not ix-ix0:
-                break
-            ix0 = ix
-            k += 1
-        pos_pks[n] = (ix-bw) + np.argmax(trace[ix-bw:ix+bw+1])
+    dists
+        The Mahalanobis distances of the test points w.r.t. the population.
 
-        # grab a slice rewinding a little bit from here (in order
-        # to keep window slicing in-bounds)
-        trace = -x[n, pos_pks[n]-m:] + x[n, pos_pks[n]]
-        ix0 = m + bw
-        skip = 1
-        k = 0
-        # allow more mean-shift iterations, since the initial point
-        # is a very rough guess
-        while k < 2*msiter:
-            if ix0 > len(trace) - bw:
-                # we have no idea where we are!
-                # return global minimum
-                ix = np.argmin(trace)
-                break
-            ix = round(mini_mean_shift(trace, ix0, bw))
-            if not ix-ix0:
-                break
-            if ix < ix0:
-                # going backwards.. reset with bigger skip ahead
-                ix0 = m + skip*bw
-                skip += 1
-                k = 0
-                continue
-            ix0 = ix
-            k += 1
+    """
 
-        #neg_pks[n] = round(ix) + pos_pks[n] - m
-        neg_pks[n] = (ix-bw) + np.argmax(trace[ix-bw:ix+bw+1]) + \
-          (pos_pks[n]-m)
+    test_points = np.atleast_2d(test_points)
 
-    cx = np.arange(x.shape[0])
-    p2p = x[ (cx, pos_pks) ] - x[ (cx, neg_pks) ]
+    n_tests = test_points.shape[0]
+    n_samps = population.shape[0]
+    # do usual PCA thing.. 
+    # Cxx is estimated by: (1/n)(P' * P) = V * (S/sqrt(n))^2 * V'
+    p_mean = np.mean(population, axis=0)
+    pop0 = (population - p_mean) / np.sqrt(n_samps-1)
+    U, S, Vt = la.svd(pop0, full_matrices=False)
 
-    if points:
-        return map(lambda x: x.reshape(oshape[:-1]), (p2p, neg_pks, pos_pks))
+    # project to proper non-degenerate subspace to 
+    # avoid ill-conditioned inverse
+    if tol < 1:
+        portion_variance = np.cumsum(S**2) / np.sum(S**2)
+        dims = portion_variance.searchsorted(tol) + 1
     else:
-        return p2p.reshape(oshape[:-1])
+        dims = len(S)
+    
+    # The projection to subpsace is Vt[:dims]
+    P = Vt[:dims]
+    icov = 1 / S[:dims]**2
+
+    # subtract mean and project to (dims, n_tests)
+    test_points = P.dot( (test_points - p_mean).T )
+
+    signal_dists = np.diag( np.dot( test_points.T * icov, test_points ) )
+    return np.sqrt(signal_dists)
+
+
+def bootstrap_stat(*arrays, **kwargs):
+    """
+    This method parallelizes simple bootstrap resampling over the 
+    1st axis in the arrays. This can be used only with methods that 
+    are vectorized over one dimension (e.g. have an "axis" keyword 
+    argument).
+
+    kwargs must include the method keyed by "func"
+
+    func : the method to reduce the sample
+
+    n_boot : number of resampling steps
+
+    rand_seed : seed for random state
+
+    args : method arguments to concatenate to the array list
+
+    extra : any further arguments are passed directly to func
+
+    """
+    # If axis is given as positive it will have to be increased
+    # by one slot
+    axis = kwargs.setdefault('axis', -1)
+    if axis >= 0:
+        kwargs['axis'] = axis + 1
+
+    func = kwargs.pop('func', None)
+    n_boot = kwargs.pop('n_boot', 1000)
+    rand_seed = kwargs.pop('rand_seed', None)
+    args = kwargs.pop('args', [])
+    splice_args = kwargs.pop('splice_args', None)
+    
+    if func is None:
+        raise ValueError('func must be set')
 
     
-def peak_to_peak2(x, m, p=4, xwin=(), msiter=4, points=False):
-    # m is approimately the characteristic width of a peak
-    # x is 2d, n_array x n_pts
-    oshape = x.shape
-    x = x.reshape(-1, oshape[-1])
-    
-    # force m to be odd and get 1st derivatives
-    m = 2 * (m//2) + 1
-    if m < 2*p:
-        # m *must* satisify m > p+1
-        # but pad to 2*p - 1 for stability
-        m = 2*p - 1
-    
-    dx = savitzky_golay(x, m, p, deriv=1, axis=-1)
+    np.random.RandomState(rand_seed)
 
-    if not xwin:
-        xwin = (0, dx.shape[axis])
-    xwin = map(int, xwin)
+    b_arrays = list()
+    for arr in arrays:
+        r = len(arr)
+        resamp = np.random.randint(0, r, r*n_boot)
+        b_arr = np.take(arr, resamp, axis=0)
+        b_arr.shape = (n_boot, r) + arr.shape[1:]
+        b_arrays.append(b_arr)
 
-    pk_dx = np.argmax(dx[:, xwin[0]:xwin[1]], axis=-1) + xwin[0]
-    # these are our starting points for peak finding
+    if not splice_args:
+        # try to determine automatically
+        
+        test_input = [b[0] for b in b_arrays] + list(args)
 
-    pos_pks = np.zeros(x.shape[0], 'i')
-    neg_pks = np.zeros(x.shape[0], 'i')
-    bw = m//2
-    for n in xrange(x.shape[0]):
-        trace = x[n].copy()
-        # must be all positive
-        #trace = trace - trace.min()
-        ix = pk_dx[n]
-        pos_pks[n] = (ix-m) + np.argmax(trace[ix-m:ix+m+1])
-
-        # grab a slice rewinding a little bit from here (in order
-        # to keep window slicing in-bounds)
-        trace = -x[n, pos_pks[n]-m:] + x[n, pos_pks[n]]
-        ix0 = m + bw
-        skip = 1
-        k = 0
-        # allow more mean-shift iterations, since the initial point
-        # is a very rough guess
-        while k < msiter:
-            if ix0 >= len(trace) - bw:
-                # we have no idea where we are!
-                # return global minimum
-                ix = np.argmin(trace)
-                break
-            ix = round(mini_mean_shift(trace, ix0, bw))
-            if not ix-ix0:
-                break
-            if ix < ix0:
-                # going backwards.. reset with bigger skip ahead
-                ix0 = m + skip*bw
-                skip += 1
-                k = 0
-                continue
-            ix0 = ix
-            k += 1
-
-        #neg_pks[n] = round(ix) + pos_pks[n] - m
-        neg_pks[n] = (ix-bw) + np.argmax(trace[ix-bw:ix+bw+1]) + \
-          (pos_pks[n]-m)
-
-    cx = np.arange(x.shape[0])
-    p2p = x[ (cx, pos_pks) ] - x[ (cx, neg_pks) ]
-
-    if points:
-        return map(lambda x: x.reshape(oshape[:-1]), (p2p, neg_pks, pos_pks))
+        test_output = func(*test_input, **kwargs)
+        if isinstance(test_output, tuple):
+            outputs = range(len(test_output))
+        else:
+            outputs = (0,)
     else:
-        return p2p.reshape(oshape[:-1])
+        outputs = splice_args
+        print outputs
 
-def peak_to_peak3(x, m, p=4, xwin=(), msiter=4, points=False):
-    # m is approimately the characteristic width of a peak
-    # x is 2d, n_array x n_pts
-    oshape = x.shape
-    x = x.reshape(-1, oshape[-1])
-    
-    # force m to be odd and get 1st derivatives
-    m = 2 * (m//2) + 1
-    if m < 2*p:
-        # m *must* satisify m > p+1
-        # but pad to 2*p - 1 for stability
-        m = 2*p - 1
-    
-    sx, dx = savitzky_golay(x, m, p, deriv=(0,1), axis=-1)
+    p_func = split_at(
+        split_arg=range(len(b_arrays)), 
+        splice_at=outputs
+        )(func)
 
-    if not xwin:
-        xwin = (0, dx.shape[axis])
-    xwin = map(int, xwin)
-
-    pk_dx = np.argmax(dx[:, xwin[0]:xwin[1]], axis=-1) + xwin[0]
-    # these are our starting points for peak finding
-
-    pos_pks = np.zeros(x.shape[0], 'i')
-    neg_pks = np.zeros(x.shape[0], 'i')
-    bw = m//2
-    for n in xrange(x.shape[0]):
-        trace = x[n].copy()
-        # must be all positive
-        #trace = trace - trace.min()
-        ix = pk_dx[n]
-        rewind = max(0, int(ix-0.5*m))
-        pos_pks[n] = rewind + np.argmax(trace[rewind:int(ix+0.5*m)])
-
-        #trace = sx[n, pos_pks[n]:pos_pks[n]+5*m]
-        trace = x[n, pos_pks[n]:pos_pks[n]+3*m]
-        neg_pks[n] = np.argmin(trace) + pos_pks[n]
-
-    cx = np.arange(x.shape[0])
-    p2p = x[ (cx, pos_pks) ] - x[ (cx, neg_pks) ]
-
-    if points:
-        return map(lambda x: x.reshape(oshape[:-1]), (p2p, neg_pks, pos_pks))
-    else:
-        return p2p.reshape(oshape[:-1])
-
-    
+    inputs = b_arrays + list(args)
+    b_output = p_func(*inputs, **kwargs)
+    return b_output
