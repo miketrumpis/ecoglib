@@ -81,12 +81,17 @@ def split_at(
         split_arg=(0,), splice_at=(0,), 
         shared_args=(), n_jobs=-1, concurrent=False
         ):
+    # normalize inputs
     if not np.iterable(splice_at):
         splice_at = (splice_at,)
     if not np.iterable(split_arg):
         split_arg = (split_arg,)
     if n_jobs < 0:
         n_jobs = mp.cpu_count()
+
+    splice_at = tuple(splice_at)
+    split_arg = tuple(split_arg)
+    shared_args = tuple(shared_args)
     @decorator
     def inner_split_method(method, *args, **kwargs):
         # make available short-cut to not use subprocesses:
@@ -161,7 +166,7 @@ def split_at(
         else:
             # raises exception ?
             res.get()
-        gc.collect()
+        #gc.collect()
         return res
 
     return inner_split_method
