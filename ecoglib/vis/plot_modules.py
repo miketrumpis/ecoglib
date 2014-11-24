@@ -172,6 +172,10 @@ class LongNarrowPlot(BlitPlot):
 
     def __init__(self, *args, **traits):
         super(LongNarrowPlot, self).__init__(*args, **traits)
+
+    @on_trait_change('n_yticks')
+    def _change_yticks(self):
+        self.set_ylim()
     
     @on_trait_change('ylim')
     def set_ylim(self, *ylim):
