@@ -214,25 +214,6 @@ def calibration_axes(
     ## if time_units == 'sec':
     ##     t_calib /= 1e3
     ##     sub_t_len /= 1e3
-    
-    # repurpose y vars
-    # start vertical bar 1/4 of the way from the bottom
-    # y0 = (3/4.) * ylim[0] + (1/4.) * ylim[1]
-    y0 = 0.5 * (ylim[0] + ylim[1] - y_calib * scale_back)
-    y1 = y0 + y_calib * scale_back
-    ## if ylim[1] - ylim[0] < 1:
-    ##     y1 = y0 + y_calib/1e6
-    ## else:
-    ##     y1 = y0 + y_calib
-
-    # center the t-calibration bar
-    t0 = -t_calib/2.0
-    t1 = t_calib/2.0
-
-    calib_kws = dict(color='k', linewidth=3, solid_capstyle='butt')
-
-    calib_ax.plot([t0, t1], [y0, y0], **calib_kws)
-    calib_ax.plot([t0, t0], [y0, y1], **calib_kws)
 
     calib_ax.set_ylim(ylim)
     calib_ax.set_xlim(-sub_t_len/2.0, sub_t_len/2.0)
@@ -250,13 +231,35 @@ def calibration_axes(
         fw = f.get_figwidth() * f.dpi
         dy = np.diff(ylim)[0] / ( fh * (pos.y1-pos.y0) )
         dx = sub_t_len / ( fw * (pos.x1-pos.x0) )
-        
+    
+    # repurpose y vars
+    # start vertical bar 1/4 of the way from the bottom
+    # y0 = (3/4.) * ylim[0] + (1/4.) * ylim[1]
+    # y0 = 0.5 * (ylim[0] + ylim[1] - y_calib * scale_back)
+    # start vertical bar a few fontscales from the bottom
+    y0 = ylim[0] + 2 * fontsize * dy
+    y1 = y0 + y_calib * scale_back
+    ## if ylim[1] - ylim[0] < 1:
+    ##     y1 = y0 + y_calib/1e6
+    ## else:
+    ##     y1 = y0 + y_calib
+
+    # center the t-calibration bar
+    t0 = -t_calib/2.0
+    t1 = t_calib/2.0
+
+    calib_kws = dict(color='k', linewidth=3, solid_capstyle='butt')
+
+    calib_ax.plot([t0, t1], [y0, y0], **calib_kws)
+    calib_ax.plot([t0, t0], [y0, y1], **calib_kws)
+
     calib_ax.text(
-        t0 - 10*dx, y0, y_txt, ha='center', va='bottom', 
+        t0 - 0.75*fontsize*dx, y0, y_txt, ha='center', va='bottom', 
         rotation='vertical', fontsize=fontsize
         )
     calib_ax.text(
-        0, y0 - 10*dy, t_txt, ha='center', va='top', fontsize=fontsize
+        0, y0 - 0.75*fontsize*dy, t_txt, ha='center', va='top', 
+        fontsize=fontsize
         )
     return calib_ax
 
