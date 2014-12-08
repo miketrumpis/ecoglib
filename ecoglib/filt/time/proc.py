@@ -1,11 +1,12 @@
 """
 One-stop shopping for digital filtering of arrays
 """
-
+from __future__ import division
 import numpy as np
 from .design import butter_bp, cheby1_bp, cheby2_bp, notch
 from ecoglib.util import get_default_args
 from sandbox.array_split import shared_ndarray
+import scipy.signal as signal
 
 __all__ = [ 'filter_array', 'notch_all' ]
 
@@ -73,3 +74,32 @@ def notch_all(
             design_kwargs=notch_defs, filt_kwargs=filt_kwargs
             )
     return arr_f
+
+def downsample(x, fs, appx_fs=None, r=None, axis=-1):
+    if appx_fs is None and r is None:
+        return x
+    if appx_fs is not None and r is not None:
+        raise ValueError('only specify new fs or resample factor, not both')
+
+    if appx_fs is not None:
+        # new sampling interval must be a multiple of old sample interval,
+        # so find the closest match that is >= appx_fs
+        r = int( np.ceil(fs / appx_fs) )
+
+    
+    num_pts = x.shape[axis] // r
+    num_pts += int( ( x.shape[axis] - num_pts*r ) > 0 )
+
+    new_fs = fs / r
+
+    fdesign = dict(ripple=0.5, hi=0.4*new_fs, Fs=fs)
+    x_lp = filter_array(
+        x, ftype='cheby1', inplace=False, 
+        design_kwargs=fdesign, filt_kwargs=dict(axis=axis)
+        )
+    sl = [ slice(None) ] * len(x.shape)
+    sl[axis] = slice(0, x.shape[axis], r)
+    
+    x_ds = x[ sl ].copy()
+    return x_ds, new_fs
+        
