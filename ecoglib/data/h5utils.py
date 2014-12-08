@@ -87,7 +87,7 @@ def save_bunch(f, path, b, mode='a', compress_arrays=0):
             )
     return
 
-def load_bunch(f, path, shared_arrays=()):
+def load_bunch(f, path, shared_arrays=(), load=True):
     """
     Load a saved bunch, or an arbitrary collection of arrays into a
     new Bunch object.
@@ -101,7 +101,7 @@ def load_bunch(f, path, shared_arrays=()):
     """
 
     shared_arrays = map(lambda a: os.path.join(path, a), shared_arrays)
-    return traverse_table(f, path=path, shared_paths=shared_arrays)
+    return traverse_table(f, path=path, shared_paths=shared_arrays, load=load)
 
 def traverse_table(f, path='/', load=True, shared_paths=()):
     # Walk nodes and stuff arrays into the bunch.
@@ -136,12 +136,17 @@ def traverse_table(f, path='/', load=True, shared_paths=()):
                 arr = n
             gbunch[n.name] = arr
         elif isinstance(n, tables.VLArray):
-            obj = n.read()[0]
-            # if it's a generic Bunch Pickle, then update the bunch
-            if n.name == 'b_pickle':
-                gbunch.update(obj)
+            if load:
+                obj = n.read()[0]
+                # if it's a generic Bunch Pickle, then update the bunch
+                if n.name == 'b_pickle':
+                    gbunch.update(obj)
+                else:
+                    gbunch[n.name] = obj
             else:
-                gbunch[n.name] = obj
+                # ignore the empty pickle
+                if n.name == 'b_pickle' and n.size_in_memory > 32L:
+                    gbunch[n.name] = 'unloaded pickle'
         elif isinstance(n, tables.Group):
             gname = n._v_name
             # walk_nodes() includes the current group:
@@ -149,8 +154,8 @@ def traverse_table(f, path='/', load=True, shared_paths=()):
             if gname==g:
                 continue
             subbunch = traverse_table(
-                f, path=os.path.join(path, gname)
-                )                
+                f, path=os.path.join(path, gname), load=load
+                )
             gbunch[gname] = subbunch
             
         else:
