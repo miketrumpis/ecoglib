@@ -218,7 +218,7 @@ class StaticFunctionPlot(LongNarrowPlot):
         bplot_kws['xlim'] = np.nanmin(t), np.nanmax(t)
         figure = bplot_kws.pop('figure', None)
         if 'ylim' not in bplot_kws:
-            bplot_kws['ylim'] = (x.min(), x.max())
+            bplot_kws['ylim'] = (np.nanmin(x), np.nanmax(x))
         super(StaticFunctionPlot, self).__init__(figure=figure, **bplot_kws)
         # XXX: why setting traits after construction?
         #self.trait_set(**bplot_kws)
