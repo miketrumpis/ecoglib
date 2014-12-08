@@ -456,8 +456,8 @@ class ExpoExperiment(StimulatedExperiment):
             pix_size = float(units.attrib['PixelSize'])
             # tick duration is in micro-secs
             tick_len = float(units.attrib['TickDuration'])
-        print 'got data:', data.keys()
-        print [len(val) for val in data.values()]
+        ## print 'got data:', data.keys()
+        ## print [len(val) for val in data.values()]
         self.stim_props = Bunch(pix_size=pix_size, tick_len=tick_len)
         self._fill_tables(**data)
         self._filled = True
