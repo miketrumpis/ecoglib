@@ -209,7 +209,7 @@ def mtm_spectrogram(
             pl = 1 - float(m)/n
             print ' to %0.2f'%pl
         delta = m//p
-        delta -= delta % 2
+        #delta -= delta % 2
 
     print user_delta, delta, m
 
@@ -384,7 +384,7 @@ def mtm_complex_demodulate(
     elif samp_factor < 1:
         t_res = max(2, int(1/samp_factor))
         # force t_res to be even??
-        t_res -= t_res%2
+        # t_res -= t_res%2
         ix = (np.arange( N//t_res ) + 0.5) * t_res
         #ix = np.arange(0, N, t_res) + t_res/2
         dpss_sub = np.take(dpss, ix.astype('i'), axis=1)
