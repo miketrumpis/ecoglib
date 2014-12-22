@@ -146,7 +146,7 @@ def extract_epochs(x, trig_code, selected=(), pre=0, post=0):
     epochs : array (n_chan, n_epoch, epoch_len)
 
     """
-    x.shape = (1,) + x.shape if x.ndim == 1 else x.shape
+    x = np.atleast_2d(x) if x.ndim == 1 else x
     pos_edge, conds = trigs_and_conds(trig_code)
     epoch_len = int( np.median(np.diff(pos_edge)) )
 
@@ -169,7 +169,7 @@ def extract_epochs(x, trig_code, selected=(), pre=0, post=0):
         idx = (slice(None), slice(k-pre, k+post))
         epochs[:,n,:] = x[idx]
 
-    x.shape = filter(lambda x: x > 1, x.shape)
+    
     return epochs
 
 ## from array_split_test import mtm_lite
