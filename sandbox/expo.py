@@ -270,6 +270,8 @@ class StimulatedExperiment(object):
     def _fill_tables(self, **tables):
         self.__dict__.update(tables)
         self.event_names = tables.keys()
+        for k, v in tables.items():
+            setattr(self, 'u'+k, np.unique(v))
     
     def __getitem__(self, slicing):
         sub_tables = dict()
