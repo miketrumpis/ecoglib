@@ -28,6 +28,9 @@ def lowpass_envelope(x, n, lowpass, design_kws=dict(), filt_kws=dict()):
     for block in block_sig.fwd():
         block_a = hilbert(block, N=n)
         block[:] = np.abs(block_a[..., :block.shape[-1]])
+
+    if lowpass == 1:
+        return x
     
     filt_kws.setdefault('filtfilt', True)
 
