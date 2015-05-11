@@ -123,8 +123,9 @@ class ChannelMap(list):
                 )
         shape.pop(axis)
         shape.insert(axis, self.geometry[0]*self.geometry[1])
-        array = np.empty(shape)
-        array.fill(fill)
+        array = np.empty(shape, dtype=data.dtype)
+        if not isinstance(fill, str):
+            array.fill(fill)
         slicing = [slice(None)] * len(shape)
         slicing[axis] = self.as_row_major()[:]
         array[slicing] = data
@@ -132,7 +133,41 @@ class ChannelMap(list):
         shape.insert(axis, self.geometry[1])
         shape.insert(axis, self.geometry[0])
         array.shape = shape
+        if isinstance(fill, str):
+            return self.interpolated(array, axis=axis)
         return array
+
+    def interpolated(self, image, axis=0, method='median'):
+        # acts in-place
+        mask = self.embed(np.zeros(len(self), dtype='?'), fill=1)
+        missing = np.where( mask )
+        g = self.geometry
+        def _slice(i, j, w):
+            before = [slice(None)] * axis
+            after = [slice(None)] * (image.ndim - axis - 2)
+            if w:
+                isl = slice( max(0, i-w), min(g[0], i+w+1) )
+                jsl = slice( max(0, j-w), min(g[1], j+w+1) )
+            else:
+                isl = i; jsl = j
+            before.extend( [isl, jsl] )
+            before.extend( after )
+            return tuple(before)
+
+        # first pass, tag all missing sites with nan
+        for i, j in zip(*missing):
+            image[ _slice(i, j, 0) ] = np.nan
+        for i, j in zip(*missing):
+            # do a +/- 2 neighborhoods (8 neighbors)
+            patch = image[ _slice(i, j, 1) ].copy()
+            s = list( patch.shape )
+            s = s[:axis] + [ s[axis]*s[axis+1] ] + s[axis+2:]
+            patch.shape = s
+            fill = np.nanmedian( patch, axis=axis )
+            image[ _slice(i, j, 0) ] = fill
+        return image
+            
+            
 
 def flat_to_mat(mn, idx, col_major=True):
     idx = np.asarray(idx)
