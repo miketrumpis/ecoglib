@@ -19,6 +19,9 @@ def rst_image_markup(relpath, name, extensions):
     lines.append(download)
     return ''.join(lines)
 
+def make_heading(txt, level='-'):
+    return txt + '\n' + level*len(txt) + '\n\n'
+
 # knicked from SO with modifications
 # http://stackoverflow.com/questions/17870544/python-find-starting-and-ending-indices-of-sublist-in-list
 def find_sub_source(sl,l):
@@ -43,7 +46,8 @@ class ScriptPlotSkip(Exception):
 
 class ScriptPlotter(object):
     """
-    A context manager to handle saving figures in a plot
+    A context manager to handle saving figures in a plot and provide
+    some magical weaving of images into ex2rst generated reStructuredText.
     """
 
     def __init__(
@@ -52,7 +56,9 @@ class ScriptPlotter(object):
             dpi=None,
             plotting=True,
             saving=True,
-            www=False
+            www=False,
+            heading='',
+            hlevel='-'
             ):
         path = os.path.abspath(path)
         self.fig_path = os.path.join(path, name)
@@ -63,6 +69,9 @@ class ScriptPlotter(object):
         self.plotting = plotting
         self.saving = saving
         self.www = www
+        self.heading = heading
+        self.hlevel = hlevel
+        self._heading_pending = len(heading) > 0
         if www and 'png' not in self.formats:
             self.formats.append('png')
 
@@ -105,7 +114,6 @@ class ScriptPlotter(object):
         cstart = line + sub_idx[1]
 
         prev_lines = rst_source[:cstart]
-        #post_lines = rst_source[cstart:]
 
         # We may be in the middle of a literal block or a hidden-code
         # block, so scan ahead until we're out of the block. Since
@@ -113,18 +121,11 @@ class ScriptPlotter(object):
         # we'll have to check for the end of the sequence of fixed-up
         # ReST.
 
-        ## fig_names = [os.path.join(self.fig_path, n[1])
-        ##              for n in self.fig_cache]
-        ## fig_hash = '.. %s\n'%str(hash(tuple(fig_names)))
         fig_names = [n[1] for n in self.fig_cache]
         fig_hash = '.. %s\n'%str(tuple(fig_names))
         
         magic_str = '\n.. post-hoc images\n'
         magic_end = '.. post-hoc images finished\n\n'
-
-        ## if post.find(magic_str)==0:
-        ##     print 'already fixed'
-        ##     return
         
         new_str = prev_lines[:]
 
@@ -171,6 +172,12 @@ class ScriptPlotter(object):
                     new_str.append(line)
                     cstart += 1
         post = rst_source[cstart:]
+
+        # if a new heading is to be written, see to it here
+        if self.heading and not self._heading_pending:
+            new_str.append( make_heading(self.heading, self.hlevel) )
+            self._heading_pending = False
+        # now proceed to add figure directive and title
         new_str.extend( [magic_str, fig_hash] )
         
         pth, _ = os.path.split(fname)

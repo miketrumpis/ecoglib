@@ -120,6 +120,8 @@ class BlitPlot(HasTraits):
         """
         Draw only dynamic actors, then restore the background.
         """
+        if self.fig.canvas is None:
+            return
         # detect a resize
         new_size = (self.fig.canvas.width(), self.fig.canvas.height())
         if new_size != self._old_size:

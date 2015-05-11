@@ -39,7 +39,8 @@ def write_anim(
         # do arguments that are quicktime compatible
         extra_args = ['-pix_fmt', 'yuv420p', '-qp', '1']
         # yuv420p looks a bit crappy, but upping the res helps
-        dpi = 300
+        #dpi = 300
+        dpi = fig.dpi
     else:
         # yuv422p seems pretty good
         extra_args = ['-pix_fmt', 'yuv422p', '-qp', '0']
@@ -58,17 +59,21 @@ def dynamic_frames_and_series(
         xlabel='Epoch (s)', ylabel='V', 
         stack_traces=True, interp=1,
         imshow_kw={}, line_props={},
-        title='Array Movie'
+        title='Array Movie', vertical=True
         ):
     # returns a function that can be used to step through
     # figure frames
-    
-    fig = pp.figure(figsize=(5, 10))
-    frame_ax = fig.add_subplot(211)
-    trace_ax = fig.add_subplot(212)
+    if vertical:
+        fig = pp.figure(figsize=(5, 10))
+        frame_ax = fig.add_subplot(211)
+        trace_ax = fig.add_subplot(212)
+    else:
+        fig = pp.figure(figsize=(8, 8))
+        frame_ax = fig.add_subplot(121)
+        trace_ax = fig.add_subplot(122)
     
     if tx is None:
-        tx = np.arange(len(stack_data))
+        tx = np.arange(len(series))
 
     if interp > 1:
         n = len(tx)
