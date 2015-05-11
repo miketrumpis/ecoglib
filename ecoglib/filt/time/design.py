@@ -55,7 +55,8 @@ def notch(fcut, Fs=2.0, nwid=3.0, npo=None, nzo=3):
     return (b, a)
 
 def plot_filt(
-        b, a, Fs=2.0, n=2048, log=True, db=False, filtfilt=False, ax=None
+        b, a, Fs=2.0, n=2048, log=True, loglog=False, db=False, 
+        filtfilt=False, phase=False, ax=None
         ):
     import matplotlib.pyplot as pp
     w, f = signal.freqz(b, a, worN=n)
@@ -71,11 +72,17 @@ def plot_filt(
     if log and db:
         # assume dB actually preferred
         log = False
-    
-    if log:
+
+    if loglog:
+        pp.loglog( w*Fs/2/np.pi, m )
+    elif log:
         pp.semilogy( w*Fs/2/np.pi, m )
     else:
         if db:
             m = 10*np.log(m)
         pp.plot( w*Fs/2/np.pi, m )
     pp.title('freq response')
+    if phase:
+        ax2 = pp.gca().twinx()
+        ax2.plot( w*Fs/2/np.pi, np.angle(f), ls='--' )
+        ax2.set_ylabel('radians')
