@@ -96,9 +96,16 @@ class ChannelMap(list):
                     )
             # get the channels/indices of the subset of sites
             sub = self.lookup(*submap.nonzero())
-        elif isinstance(sub, np.ndarray) and sub.ndim==2:
-            # get the channels/indices of the subset of sites
-            sub = self.lookup(*sub.nonzero())            
+        elif isinstance(sub, np.ndarray):
+            if sub.ndim==2:
+                # get the channels/indices of the subset of sites
+                sub = self.lookup(*sub.nonzero())
+            elif sub.ndim==1 and sub.dtype.kind in ('b', 'i'):
+                sub = sub.nonzero()[0]
+            else:
+                raise ValueError('Cannot interpret subset array')
+        else:
+            raise ValueError('Unknown subset type')
             
         return ChannelMap(
             [self[i] for i in sub],
