@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.signal as signal
+from scipy.linalg import LinAlgError
 
 from ..blocks import BlockedSignal
 
@@ -14,7 +15,12 @@ def bfilter(b, a, x, bsize=0, axis=-1, zi=None, filtfilt=False):
         bsize = x.shape[axis]
     x_blk = BlockedSignal(x, bsize, axis=axis)
 
-    zii = signal.lfilter_zi(b, a)
+    try:
+        zii = signal.lfilter_zi(b, a)
+    except LinAlgError:
+        # the integrating filter doesn't have valid zi
+        zii = np.array([0.0])
+        
     zi_sl = [np.newaxis] * x.ndim
     zi_sl[axis] = slice(None)
     xc_sl = [slice(None)] * x.ndim
