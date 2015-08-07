@@ -2,6 +2,7 @@
 import os
 import copy
 import errno
+from glob import glob
 import numpy as np
 import inspect
 import itertools
@@ -144,6 +145,9 @@ class ChannelMap(list):
         if isinstance(fill, str):
             return self.interpolated(array, axis=axis)
         return array
+
+    def inpainted(self, image, axis=0, **kwargs):
+        pass
 
     def interpolated(self, image, axis=0, method='median'):
         # acts in-place
@@ -321,3 +325,20 @@ def equalize_groups(x, group_sizes, axis=0, fill=np.nan, reshape=True):
         new_shape.pop(axis+1)
         y = y.reshape(new_shape)
     return y
+
+def search_results(path, filter=''):
+    from ecoglib.data.h5utils import load_bunch
+    filter = filter + '*.h5'
+    existing = sorted(glob(os.path.join(path, filter)))
+    if existing:
+        print 'Precomputed results exist:'
+        for n, path in enumerate(existing):
+            print '\t(%d)\t%s'%(n,path)
+        mode = raw_input(
+            'Enter a choice to load existing work,'\
+            'or (c) to compute new results: '
+            )
+        try:
+            return load_bunch(existing[int(mode)], '/')
+        except ValueError:
+            return Bunch()
