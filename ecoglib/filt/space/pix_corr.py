@@ -112,3 +112,30 @@ def pixel_corrections(
             ## blk[:,c,r] = arr_i[:,c,r]
 
     return arr.squeeze()
+
+class Scaler(object):
+    def __init__(self, realval):
+        self.min = realval.min()
+        self.max = realval.max()
+    def quantize(self, x, scale=255, round=True):
+        q = (x - self.min) / (self.max - self.min) * scale
+        return np.round(q) if round else q
+    def rescale(self, x, mx, mn=0):
+        return (x - mn) / float(mx - mn) * (self.max - self.min) + self.min
+
+import cv2
+def inpaint_pixels(img, mask=None, radius=3, method=cv2.INPAINT_TELEA):
+
+    if isinstance(img, np.ma.MaskedArray):
+        mask = img.mask
+        img = img.data
+
+    elif mask is None:
+        return img
+
+    scl = Scaler(img)
+    img_fill = cv2.inpaint(
+        scl.quantize(img).astype('B'), mask, radius, method
+        )
+    return scl.rescale(img_fill, 255.0)
+    
