@@ -8,12 +8,10 @@ import matplotlib as mpl
 import itertools
 try:
   from lxml import etree
-  print("running with lxml.etree")
 except ImportError:
   try:
     # Python 2.5
     import xml.etree.cElementTree as etree
-    print("running with cElementTree on Python 2.5+")
   except ImportError:
       print "What's wrong with your distro??"
       sys.exit(1)
