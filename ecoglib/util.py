@@ -100,11 +100,12 @@ class ChannelMap(list):
             if sub.ndim==2:
                 # get the channels/indices of the subset of sites
                 sub = self.lookup(*sub.nonzero())
-            elif sub.ndim==1 and sub.dtype.kind in ('b', 'i'):
-                sub = sub.nonzero()[0]
+            elif sub.ndim==1:
+                if sub.dtype.kind in ('b',):
+                    sub = sub.nonzero()[0]
             else:
                 raise ValueError('Cannot interpret subset array')
-        else:
+        elif not isinstance(sub, (list, tuple)):
             raise ValueError('Unknown subset type')
             
         return ChannelMap(
@@ -173,24 +174,67 @@ class ChannelMap(list):
             fill = np.nanmedian( patch, axis=axis )
             image[ _slice(i, j, 0) ] = fill
         return image
+
+    def image(
+            self, arr=None, cbar=True, nan='//',
+            fill=np.nan, ax=None, **kwargs
+            ):
+        import matplotlib.pyplot as pp
+        if ax is None:
+            f = pp.figure()
+            ax = pp.subplot(111)
+        else:
+            f = ax.figure
+
+        if arr is None:
+            # image self
+            arr = self.embed( np.ones(len(self)), fill=fill )
             
+        if arr.shape != self.geometry:
+            arr = self.embed(arr, fill=fill)
+
+        nans = zip(*np.isnan(arr).nonzero())
+        im = ax.imshow(arr, **kwargs)
+        ext = kwargs.pop('extent', ax.get_xlim() + ax.get_ylim())
+        print ext
+        dx = float(ext[1] - ext[0]) / arr.shape[1]
+        dy = float(ext[3] - ext[2]) / arr.shape[0]
+        x0 = ext[0]; y0 = ext[2]
+        def s(x):
+            return (x[0] * dy + y0, x[1] * dx + x0)
+        if len(nan):
+            for x in nans:
+                r = pp.Rectangle( s(x)[::-1], dx, dy, hatch=nan, fill=False )
+                ax.add_patch(r)
+        ax.set_ylim(ext[2:][::-1])
+        if cbar:
+            cb = pp.colorbar(im, ax=ax, use_gridspec=True)
+            return f, cb
+        return f
+        
             
 
 def flat_to_mat(mn, idx, col_major=True):
     idx = np.asarray(idx)
     # convert a flat matrix index into (i,j) style
     (m, n) = mn if col_major else mn[::-1]
-
+    if (idx < 0).any() or (idx >= m*n).any():
+        raise ValueError(
+            'The flat index does not lie inside the matrix: '+str(mn)
+            )
     j = idx // m
     i = (idx - j*m)
     return (i, j) if col_major else (j, i)
 
 def mat_to_flat(mn, i, j, col_major=True):
+    i, j = map(np.asarray, (i, j))
+    if (i < 0).any() or (i >= mn[0]).any() \
+      or (j < 0).any() or (j >= mn[1]).any():
+        raise ValueError('The matrix index does not fit the geometry: '+str(mn))
     (i, j) = map(np.asarray, (i, j))
     # covert matrix indexing to a flat (linear) indexing
     (fast, slow) = (i, j) if col_major else (j, i)
     block = mn[0] if col_major else mn[1]
-    
     idx = slow*block + fast
     return idx
 
@@ -243,10 +287,17 @@ def equalize_groups(x, group_sizes, axis=0, fill=np.nan, reshape=True):
     mx_size = max(group_sizes)
     n_groups = len(group_sizes)
     steps = np.r_[0, np.cumsum(group_sizes)]
-    if x.shape[axis] != steps[-1]:
-        raise ValueError('axis {0} in x has wrong size'.format(axis))
     new_shape = list(x.shape)
     new_shape[axis] = n_groups * mx_size
+    if np.prod(x.shape) == np.prod(new_shape):
+        # already has consistent size for equalized groups
+        if reshape:
+            new_shape[axis] = n_groups
+            new_shape.insert(axis+1, mx_size)
+            return x.reshape(new_shape)
+        return x
+    if x.shape[axis] != steps[-1]:
+        raise ValueError('axis {0} in x has wrong size'.format(axis))
     if all( [g==mx_size for g in group_sizes] ):
         if reshape:
             new_shape[axis] = n_groups
