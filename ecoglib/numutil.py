@@ -89,6 +89,9 @@ def sphere_samples(x, axis=-1):
 
 def fenced_out(samps, quantiles=(25,75), thresh=3.0, axis=None, low=True):
 
+    if isinstance(samps, np.ma.MaskedArray):
+        samps = samps.filled(np.nan)
+
     oshape = samps.shape
 
     if axis is None:
@@ -99,10 +102,10 @@ def fenced_out(samps, quantiles=(25,75), thresh=3.0, axis=None, low=True):
         samps = np.rollaxis(samps, axis, samps.ndim)
 
     quantiles = map(float, quantiles)
-    qr = np.percentile(samps, quantiles, axis=-1)
-    extended_range = thresh * (qr[1] - qr[0])
-    high_cutoff = qr[1] + extended_range/2
-    low_cutoff = qr[0] - extended_range/2
+    qr = np.nanpercentile(samps, quantiles, axis=-1)
+    extended_range = thresh * (qr[..., 1] - qr[..., 0])
+    high_cutoff = qr[..., 1] + extended_range/2
+    low_cutoff = qr[..., 0] - extended_range/2
     if not low:
         out_mask = samps < high_cutoff[...,None]
     else:
