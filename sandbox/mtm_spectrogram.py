@@ -6,10 +6,12 @@ import nitime.algorithms as alg
 import nitime.utils as nt_utils
 
 from numpy.lib.stride_tricks import as_strided
-
+from sandbox.split_methods import multi_taper_psd
 import ecoglib.filt.blocks as blocks
 
-def mtm_specgram(x, n, pl=0.25, detrend='', **mtm_kwargs):
+def mtm_spectrogram_basic(
+        x, n, pl=0.25, detrend='', **mtm_kwargs
+        ):
     """
     Make spectrogram using the multitaper spectral estimation method at
     each block.
@@ -30,30 +32,24 @@ def mtm_specgram(x, n, pl=0.25, detrend='', **mtm_kwargs):
     -------
     tx, fx, psd_matrix
     """
-    assert x.ndim == 1, 'Only taking spectrograms of single timeseries'
 
-    lx = len(x)
-    # so x need not be contiguous in memory, find the elementwise stride
-    x_stride = x.strides[0]
-
-    # reshape x into overlapping sections -- omit last block if necessary
-    blk_stride = int(np.round((1-pl) * n))
-    nblocks = lx // blk_stride
-
-    x_lapped = as_strided(
-        x, shape=(nblocks, n), strides=(x_stride*blk_stride, x_stride)
-        )
+    xb = blocks.BlockedSignal(x, n, overlap=pl, partial_block=False)
+    x_lapped = xb._x_blk.copy()
     if detrend:
-        x_lapped = signal.detrend(x_lapped, type=detrend, axis=1)
+        x_lapped = signal.detrend(x_lapped, type=detrend, axis=-1).copy()
 
-    fx, psds, nu = alg.multi_taper_psd(x_lapped, **mtm_kwargs)
+    
+    fx, psds, nu = multi_taper_psd(x_lapped, **mtm_kwargs)
 
     # infer freq sampling from f
-    Fs = 2*fx[-1] / blk_stride
+    lag = round( (1-pl) * n )
+    Fs = 2*fx[-1] / lag
 
-    tx = np.arange(0, nblocks) / Fs
+    tx = np.arange(0, xb.nblock) / Fs
+    # align the bins at the middle of the strips
+    tx += 0.5 * n / (2*fx[-1])
 
-    return tx, fx, psds
+    return tx, fx, psds.transpose(0, 2, 1)
 
 def mtm_coherogram(x, n, pl=0.25, axis=0, **mtm_kwargs):
     blk_x = blocks.BlockedSignal(
