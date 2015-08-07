@@ -193,7 +193,10 @@ def mtm_spectrogram(
     # set up time-resolution and adjust overlap to a more
     # convenient number if necessary
     K = 2*NW
-    user_delta = float(n) / K / samp_factor
+    if samp_factor == 0:
+        user_delta = 1.0
+    else:
+        user_delta = float(n) / K / samp_factor
     m = int( (1-pl) * n )
     if m < user_delta:
         delta = m
@@ -230,7 +233,8 @@ def mtm_spectrogram(
         
     # calculate the number of psd matrix time points        
     # total size of time-frequency array
-    pts_per_block = n // delta
+    #pts_per_block = n // delta
+    pts_per_block = int( np.ceil( (n - delta//2) / delta ) )
     overlap = pts_per_block - m // delta
     psd_len = nblock * pts_per_block - (nblock-1)*overlap
     psd_pl = float(overlap) / pts_per_block
@@ -251,24 +255,41 @@ def mtm_spectrogram(
 
     dpss, eigs = alg.dpss_windows(n, NW, 2*NW)
     if lb:
-        keepers = eigs > 0.9
+        lb = 0.99 if float(lb)==1.0 else lb
+        print 'low_bias:', lb
+        keepers = eigs > lb
         dpss = dpss[keepers]
         eigs = eigs[keepers]
 
+    print 'n_tapers:', len(dpss)
+    dpss_sub = dpss[..., int(delta//2)::int(delta)]
+    weight = delta * dpss_sub.T.dot( dpss_sub.dot(np.ones(pts_per_block)) )
+    #weight **= 2
+    ## window = np.power( 
+    ##     np.cos(np.linspace(-np.pi/2, np.pi/2, pts_per_block)), 0.1
+    ##     )
+    window = np.hamming(pts_per_block)
+    weight *= window
+    weight = window
+    print 'weight max:', weight.max()
+    
     for b in xrange(blk_n.nblock):
         # it's possible to exceed the data blocks, since we're not
         # using fractional blocks in the signal (??)
         if b >= nblock:
             break
         nwin = blk_n.block(b)
-        nwin[:] += 1 # just keep count of how many times we hit these points
-
+        #nwin[:] += 1 # just keep count of how many times we hit these points
+        # oddly sqrt *looks* more right
+        #nwin[:] += weight**.5
+        nwin[:] += weight
+        #nwin[:] = weight
         dwin = blk_x.block(b)
         if detrend:
             dwin = signal.detrend(dwin, type=detrend)
         mtm_pwr, ix, weighting = mtm_complex_demodulate(
             dwin, NW, nfft=nfft, adaptive=adaptive, dpss=dpss, eigs=eigs,
-            samp_factor=1.0/delta
+            samp_factor=1.0/delta if delta > 1 else 0
             )
         if freqs is None:
             mtm_pwr = 2 * np.abs(mtm_pwr)**2
@@ -282,10 +303,11 @@ def mtm_spectrogram(
         else:
             mtm_pwr /= weighting
         psd_win = blk_psd.block(b)
-        psd_win[:] = psd_win + mtm_pwr
+        #psd_win[:] = psd_win + mtm_pwr
+        psd_win[:] = psd_win + window * mtm_pwr
 
     n_avg[n_avg==0] = 1
-    n_avg = np.convolve(n_avg, np.ones(3)/3, mode='same')
+    #n_avg = np.convolve(n_avg, np.ones(overlap)/overlap, mode='same')
     #print n_avg
     psd_matrix /= n_avg
     if samp_factor == 0:
@@ -302,10 +324,19 @@ def mtm_spectrogram(
         
     return tx, fx, psd_matrix
 
+def bw2nw(bw, n, fs):
+    # nw = tw = t(bw)/2 = (n/fs)(bw)/2
+    bw, n, fs = map(float, (bw, n, fs))
+    return (n/fs) * (bw/2)
+
+def nw2bw(nw, n, fs):
+    # bw = 2w = 2(tw)/t = 2(nw)/t = 2(nw) / (n/fs) = 2(nw)(fs/n)
+    nw, n, fs = map(float, (nw, n, fs))
+    return 2 * nw * fs / n
 
 def mtm_complex_demodulate(
         x, NW, nfft=None, adaptive=True, low_bias=True,
-        dpss=None, eigs=None, samp_factor = 1
+        dpss=None, eigs=None, samp_factor = 1, fmax=0.5
 
         ):
     """
@@ -346,14 +377,16 @@ def mtm_complex_demodulate(
     if dpss is None:
         dpss, eigs = alg.dpss_windows(N, NW, 2*NW)
         if low_bias:
-            keepers = eigs > 0.9
+            low_bias = 0.99 if float(low_bias)==1.0 else low_bias
+            keepers = eigs > low_bias
             dpss = dpss[keepers]
             eigs = eigs[keepers]
 
+            
     K = len(eigs)
     if nfft is None:
         nfft = int(2**np.ceil(np.log2(N)))
-
+    fmax = int(round(fmax * nfft)) + 1
     xk = alg.tapered_spectra(x, dpss, NFFT=nfft)
     if adaptive:
         if xk.ndim == 2:
@@ -362,11 +395,11 @@ def mtm_complex_demodulate(
         for m in xrange(xk.shape[0]):
             w, _ = nt_utils.adaptive_weights(xk[m], eigs, sides='onesided')
             weight[m] = np.sum(w**2, axis=0)
-        xk = xk[..., :nfft/2+1] * w
-        xk = np.squeeze(xk)
+            xk[m, :, :fmax] = xk[m, :, :fmax] * w[:, :fmax]
+        xk = np.squeeze(xk)[..., :fmax]
         weight = np.squeeze(weight)
     else:
-        xk = xk[..., :nfft/2+1]
+        xk = xk[..., :fmax]
         weight = float(K)
 
     xk *= np.sqrt(eigs[:,None])
@@ -383,6 +416,8 @@ def mtm_complex_demodulate(
         # t_res -= t_res%2
         ix = (np.arange( N//t_res ) + 0.5) * t_res
         #ix = np.arange(0, N, t_res) + t_res/2
+        if ix[-1] + t_res < N:
+            ix = np.r_[ix, ix[-1]+t_res]
         dpss_sub = np.take(dpss, ix.astype('i'), axis=1)
     else:
         samp_factor = min(samp_factor, float(N)/(4*NW))
@@ -425,3 +460,14 @@ def jackknife_avg(samples, axis=0):
     err = np.sqrt( (float(M-1)/M) * np.sum( (jnr - r2)**2, axis=0 ) )
 
     return r, bias, err
+
+
+def normalize_spectrogram(x, baseline):
+    # normalize based on the assumption of stationarity in baseline
+    nf = x.shape[1]
+    y = np.log(x[..., baseline]).transpose(1, 0, 2).reshape(nf, -1)
+    b_spec = y.mean(-1)
+    b_rms = y.std(-1)
+
+    z = ( np.log(x).mean(0) - b_spec[:,None]) / b_rms[:,None]
+    return z
