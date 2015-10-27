@@ -213,6 +213,7 @@ class ChannelMap(list):
         ax.set_ylim(ext[2:][::-1])
         if cbar:
             cb = pp.colorbar(im, ax=ax, use_gridspec=True)
+            cb.solids.set_edgecolor('face')
             return f, cb
         return f
         
