@@ -58,7 +58,7 @@ def notch_all(
     else:
         arr_f = arr
 
-    if isinstance(lines, float):
+    if isinstance(lines, (float, int)):
         # repeat lines until nmax
         nf = lines
         lines = [ nf*i for i in xrange(1, int(nmax//nf) + 1) ]
