@@ -11,7 +11,7 @@ from sandbox.array_split import shared_ndarray
 
 _h5_seq_types = (str, list, int, float, complex, bool)
 
-def save_bunch(f, path, b, mode='a', compress_arrays=0):
+def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
     """
     Save a Bunch type to an HDF5 group in a new or existing table.
 
@@ -38,8 +38,21 @@ def save_bunch(f, path, b, mode='a', compress_arrays=0):
     
     if isinstance(f, str):
         with closing(tables.open_file(f, mode)) as f:
-            return save_bunch(f, path, b)
+            return save_bunch(
+                f, path, b, 
+                overwrite_paths=overwrite_paths,
+                compress_arrays=compress_arrays
+                )
 
+    # If we want to overwrite a node, check to see that it exists.
+    # If we want an exception when trying to overwrite, that will
+    # be caught on f.create_group()
+    if overwrite_paths:
+        try:
+            n = f.get_node(path)
+            n._f_remove(recursive=True, force=True)
+        except NoSuchNodeError:
+            pass
     p, node = os.path.split(path)
     if node:
         f.create_group(p, node, createparents=True)
