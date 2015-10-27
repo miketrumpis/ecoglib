@@ -585,6 +585,7 @@ class ChannelScroller(DataScroller):
         # this trick is for the x,y indexing convention of VTK
         vtk_cmap = dset.chan_map.as_col_major()
         vtk_cmap.col_major = False
+        vtk_cmap.geometry = vtk_cmap.geometry[::-1]
         scr = ChannelScroller(
             vtk_cmap.embed(dset.data, axis=0, fill=0), 
             window, chans=vtk_cmap, exp=dset.exp, Fs=dset.Fs,
