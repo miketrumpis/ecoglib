@@ -23,7 +23,7 @@ import plot_modules as pm
 import traitsui_bridge as tb
 import ecoglib.util as ut
 
-import devices.units as units_tools
+import ecogana.devices.units as units_tools
 
 #### Utility to prepare volumetric data for VTK without
 #### resorting to mem copying (if possible)

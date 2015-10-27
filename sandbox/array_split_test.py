@@ -35,7 +35,7 @@ def m(x):
     return k(x, g(x))
 
 def test(n_jobs=-1):
-    import anacode.ep_scoring as ep_scoring
+    import ecogana.anacode.ep_scoring as ep_scoring
     s = np.random.randn(60, 13, 30)
     b = np.random.randn(60, 390)
 

@@ -5,7 +5,7 @@ import matplotlib.pyplot as pp
 from ecoglib.util import ChannelMap, flat_to_mat, mat_to_flat
 from ecoglib.numutil import ndim_prctile
 
-from devices import units
+from ecogana.devices import units
 
 def _build_map(p, geometry, col_major):
     if isinstance(p, ChannelMap):
