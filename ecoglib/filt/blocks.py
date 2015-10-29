@@ -116,3 +116,10 @@ class BlockedSignal(object):
         else:
             blk_slice[self._axis+1] = slice(None)
         return self._x_blk[ tuple(blk_slice) ]
+
+def block_reduce(rfn, array, bsize, f_axis=1, **kwargs):
+    bsig = BlockedSignal(array, bsize, **kwargs)
+    reduced = list()
+    for blk in bsig.fwd():
+        reduced.append( rfn(blk, axis=f_axis) )
+    return np.array( reduced )
