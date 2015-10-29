@@ -198,7 +198,7 @@ def mtm_spectrogram(
         user_delta = 1.0
     else:
         user_delta = float(n) / K / samp_factor
-    m = int( (1-pl) * n )
+    m = round( (1-pl) * n )
     if m < user_delta:
         delta = m
     else:
