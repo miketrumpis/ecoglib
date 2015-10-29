@@ -41,13 +41,14 @@ def mtm_spectrogram_basic(
     
     fx, psds, nu = multi_taper_psd(x_lapped, **mtm_kwargs)
 
-    # infer freq sampling from f
+    # infer time-resolution
     lag = round( (1-pl) * n )
-    Fs = 2*fx[-1] / lag
+    Fs = 2*fx[-1]
+    spec_res = lag / Fs
 
-    tx = np.arange(0, xb.nblock) / Fs
+    tx = np.arange(0, xb.nblock) * spec_res
     # align the bins at the middle of the strips
-    tx += 0.5 * n / (2*fx[-1])
+    tx += 0.5 * n / Fs
 
     return tx, fx, psds.transpose(0, 2, 1)
 
