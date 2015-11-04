@@ -5,6 +5,7 @@ import matplotlib.animation as _animation
 import os
 import ecoglib.vis.plot_modules as pm
 import time
+from progressbar import ProgressBar, Percentage, Bar
 
 def write_frames(
         frames, fname='', title='Array Movie', fps=5, 
@@ -48,10 +49,16 @@ def write_anim(
     writer.extra_args = extra_args
     fname = fname.split('.mp4')[0]
     with writer.saving(fig, fname+'.mp4', dpi):
+        print 'Writing {0} frames'.format(n_frame)
+        pbar = ProgressBar(
+            widgets=[Percentage(), Bar()], maxval=n_frame
+            ).start()
         for n in xrange(n_frame):
             func(n)
             ## pp.draw()
             writer.grab_frame()
+            pbar.update(n)
+        pbar.finish()
 
 def dynamic_frames_and_series(
         frames, series, 
