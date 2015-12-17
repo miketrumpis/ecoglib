@@ -146,6 +146,16 @@ class ChannelMap(list):
             return self.interpolated(array, axis=axis)
         return array
 
+    def as_channels(self, matrix, axis=0):
+        """
+        Take the elements of a matrix into the "natural" channel ordering.
+        """
+        m_shape = matrix.shape
+        m_flat = m_shape[axis] * m_shape[axis+1]
+        c_dims = m_shape[:axis] + (m_flat,) + m_shape[axis+2:]
+        matrix = matrix.reshape(c_dims)
+        return np.take(matrix, self, axis=axis)
+
     def inpainted(self, image, axis=0, **kwargs):
         pass
 
@@ -184,6 +194,7 @@ class ChannelMap(list):
             fill=np.nan, ax=None, **kwargs
             ):
         import matplotlib.pyplot as pp
+        kwargs.setdefault('origin', 'upper')
         if ax is None:
             f = pp.figure()
             ax = pp.subplot(111)
@@ -192,7 +203,7 @@ class ChannelMap(list):
 
         if arr is None:
             # image self
-            arr = self.embed( np.ones(len(self)), fill=fill )
+            arr = self.embed( np.ones(len(self), 'd'), fill=fill )
             
         if arr.shape != self.geometry:
             arr = self.embed(arr, fill=fill)
@@ -200,17 +211,16 @@ class ChannelMap(list):
         nans = zip(*np.isnan(arr).nonzero())
         im = ax.imshow(arr, **kwargs)
         ext = kwargs.pop('extent', ax.get_xlim() + ax.get_ylim())
-        print ext
-        dx = float(ext[1] - ext[0]) / arr.shape[1]
-        dy = float(ext[3] - ext[2]) / arr.shape[0]
-        x0 = ext[0]; y0 = ext[2]
+        dx = abs(float(ext[1] - ext[0])) / arr.shape[1]
+        dy = abs(float(ext[3] - ext[2])) / arr.shape[0]
+        x0 = min(ext[:2]); y0 = min(ext[2:])
         def s(x):
             return (x[0] * dy + y0, x[1] * dx + x0)
         if len(nan):
             for x in nans:
                 r = pp.Rectangle( s(x)[::-1], dx, dy, hatch=nan, fill=False )
                 ax.add_patch(r)
-        ax.set_ylim(ext[2:][::-1])
+        #ax.set_ylim(ext[2:][::-1])
         if cbar:
             cb = pp.colorbar(im, ax=ax, use_gridspec=True)
             cb.solids.set_edgecolor('face')
