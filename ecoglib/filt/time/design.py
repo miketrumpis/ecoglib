@@ -6,7 +6,12 @@ import scipy.signal.filter_design as fdesign
 import scipy.signal as signal
 from scipy import poly
 
-__all__ = [ 'butter_bp', 'cheby1_bp', 'cheby2_bp', 'notch', 'plot_filt' ]
+__all__ = [ 'butter_bp', 
+            'cheby1_bp', 
+            'cheby2_bp', 
+            'notch', 
+            'plot_filt',
+            'continuous_amplitude_linphase' ]
 
 def _bandpass_params(lo, hi):
     (lo, hi) = map(float, (lo, hi))
@@ -86,3 +91,43 @@ def plot_filt(
         ax2 = pp.gca().twinx()
         ax2.plot( w*Fs/2/np.pi, np.angle(f), ls='--' )
         ax2.set_ylabel('radians')
+
+def continuous_amplitude_linphase(ft_samps):
+    """Given Fourier Transform samples of a linear phase system,
+    return functions of amplitude and phase such that the amplitude
+    function is continuous (ie, not a magnitude function), and that
+    f(e) = a(e)exp(j*p(e))
+
+    Parameters
+    ----------
+
+    ft_samps: ndarray
+      N complex samples of the fourier transform
+
+    Returns
+    -------
+
+    (a, p): ndarray
+      (continuous) amplitude and phase functions
+    """
+    npts = len(ft_samps)
+    p_jumps = np.unwrap(np.angle(ft_samps))
+    p_diff = np.diff(p_jumps)
+    # assume there is not a filter zero at point 0 or 1
+    p_slope = p_diff[0]
+    zeros = np.where(np.pi - (p_diff-p_slope) <= (np.pi-1e-5))[0] + 1
+    zeros = np.where(np.abs(p_diff-p_slope) >= 1)[0] + 1
+                     
+    zeros = np.r_[zeros, npts]
+
+    # now get magnitude from ft_samps
+    # assumption: amplitude from 0 to first filter zero is positive 
+    a = np.abs(ft_samps)
+    psign = np.sign(p_slope)
+    k=1
+    for lower, upper in zip(zeros[:-1], zeros[1:]):
+        a[lower:upper] *= np.power(-1, k)
+        p_jumps[lower:upper] += k*psign*np.pi
+        k += 1
+
+    return a, p_jumps
