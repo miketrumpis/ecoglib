@@ -8,7 +8,7 @@ import time
 from progressbar import ProgressBar, Percentage, Bar
 
 def write_frames(
-        frames, fname='', title='Array Movie', fps=5, 
+        frames, fname, timer='ms', time=(), title='Array Movie', fps=5, 
         quicktime=False, axis_toggle='on', **imshow_kw
         ):
     # most simple frame writer -- no tricks
@@ -17,8 +17,15 @@ def write_frames(
     im = ax.imshow(frames[0], **imshow_kw)
     ax.axis('image')
     ax.axis(axis_toggle)
+    if len(time):
+        ttl = ax.set_title('{0:.2f} {1}'.format(time[0], timer))
+    else:
+        ttl = None
     def _step_time(num, frames, frame_im):
         frame_im.set_data(frames[num])
+        if ttl:
+            ttl.set_text('{0:.2f} {1}'.format(time[num], timer))
+            return (frame_im, ttl)
         return (frame_im,)
     func = lambda x: _step_time(x, frames, im)
     write_anim(
@@ -61,23 +68,28 @@ def write_anim(
         pbar.finish()
 
 def dynamic_frames_and_series(
-        frames, series, 
+        frames, series, timer='ms',
         tx=None, frame_times=None,
         xlabel='Epoch (s)', ylabel='V', 
         stack_traces=True, interp=1,
         imshow_kw={}, line_props={},
-        title='Array Movie', vertical=True
+        title='Array Movie', vertical=True,
+        image_sz=0.5, figsize=()
         ):
     # returns a function that can be used to step through
     # figure frames
+    image_sz = int( 100 * image_sz )
+    trace_sz = 100 - image_sz
     if vertical:
-        fig = pp.figure(figsize=(5, 10))
-        frame_ax = fig.add_subplot(211)
-        trace_ax = fig.add_subplot(212)
+        figsize = figsize or (5, 10)
+        fig = pp.figure(figsize=figsize)
+        frame_ax = pp.subplot2grid( (100, 1), (0, 0), rowspan=image_sz )
+        trace_ax = pp.subplot2grid( (100, 1), (image_sz, 0), rowspan=trace_sz )
     else:
-        fig = pp.figure(figsize=(8, 8))
-        frame_ax = fig.add_subplot(121)
-        trace_ax = fig.add_subplot(122)
+        figsize = figsize or (8, 8)
+        fig = pp.figure(figsize=figsize)
+        frame_ax = pp.subplot2grid( (1, 100), (0, 0), colspan=image_sz )
+        trace_ax = pp.subplot2grid( (1, 100), (0, image_sz), colspan=trace_sz )
     
     if tx is None:
         tx = np.arange(len(series))
@@ -101,12 +113,18 @@ def dynamic_frames_and_series(
     trace_ax.set_xlabel(xlabel)
     trace_ax.set_ylabel(ylabel)
     trace_ax.set_ylim(ylim)
+    trace_ax.set_xlim(tx[0], tx[-1])
     time_mark = trace_ax.axvline(x=tx[0], color='r', ls='-')
+    if timer:
+        ttl = frame_ax.set_title('{0:.2f} {1}'.format(tx[0], timer))
+    else:
+        if title:
+            frame_ax.set_title(title, fontsize=18)
+        ttl = None
     
     ## Set up array frames
     f_img = frame_ax.imshow(frames[0], **imshow_kw)
     frame_ax.axis('image'); #frame_ax.axis('off')
-    frame_ax.set_title(title, fontsize=18)
     
     def _step_time(num, tx, frames, frame_img, tm, f_idx=None):
         # frame index array f_idx encodes possible offsets and skips
@@ -117,7 +135,10 @@ def dynamic_frames_and_series(
             x = tx[ f_idx[num] ]
         tm.set_data(( [x, x], [0, 1] ))
         frame_img.set_data(frames[num])
-        return (frame_img, tm)
+        if not ttl:
+            return (frame_img, tm)
+        ttl.set_text('{0:.2f} {1}'.format(tx[num], timer))
+        return (frame_img, tm, ttl)
 
     func = lambda x: _step_time(
         x, tx, frames, f_img, time_mark, f_idx=frame_times
