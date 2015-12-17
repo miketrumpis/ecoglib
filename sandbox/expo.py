@@ -364,7 +364,7 @@ class TonotopyExperiment(StimulatedExperiment):
         event_tables = kwargs.pop('event_tables', None)
         if not event_tables:
         
-            if tone_tab == '' or amp_tab == '':
+            if not len(tone_tab) or not len(amp_tab):
                 tones = np.array(self.fixed_tones_pattern)
                 amps = np.array(self.fixed_amps_pattern)
             else:
