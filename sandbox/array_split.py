@@ -1,3 +1,4 @@
+import platform
 import multiprocessing as mp
 import multiprocessing.sharedctypes
 import ctypes
@@ -38,7 +39,7 @@ dtype_maps_to = dict([ ('?', 'b') ])
 
 def shared_ndarray(shape, typecode='d'):
     N = reduce(np.multiply, shape)
-    shm = mp.Array(typecode, int(N))
+    shm = mp.Array(typecode, N)
     return tonumpyarray(shm, shape=shape, dtype=typecode)
 
 def shared_copy(x):
@@ -81,6 +82,14 @@ def split_at(
         split_arg=(0,), splice_at=(0,), 
         shared_args=(), n_jobs=-1, concurrent=False
         ):
+    # short circuit if the platform is Windows-based (look into doing
+    # real multiproc later)
+    if platform.system().lower().find('windows') >= 0:
+        @decorator
+        def inner_split_method(method, *args, **kwargs):
+            return method(*args, **kwargs)
+        return inner_split_method
+    
     # normalize inputs
     if not np.iterable(splice_at):
         splice_at = (splice_at,)
