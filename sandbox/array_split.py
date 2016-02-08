@@ -39,7 +39,7 @@ dtype_maps_to = dict([ ('?', 'b') ])
 
 def shared_ndarray(shape, typecode='d'):
     N = reduce(np.multiply, shape)
-    shm = mp.Array(typecode, N)
+    shm = mp.Array(typecode, int(N))
     return tonumpyarray(shm, shape=shape, dtype=typecode)
 
 def shared_copy(x):
