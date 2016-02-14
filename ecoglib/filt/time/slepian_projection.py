@@ -16,6 +16,11 @@ def slepian_projection(data, BW, Fs, Kmax=None, w0=0, baseband=False):
     # round to the nearest multiple of 1/2
     TW = round( 2 * T * BW ) / 2.0
     K = 2 * TW
+    if K < 1:
+        min_bw = 0.5 / T
+        err = 'BW is too small for the window size: ' \
+          'minimum BW={0}'.format(min_bw)
+        raise ValueError(err)
     if Kmax is not None:
         K = min(Kmax, K)
     dpss, _ = dpss_windows(npts, TW, K)

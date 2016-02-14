@@ -1,4 +1,4 @@
-from nose.tools import assert_true
+from nose.tools import assert_true, assert_equal
  
 from numpy.testing import assert_almost_equal
 import numpy as np
@@ -49,3 +49,12 @@ def test_bandpass_power():
     # take up ~ 10% of the signal power (which is pretty much unit-valued)
     sg_bp = slepian_projection(sg, 50, 1000, w0=0)
     assert_almost_equal(sg_bp.var(), 0.1, decimal=1)
+
+def test_shapes():
+    sg_1d = np.random.randn(200)
+    sg_2d = np.random.randn(3, 200)
+    sg_3d = np.random.randn(2, 2, 200)
+
+    assert_equal(slepian_projection(sg_1d, 20, 1000.0).shape, sg_1d.shape)
+    assert_equal(slepian_projection(sg_2d, 20, 1000.0).shape, sg_2d.shape)
+    assert_equal(slepian_projection(sg_3d, 20, 1000.0).shape, sg_3d.shape)
