@@ -39,8 +39,8 @@ def slepian_projection(data, BW, Fs, Kmax=None, w0=0, baseband=False):
         wp = data.dot( dpss_pf.conj().T )
         wn = data.dot( dpss_nf.conj().T )
         if baseband:
-            bp = ( wp.dot( dpss ) + wn.dot( dpss ) ).real
+            bp = ( wp.dot( dpss ) + wn.dot( dpss ) ).real.copy()
         else:
-            bp = ( wp.dot( dpss_pf ) + wn.dot( dpss_nf ) ).real
+            bp = ( wp.dot( dpss_pf ) + wn.dot( dpss_nf ) ).real.copy()
     return bp.reshape(shp)
 
