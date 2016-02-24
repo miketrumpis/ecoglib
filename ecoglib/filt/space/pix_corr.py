@@ -123,19 +123,24 @@ class Scaler(object):
     def rescale(self, x, mx, mn=0):
         return (x - mn) / float(mx - mn) * (self.max - self.min) + self.min
 
-import cv2
-def inpaint_pixels(img, mask=None, radius=3, method=cv2.INPAINT_TELEA):
+try:
+    import cv2
+    def inpaint_pixels(img, mask=None, radius=3, method=cv2.INPAINT_TELEA):
 
-    if isinstance(img, np.ma.MaskedArray):
-        mask = img.mask
-        img = img.data
+        if isinstance(img, np.ma.MaskedArray):
+            mask = img.mask
+            img = img.data
 
-    elif mask is None:
-        return img
+        elif mask is None:
+            return img
 
-    scl = Scaler(img)
-    img_fill = cv2.inpaint(
-        scl.quantize(img).astype('B'), mask, radius, method
-        )
-    return scl.rescale(img_fill, 255.0)
-    
+        scl = Scaler(img)
+        img_fill = cv2.inpaint(
+            scl.quantize(img).astype('B'), mask, radius, method
+            )
+        return scl.rescale(img_fill, 255.0)
+ 
+except:
+   def inpain_pixels(*args, **kwargs):
+       raise NotImplementedError('Could not import opencv')
+
