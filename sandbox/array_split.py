@@ -8,6 +8,7 @@ import gc
 from decorator import decorator
 import numpy as np
 
+_NO_PARA_ = False
 
 # from the "array" module docstring
 """
@@ -84,7 +85,7 @@ def split_at(
         ):
     # short circuit if the platform is Windows-based (look into doing
     # real multiproc later)
-    if platform.system().lower().find('windows') >= 0:
+    if n_jobs==0 or platform.system().lower().find('windows') >= 0 or _NO_PARA_:
         @decorator
         def inner_split_method(method, *args, **kwargs):
             return method(*args, **kwargs)
