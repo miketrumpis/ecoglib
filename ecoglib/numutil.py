@@ -560,6 +560,14 @@ def mahal_distance(population, test_points, tol=1-1e-2):
     signal_dists = np.diag( np.dot( test_points.T * icov, test_points ) )
     return np.sqrt(signal_dists)
 
+def _autovectorize(fn, exclude_after=-1):
+    def vfn(*args, **kwargs):
+        kwargs.pop('axis', None)
+        va = map(np.atleast_2d, args)
+        used = range(len(va))
+        res = [ fn(*a_, **kwargs) for a_ in zip(*va) ]
+        return np.array(res).squeeze()
+    return vfn
 
 def bootstrap_stat(*arrays, **kwargs):
     """
@@ -573,6 +581,11 @@ def bootstrap_stat(*arrays, **kwargs):
     func : the method to reduce the sample
 
     n_boot : number of resampling steps
+
+    assoc_args : arguments are associated? if so, resample the 
+                 entire argument tuple at once (default True)
+
+    autovec : naively vectorize a function of 1D args (default False)
 
     rand_seed : seed for random state
 
@@ -592,17 +605,23 @@ def bootstrap_stat(*arrays, **kwargs):
     rand_seed = kwargs.pop('rand_seed', None)
     args = kwargs.pop('args', [])
     splice_args = kwargs.pop('splice_args', None)
-    
+    assoc_args = kwargs.pop('assoc_args', True)
+    autovec = kwargs.pop('autovec', False)
     if func is None:
         raise ValueError('func must be set')
-
+    if autovec:
+        func = _autovectorize(func)
     
     np.random.RandomState(rand_seed)
 
     b_arrays = list()
-    for arr in arrays:
-        r = len(arr)
+    if assoc_args:
+        r = len(arrays[0])
         resamp = np.random.randint(0, r, r*n_boot)
+    for arr in arrays:
+        if not assoc_args:
+            r = len(arr)
+            resamp = np.random.randint(0, r, r*n_boot)
         b_arr = np.take(arr, resamp, axis=0)
         b_arr.shape = (n_boot, r) + arr.shape[1:]
         b_arrays.append(b_arr)
