@@ -1,5 +1,5 @@
 import numpy as np
-
+import scipy.ndimage as ndimage
 import ecoglib.filt.time.blocked_filter as bf
 import ecoglib.util as ut
 
@@ -18,6 +18,7 @@ multi_taper_psd = array_split.split_at(splice_at=(1,2))(
     ntalg.multi_taper_psd
     )
 
+convolve1d = array_split.split_at(split_arg=0)(ndimage.convolve1d)
 
 ### Convenience wrappers
 #@array_split.split_at() # bfilter already split
