@@ -8,7 +8,7 @@ from ecoglib.util import get_default_args
 from sandbox.array_split import shared_ndarray
 import scipy.signal as signal
 
-__all__ = [ 'filter_array', 'notch_all' ]
+__all__ = [ 'filter_array', 'notch_all', 'downsample', 'ma_highpass' ]
 
 def _get_poles_zeros(destype, **filt_args):
     if destype.lower().startswith('butter'):
@@ -103,3 +103,16 @@ def downsample(x, fs, appx_fs=None, r=None, axis=-1):
     x_ds = x[ sl ].copy()
     return x_ds, new_fs
         
+def ma_highpass(x, fc):
+    """
+    Implement a stable FIR highpass filter using a moving average.
+    """
+
+    from sandbox.split_methods import convolve1d
+    n = round(fc ** -1.0)
+    if not n%2:
+        n += 1
+    h = np.empty(n)
+    h.fill( -1.0 / n )
+    h[n//2] += 1
+    return convolve1d(x, h)
