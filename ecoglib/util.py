@@ -59,6 +59,14 @@ class ChannelMap(list):
         self.col_major = col_major
         self.geometry = geo
 
+    @staticmethod
+    def from_mask(mask, col_major=True):
+        # create a ChannelMap from a binary grid
+        i, j = mask.nonzero()
+        geo = mask.shape
+        map = mat_to_flat(geo, i, j, col_major=col_major)
+        return ChannelMap(map, geo, col_major=col_major)
+    
     def as_row_major(self):
         if self.col_major:
             return ChannelMap(
