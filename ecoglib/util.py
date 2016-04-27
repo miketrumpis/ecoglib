@@ -361,3 +361,42 @@ def search_results(path, filter=''):
             return load_bunch(existing[int(mode)], '/')
         except ValueError:
             return Bunch()
+
+from decorator import decorator
+def input_as_2d(in_arr=0, out_arr=-1):
+    """
+    Reshape input to be 2D and then bring output back to original
+    size (possibly with loss of last dimension).
+
+    in_arr : position of argument to be reshaped
+    out_arr : (positive) position of output to be reshaped. If None, then no
+              output is reshaped. If -1, then treat the method as having
+              a single output that is reshaped
+
+    """
+    
+    @decorator
+    def _wrap(fn, *args, **kwargs):
+        args = list(args)
+        x = args[in_arr]
+        shp = x.shape
+        x = x.reshape(-1, shp[-1])
+        args[in_arr] = x
+        r = fn(*args, **kwargs)
+        if out_arr is None:
+            return r
+        if out_arr >= 0:
+            x = r[out_arr]
+        else:
+            x = r
+        n_out = len(x.shape)
+        # check to see if the function ate the last dimension
+        if n_out < 2:
+            shp = shp[:-1]
+        x = x.reshape(shp)
+        if out_arr >= 0:
+            r[out_arr] = x
+        else:
+            r = x
+        return r
+    return _wrap
