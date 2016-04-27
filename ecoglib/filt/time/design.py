@@ -60,11 +60,18 @@ def notch(fcut, Fs=2.0, nwid=3.0, npo=None, nzo=3):
     return (b, a)
 
 def plot_filt(
-        b, a, Fs=2.0, n=2048, log=True, loglog=False, db=False, 
-        filtfilt=False, phase=False, ax=None
+        b, a, Fs=2.0, n=2048, log=True, logx=False, db=False, 
+        filtfilt=False, phase=False, ax=None, **plot_kws
         ):
     import matplotlib.pyplot as pp
-    w, f = signal.freqz(b, a, worN=n)
+
+    if logx:
+        hi = np.log10( Fs/2. )
+        lo = hi - 4
+        w = np.logspace(lo, hi, n)
+    else:
+        w = np.linspace(0, Fs/2.0, n) 
+    _, f = signal.freqz(b, a, worN=w * (2*np.pi/Fs))
     if ax:
         pp.sca(ax)
     else:
@@ -78,18 +85,26 @@ def plot_filt(
         # assume dB actually preferred
         log = False
 
-    if loglog:
-        pp.loglog( w*Fs/2/np.pi, m )
+    if db:
+        m = 20*np.log(m)
+    if logx and log:
+        pp.loglog( w, m, **plot_kws )
+        pp.ylabel('Magnitude')
     elif log:
-        pp.semilogy( w*Fs/2/np.pi, m )
+        pp.semilogy( w, m, **plot_kws )
+        pp.ylabel('Magnitude')
+    elif logx:
+        pp.semilogx( w, m, **plot_kws )
+        pp.ylabel('Magnitude (dB)' if db else 'Magnitude')
     else:
-        if db:
-            m = 10*np.log(m)
-        pp.plot( w*Fs/2/np.pi, m )
-    pp.title('freq response')
+        pp.plot( w, m, **plot_kws )
+        pp.ylabel('Magnitude (dB)' if db else 'Magnitude')
+    pp.xlabel('Frequency (Hz)')
+    pp.title('Frequency response' + (' (filtfilt)' if filtfilt else ''))
     if phase:
+        plot_kws['ls'] = '--'
         ax2 = pp.gca().twinx()
-        ax2.plot( w*Fs/2/np.pi, np.angle(f), ls='--' )
+        ax2.plot( w, np.angle(f), **plot_kws )
         ax2.set_ylabel('radians')
 
 def continuous_amplitude_linphase(ft_samps):
