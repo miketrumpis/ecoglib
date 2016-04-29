@@ -103,9 +103,17 @@ def fenced_out(samps, quantiles=(25,75), thresh=3.0, axis=None, low=True):
 
     quantiles = map(float, quantiles)
     qr = np.nanpercentile(samps, quantiles, axis=-1)
-    extended_range = thresh * (qr[..., 1] - qr[..., 0])
-    high_cutoff = qr[..., 1] + extended_range/2
-    low_cutoff = qr[..., 0] - extended_range/2
+    # Apparently the output of nanpercentile has changed?
+    v_maj, v_min, v_sub = map(int, np.version.version.split('.'))
+    if v_maj == 1 and v_min < 11:
+        q_lo = qr[..., 0]
+        q_hi = qr[..., 1]
+    else:
+        q_lo = qr[0]
+        q_hi = qr[1]
+    extended_range = thresh * (q_hi - q_lo)
+    high_cutoff = q_hi + extended_range/2
+    low_cutoff = q_lo - extended_range/2
     if not low:
         out_mask = samps < high_cutoff[...,None]
     else:
