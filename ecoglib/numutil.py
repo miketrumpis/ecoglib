@@ -11,8 +11,8 @@ from ecoglib.util import *
 from sandbox.array_split import split_at
 
 def nextpow2(n):
-    pow = int( np.floor( np.log2(n) ) + 1 )
-    return 2**pow
+    l2 = np.log2(n)
+    return int( 2 ** (int(l2) + 1 if l2 != int(l2) else l2) )
 
 def ndim_prctile(x, p, axis=0):
     xs = np.sort(x, axis=axis)
