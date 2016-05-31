@@ -6,7 +6,7 @@ from sandbox.array_split import split_at
 # @split_at() 
 def slepian_projection(
         data, BW, Fs, Kmax=None, w0=0, baseband=False, 
-        dpss=None, save_dpss=False
+        dpss=None, save_dpss=False, min_conc=None
         ):
     """
     Perform bandpass filtering by projection onto the bandpass space
@@ -55,7 +55,10 @@ def slepian_projection(
             raise ValueError(err)
         if Kmax is not None:
             K = min(Kmax, K)
-        dpss, _ = dpss_windows(npts, TW, K)
+        dpss, eigs = dpss_windows(npts, TW, K)
+        if min_conc is not None:
+            keep = eigs > min_conc
+            dpss = dpss[keep]
     if w0 == 0:
         # shortcut for lowpass only
         w = data.dot( dpss.T )
