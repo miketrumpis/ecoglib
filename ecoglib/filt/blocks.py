@@ -123,3 +123,42 @@ def block_reduce(rfn, array, bsize, f_axis=1, **kwargs):
     for blk in bsig.fwd():
         reduced.append( rfn(blk, axis=f_axis) )
     return np.array( reduced )
+
+def block_apply(fn, bsize, args, block_arg=0, b_axis=-1, **kwargs):
+    """
+    Performs blockwise computation of an array operator 'fn'.
+
+    Parameters
+    ----------
+
+    fn : operator method with one-to-one array input-output
+    bsize : block size to operate over
+    args : method arguments sequence
+    block_arg : index of the operand in 'args' sequence
+    b_axis : axis of array to block (currently must be last)
+    kwargs : method keyword arguments
+
+    Returns
+    -------
+
+    arr : output array of same shape and dtype as input array
+
+    """
+    array = args[block_arg]
+    if not (b_axis == -1 or b_axis == array.ndim-1):
+        raise ValueError('Currently only blocking on last axis')
+
+    def _hotswap_block(blk):
+        n_arg = len(args)
+        a = [args[n] for n in xrange(n_arg) if n != block_arg]
+        a.insert(block_arg, blk)
+        return a
+    
+    b_sig = BlockedSignal(array, bsize, partial_block=True, axis=b_axis)
+    a_proc = np.empty_like(array)
+    b_proc = BlockedSignal(a_proc, bsize, partial_block=True, axis=b_axis)
+
+    for b_in, b_out in zip( b_sig.fwd(), b_proc.fwd() ):
+        a = _hotswap_block(b_in)
+        b_out[:] = fn(*a, **kwargs)
+    return a_proc
