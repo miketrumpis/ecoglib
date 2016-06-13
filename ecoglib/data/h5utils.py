@@ -3,6 +3,7 @@
 
 import numpy as np
 import tables
+from tables import NoSuchNodeError
 import os
 from contextlib import closing
 
