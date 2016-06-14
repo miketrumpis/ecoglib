@@ -95,7 +95,7 @@ class ChannelMap(list):
     def rlookup(self, c):
         return flat_to_mat(self.geometry, self[c], col_major=self.col_major)
 
-    def subset(self, sub):
+    def subset(self, sub, as_mask=False):
         if isinstance(sub, type(self)):
             # check that it's a submap
             submap = map_intersection([self, sub])
@@ -118,7 +118,12 @@ class ChannelMap(list):
                 raise ValueError('Cannot interpret subset array')
         elif not isinstance(sub, (list, tuple)):
             raise ValueError('Unknown subset type')
-            
+
+        if as_mask:
+            mask = np.zeros( (len(self),), dtype='?' )
+            mask[sub] = True
+            return mask
+        
         return ChannelMap(
             [self[i] for i in sub],
             self.geometry, col_major=self.col_major
