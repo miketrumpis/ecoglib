@@ -37,7 +37,7 @@ def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
     # * save everything else as the pickled ObjectAtom 
     # * if there are any sub-bunches, then re-enter method with subgroup
     
-    if isinstance(f, str):
+    if not isinstance(f, tables.file.File):
         with closing(tables.open_file(f, mode)) as f:
             return save_bunch(
                 f, path, b, 
@@ -120,7 +120,7 @@ def load_bunch(f, path, shared_arrays=(), load=True):
 def traverse_table(f, path='/', load=True, shared_paths=()):
     # Walk nodes and stuff arrays into the bunch.
     # If we encouter a group, then loop back into this method
-    if isinstance(f, str):
+    if not isinstance(f, tables.file.File):
         with closing(tables.open_file(f)) as f:
             return traverse_table(
                 f, path=path, load=load, shared_paths=shared_paths
