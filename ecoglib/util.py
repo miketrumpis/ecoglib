@@ -107,8 +107,10 @@ class ChannelMap(list):
             sub = self.lookup(*submap.nonzero())
         elif isinstance(sub, np.ndarray):
             if sub.ndim==2:
-                # get the channels/indices of the subset of sites
-                sub = self.lookup(*sub.nonzero())
+                # Get the channels/indices of the subset of sites.
+                # This needs to be sorted to look up the subset of
+                # channels in sequence
+                sub = np.sort(self.lookup(*sub.nonzero()))
             elif sub.ndim==1:
                 if sub.dtype.kind in ('b',):
                     sub = sub.nonzero()[0]
