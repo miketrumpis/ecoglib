@@ -666,7 +666,10 @@ class ChannelScroller(DataScroller):
         delta = (ylim[1] - ylim[0]) / 100
         page = self.page
         plen = self.page_length
-        events = self.exp.trig_times
+        try:
+            events = self.exp.time_stamps
+        except AttributeError:
+            events = self.exp.trig_times
         plotted_stims = (events >= page*plen) & (events < (page+1)*plen)
         stim_idx = np.where(plotted_stims)[0]
         for idx in stim_idx:

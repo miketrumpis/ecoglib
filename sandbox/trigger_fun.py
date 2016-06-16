@@ -3,7 +3,10 @@ import scipy.signal as signal
 
 import ecoglib.util as ut
 import ecoglib.numutil as nut
-from sandbox.expo import StimulatedExperiment
+try:
+    from ecogana.expconfig.exp_descr import StimulatedExperiment
+except ImportError:
+    from sandbox.expo import StimulatedExperiment
 import sandbox.array_split as array_split
 
 # define some trigger-locked aggregating utilities
@@ -13,7 +16,10 @@ def trigs_and_conds(trig_code):
       isinstance(trig_code, list):
         trigs, conds = trig_code
     elif isinstance(trig_code, StimulatedExperiment):
-        trigs = trig_code.trig_times
+        try:
+            trigs = trig_code.time_stamps
+        except AttributeError:
+            trigs = trig_code.trig_times
         conds, _ = trig_code.enumerate_conditions()
     return trigs, conds
 
