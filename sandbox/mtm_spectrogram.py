@@ -33,6 +33,8 @@ def mtm_spectrogram_basic(
     tx, fx, psd_matrix
     """
 
+    mtm_kwargs.setdefault('adaptive', True)
+    mtm_kwargs.setdefault('jackknife', False)
     xb = blocks.BlockedSignal(x, n, overlap=pl, partial_block=False)
     x_lapped = xb._x_blk.copy()
     if detrend:
