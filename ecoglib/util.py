@@ -140,6 +140,7 @@ class ChannelMap(list):
         Embed the data in electrode array geometry, mapping channels
         on the given axis
         """
+        data = np.atleast_1d(data)
         shape = list(data.shape)
         if shape[axis] != len(self):
             raise ValueError(
