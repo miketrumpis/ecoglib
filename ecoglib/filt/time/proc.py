@@ -109,7 +109,7 @@ def ma_highpass(x, fc):
     """
 
     from sandbox.split_methods import convolve1d
-    n = round(fc ** -1.0)
+    n = int(round(fc ** -1.0))
     if not n%2:
         n += 1
     h = np.empty(n)
