@@ -210,6 +210,7 @@ class ChannelMap(list):
             fill=np.nan, ax=None, **kwargs
             ):
         import matplotlib.pyplot as pp
+        from matplotlib.colors import BoundaryNorm
         kwargs.setdefault('origin', 'upper')
         if ax is None:
             f = pp.figure()
@@ -220,6 +221,9 @@ class ChannelMap(list):
         if arr is None:
             # image self
             arr = self.embed( np.ones(len(self), 'd'), fill=fill )
+            kwargs['clim'] = (0, 1)
+            kwargs['norm'] = BoundaryNorm([0, .5, 1], pp.cm.binary.N)
+            kwargs['cmap'] = pp.cm.binary
             
         if arr.shape != self.geometry:
             arr = self.embed(arr, fill=fill)
