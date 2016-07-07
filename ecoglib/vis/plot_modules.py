@@ -133,7 +133,7 @@ class BlitPlot(HasTraits):
             self.ax.draw_artist(artist)
         self.fig.canvas.blit(self.ax.bbox)
 
-    def connect_live_interaction(self, *extra_connections):
+    def connect_live_interaction(self, extra_connections=()):
         """
         Make callback connections with the figure's canvas. The
         argument extra_connections is a sequence of (event-name, handler)
@@ -244,7 +244,7 @@ class StaticFunctionPlot(LongNarrowPlot):
         self.time_mark.set_data(( [time, time], [0, 1] ))
         self.draw_dynamic()
 
-    def connect_live_interaction(self, *extra_connections):
+    def connect_live_interaction(self, extra_connections=(), sense_button=1):
         # connect a sequence of callbacks to
         # click -> enable scrolling
         # drag -> scroll time bar (if scrolling)
@@ -256,11 +256,14 @@ class StaticFunctionPlot(LongNarrowPlot):
             )
         connections = connections + extra_connections
         self._scrolling = False
-        super(StaticFunctionPlot, self).connect_live_interaction(*connections)
+        self._sense_button = sense_button
+        super(StaticFunctionPlot, self).connect_live_interaction(
+            extra_connections=connections
+            )
 
     def _scroll_handler(self, ev):
         # XXX: debug
-        if not ev.inaxes or ev.button != 1:
+        if not ev.inaxes or ev.button != self._sense_button:
             return
         if not self._scrolling and ev.name == 'button_press_event':
             self._scrolling = True
@@ -358,7 +361,7 @@ class WindowedFunctionPlot(StaticFunctionPlot):
             self._time_insensitive = False
         super(WindowedFunctionPlot, self).move_bar(time)
 
-    def connect_live_interaction(self, *extra_connections):
+    def connect_live_interaction(self, extra_connections=()):
         # connect a right-mouse-button triggered paging
         connections = (
             ('button_press_event', self._window_handler),
@@ -366,7 +369,7 @@ class WindowedFunctionPlot(StaticFunctionPlot):
         connections = connections + extra_connections
         super(
             WindowedFunctionPlot, self
-            ).connect_live_interaction(*connections)
+            ).connect_live_interaction(extra_connections=connections)
 
     def _window_handler(self, ev):
         if ev.button != 3 or not ev.inaxes:
