@@ -64,7 +64,7 @@ def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
 
     # 1) create arrays for suitable types
     for key, val in items:
-        if isinstance(val, np.ndarray):
+        if isinstance(val, np.ndarray) and len(val):
             atom = tables.Atom.from_dtype(val.dtype)
             if compress_arrays:
                 filters = tables.Filters(
@@ -81,7 +81,7 @@ def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
         elif type(val) in _h5_seq_types:
             try:
                 f.create_array(path, key, val)
-            except TypeError:
+            except TypeError, ValueError:
                 pickle_bunch[key] = val
 
         elif isinstance(val, Bunch):
