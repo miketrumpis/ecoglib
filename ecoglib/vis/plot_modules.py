@@ -37,7 +37,9 @@ class BlitPlot(HasTraits):
                 self.fig.add_axes(axes)
             self.ax = axes
         else:
-            self.ax = self.fig.add_axes([.15, .12, .8, .85])
+            # xxx: is there a reason not to use fig.add_subplot?
+            #self.ax = self.fig.add_axes([.15, .12, .8, .85])
+            self.ax = self.fig.add_subplot(111)
         xlim = traits.pop('xlim', self.ax.get_xlim())
         ylim = traits.pop('ylim', self.ax.get_ylim())
         self.static_artists = []
@@ -197,11 +199,111 @@ class LongNarrowPlot(BlitPlot):
 ##############################################################################
 ########## Classes To Define Plot Functionality ##############################
 
+class PlotInteraction(object):
+    "Basis for plot-interaction factories"
+    # List of event types to associate with this object's callable
+    events = ()
+    strict_type = None
+
+    @classmethod
+    def gen_event_associations(cls, plot_obj, *args, **kwargs):
+        if cls.strict_type and not isinstance(plot_obj, BlitPlot):
+            raise ValueError(str(cls) + 'requires a' + str(cls.strict_type))
+        obj = cls(plot_obj, *args, **kwargs)
+        objs = [ obj ] * len(cls.events)
+        return tuple( zip( cls.events, objs ) )
+
+class MouseScrubber(PlotInteraction):
+    events = ('button_press_event', 
+              'button_release_event', 
+              'motion_notify_event')
+    
+class TimeBar(MouseScrubber):
+    
+    def __init__(self, obj, link_var, sense_button=1):
+        self.obj = obj
+        self.link_var = link_var
+        self.sense_button = sense_button
+        self.scrolling = False
+
+    def __call__(self, ev):
+        if not ev.inaxes or ev.button != self.sense_button:
+            return
+        if not self.scrolling and ev.name == 'button_press_event':
+            self.scrolling = True
+            #self.time = ev.xdata
+            setattr(self.obj, self.link_var, ev.xdata)
+        elif ev.name == 'button_release_event':
+            self.scrolling = False
+        elif self.scrolling and ev.name == 'motion_notify_event':
+            #self.time = ev.xdata
+            setattr(self.obj, self.link_var, ev.xdata)
+
+from matplotlib.patches import FancyBboxPatch, Rectangle
+class AxesScrubber(MouseScrubber):
+    strict_type = BlitPlot
+    
+    def __init__(
+            self, obj, link_lo, link_hi, sense_button=1,
+            transient=True, scrub_x=True
+            ):
+        self.obj = obj
+        self.link_lo = link_lo
+        self.link_hi = link_hi
+        self.sense_button = sense_button
+        self.transient = transient
+        self.scrub_x = scrub_x
+        self.scrolling = False
+        self.pressed = False
+
+    def __call__(self, ev):
+        if not ev.inaxes or not hasattr(ev, 'button') or \
+          ev.button != self.sense_button:
+            return
+
+        if ev.name == 'button_press_event':
+            self.scrolling = True
+            self._rect_start = ev.xdata if self.scrub_x else ev.ydata
+            yl = self.obj.ylim
+            xl = self.obj.xlim
+            lims = xl if self.scrub_x else yl
+            init_width = (lims[1] - lims[0])/100.0
+            corner = (ev.xdata, yl[0]) if self.scrub_x else (xl[0], ev.ydata)
+            x_len = init_width if self.scrub_x else xl[1] - xl[0]
+            y_len = yl[1] - yl[0] if self.scrub_x else init_width
+            # start a rectangle patch
+            self._patch = Rectangle(
+                corner, x_len, y_len, fc='k', ec='k', alpha=.25
+                )
+            self.obj.ax.add_artist(self._patch)
+            self.obj.add_dynamic_artist(self._patch)
+            self.pressed = True
+            self.obj.draw()
+
+        if ev.name == 'motion_notify_event' and self.scrolling:
+            if self.scrub_x:
+                self._patch.set_width( ev.xdata - self._rect_start )
+            else:
+                self._patch.set_height( ev.ydata - self._rect_start )
+            self.obj.draw_dynamic()
+
+        if ev.name == 'button_release_event' and self.scrolling:
+            self.scrolling = False
+            if self.transient:
+                self.obj.remove_dynamic_artist(self._patch)
+                self.obj.draw()
+
+            end_val = ev.xdata if self.scrub_x else ev.ydata
+            lo_val, hi_val = sorted( [self._rect_start, end_val] )
+            setattr(self.obj, self.link_lo, lo_val)
+            setattr(self.obj, self.link_hi, hi_val)
+
 class StaticFunctionPlot(LongNarrowPlot):
     """
     Plain vanilla x(t) plot, with a marker for the current time.
     """
     time = Float
+    interactions = [ (TimeBar, 'time') ]
 
     # Caution: mixin-only. Supposes the method
     # * create_fn_image() which produces a particular plot
@@ -249,29 +351,14 @@ class StaticFunctionPlot(LongNarrowPlot):
         # click -> enable scrolling
         # drag -> scroll time bar (if scrolling)
         # release click -> disable scrolling
-        connections = (
-            ('button_press_event', self._scroll_handler),
-            ('button_release_event', self._scroll_handler),
-            ('motion_notify_event', self._scroll_handler),
+        # Note: this is now handled by a PlotInteraction type
+        connections = TimeBar.gen_event_associations(
+            self, 'time', sense_button=sense_button
             )
         connections = connections + extra_connections
-        self._scrolling = False
-        self._sense_button = sense_button
         super(StaticFunctionPlot, self).connect_live_interaction(
             extra_connections=connections
             )
-
-    def _scroll_handler(self, ev):
-        # XXX: debug
-        if not ev.inaxes or ev.button != self._sense_button:
-            return
-        if not self._scrolling and ev.name == 'button_press_event':
-            self._scrolling = True
-            self.time = ev.xdata
-        elif ev.name == 'button_release_event':
-            self._scrolling = False
-        elif self._scrolling and ev.name == 'motion_notify_event':
-            self.time = ev.xdata
 
 class WindowedFunctionPlot(StaticFunctionPlot):
     """
