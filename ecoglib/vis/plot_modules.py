@@ -45,7 +45,7 @@ class BlitPlot(HasTraits):
         self._bkgrnd = None
         self._old_size = tuple(self.ax.bbox.size)
         self._mpl_connections = []
-        traits = dict(xlim=xlim, ylim=ylim)
+        traits.update( dict(xlim=xlim, ylim=ylim) )
         #super(BlitPlot, self).__init__(**traits)
         HasTraits.__init__(self, **traits)
 
