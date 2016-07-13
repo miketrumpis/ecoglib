@@ -237,16 +237,6 @@ class DataScroller(HasTraits):
             plot_line_props=lprops, ylim=lim
             )
 
-    def configure_traits(self, *args, **kwargs):
-        ui = super(DataScroller, self).configure_traits(*args, **kwargs)
-        self._post_canvas_hook()
-        return ui
-
-    def edit_traits(self, *args, **kwargs):
-        ui = super(DataScroller, self).edit_traits(*args, **kwargs)
-        self._post_canvas_hook()
-        return ui
-
     def _post_canvas_hook(self):
         self.ts_plot.connect_live_interaction()
         self.zoom_plot.connect_live_interaction()
@@ -382,7 +372,8 @@ class DataScroller(HasTraits):
                 )
             ),
         resizable=True,
-        title='Data Scroller'
+        title='Data Scroller',
+        handler=tb.PingPongStartup()
     )
 
 class ColorCodedDataScroller(DataScroller):
@@ -821,7 +812,8 @@ class ChannelScroller(DataScroller):
                     )
                 )
             ),
-        resizable=True, title='ChannelScroller'
+        resizable=True, title='ChannelScroller',
+        handler=tb.PingPongStartup()
     )
                 
                 

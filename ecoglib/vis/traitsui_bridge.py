@@ -27,6 +27,7 @@ from matplotlib._pylab_helpers import Gcf
 
 from traitsui.qt4.editor import Editor
 from traitsui.basic_editor_factory import BasicEditorFactory
+from traitsui.api import Handler
 
 
 ##############################################################################
@@ -95,7 +96,7 @@ class _MPLFigureEditor(Editor):
     under the TraitsUI framework.
     """
 
-    scrollable  = True
+    scrollable = True
 
     def init(self, parent):
         self.control = self._create_canvas(parent)
@@ -119,3 +120,16 @@ class _MPLFigureEditor(Editor):
 class MPLFigureEditor(BasicEditorFactory):
 
    klass = _MPLFigureEditor
+
+
+class PingPongStartup(Handler):
+    """
+    This object can act as a View Handler for an HasTraits instance 
+    that creates Matplotlib elements after the GUI canvas is created.
+    This handler simply calls the _post_canvas_hook() method on the
+    HasTraits instance, which applies any finishing touches to the MPL
+    elements.
+    """
+
+    def init(self, info):
+        info.object._post_canvas_hook()
