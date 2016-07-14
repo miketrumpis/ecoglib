@@ -255,18 +255,19 @@ class AxesScrubber(MouseScrubber):
         self.scrub_x = scrub_x
         self.scrolling = False
         self.pressed = False
+        # code is 0 for left/down (e.g. get_xlim()[0] and 1 for right/up
+        self.scr_dir = 1 
 
     def __call__(self, ev):
-        if not ev.inaxes or not hasattr(ev, 'button') or \
-          ev.button != self.sense_button:
+        if not hasattr(ev, 'button') or ev.button != self.sense_button:
             return
-
-        if ev.name == 'button_press_event':
+        
+        yl = self.obj.ax.get_ylim()
+        xl = self.obj.ax.get_xlim()
+        lims = xl if self.scrub_x else yl
+        if ev.name == 'button_press_event' and ev.inaxes:
             self.scrolling = True
             self._rect_start = ev.xdata if self.scrub_x else ev.ydata
-            yl = self.obj.ylim
-            xl = self.obj.xlim
-            lims = xl if self.scrub_x else yl
             init_width = (lims[1] - lims[0])/100.0
             corner = (ev.xdata, yl[0]) if self.scrub_x else (xl[0], ev.ydata)
             x_len = init_width if self.scrub_x else xl[1] - xl[0]
@@ -280,12 +281,18 @@ class AxesScrubber(MouseScrubber):
             self.pressed = True
             self.obj.draw()
 
+        if ev.inaxes:
+            evdata = ev.xdata if self.scrub_x else ev.ydata
+        else:
+            evdata = lims[self.scr_dir]
+        self.scr_dir = int( evdata > self._rect_start )
+        
         if ev.name == 'motion_notify_event' and self.scrolling:
             if self.scrub_x:
-                self._patch.set_width( ev.xdata - self._rect_start )
+                self._patch.set_width( evdata - self._rect_start )
             else:
-                self._patch.set_height( ev.ydata - self._rect_start )
-            self.obj.draw_dynamic()
+                self._patch.set_height( evdata - self._rect_start )
+            self.obj.draw_dynamic()            
 
         if ev.name == 'button_release_event' and self.scrolling:
             self.scrolling = False
@@ -293,8 +300,7 @@ class AxesScrubber(MouseScrubber):
                 self.obj.remove_dynamic_artist(self._patch)
                 self.obj.draw()
 
-            end_val = ev.xdata if self.scrub_x else ev.ydata
-            lo_val, hi_val = sorted( [self._rect_start, end_val] )
+            lo_val, hi_val = sorted( [self._rect_start, evdata] )
             setattr(self.obj, self.link_lo, lo_val)
             setattr(self.obj, self.link_hi, hi_val)
 
