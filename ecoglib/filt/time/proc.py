@@ -8,7 +8,8 @@ from ecoglib.util import get_default_args
 from sandbox.array_split import shared_ndarray
 import scipy.signal as signal
 
-__all__ = [ 'filter_array', 'notch_all', 'downsample', 'ma_highpass' ]
+__all__ = [ 'filter_array', 'notch_all', 'downsample', 'ma_highpass',
+            'common_average_regression' ]
 
 def _get_poles_zeros(destype, **filt_args):
     if destype.lower().startswith('butter'):
@@ -116,3 +117,16 @@ def ma_highpass(x, fc):
     h.fill( -1.0 / n )
     h[n//2] += 1
     return convolve1d(x, h)
+
+def common_average_regression(data, mu=(), inplace=True):
+    """
+    Return the residual of each channel after regressing a 
+    common signal (by default the channel-average).
+    """
+    if not len(mu):
+        mu = data.mean(0)
+    beta = data.dot(mu) / np.sum( mu**2 )
+    data_r = data if inplace else data.copy()
+    for chan, b in zip(data_r, beta):
+        chan -= b * mu
+    return data_r
