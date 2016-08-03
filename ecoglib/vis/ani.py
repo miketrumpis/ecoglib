@@ -138,7 +138,7 @@ def dynamic_frames_and_series(
         frame_img.set_data(frames[num])
         if not ttl:
             return (frame_img, tm)
-        ttl.set_text('{0:.2f} {1}'.format(tx[num], timer))
+        ttl.set_text('{0:.2f} {1}'.format(x, timer))
         return (frame_img, tm, ttl)
 
     func = lambda x: _step_time(
