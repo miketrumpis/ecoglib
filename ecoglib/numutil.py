@@ -22,6 +22,25 @@ def ndim_prctile(x, p, axis=0):
     slicer[axis] = idx
     return xs[slicer]
 
+def nanpercentile(*args, **kwargs):
+    """
+    Light wrap of nanpercentile from numpy. This version presents output
+    consistent with the percentile function from versions 1.9.x to 1.10.x.
+    The behavior from version 1.11.x is already consistent.
+    """
+    axis = kwargs.get('axis', None)
+    res = np.nanpercentile(*args, **kwargs)
+
+    import distutils.version as vs
+    if vs.LooseVersion(np.__version__) < vs.LooseVersion('1.11.0'):
+        if axis is not None:
+            print axis
+            while axis < 0:
+                axis += args[0].ndim
+            print axis
+            return np.rollaxis(res, axis)
+    return res
+
 def unity_normalize(x, axis=None):
     if axis is None:
         mn = x.min(axis=axis)
@@ -102,15 +121,7 @@ def fenced_out(samps, quantiles=(25,75), thresh=3.0, axis=None, low=True):
         samps = np.rollaxis(samps, axis, samps.ndim)
 
     quantiles = map(float, quantiles)
-    qr = np.nanpercentile(samps, quantiles, axis=-1)
-    # Apparently the output of nanpercentile has changed?
-    v_maj, v_min, v_sub = map(int, np.version.version.split('.'))
-    if v_maj == 1 and v_min < 11:
-        q_lo = qr[..., 0]
-        q_hi = qr[..., 1]
-    else:
-        q_lo = qr[0]
-        q_hi = qr[1]
+    q_lo, q_hi = nanpercentile(samps, quantiles, axis=-1)
     extended_range = thresh * (q_hi - q_lo)
     high_cutoff = q_hi + extended_range/2
     low_cutoff = q_lo - extended_range/2
