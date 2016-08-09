@@ -269,7 +269,8 @@ class DataScroller(HasTraits):
         #lim = self._map_eps(self.eps, (self.min_ts_amp, self.max_ts_amp))
         lim = self._map_eps(self.eps, (-full_limits, full_limits))
         self.ts_plot.ylim = lim
-        self.zoom_plot.ylim = lim
+        if self.zoom_plot:
+            self.zoom_plot.ylim = lim
 
     @on_trait_change('arr_eps')
     def _update_arr_eps(self):
@@ -520,7 +521,7 @@ class ChannelScroller(DataScroller):
     ts_plot = Instance(pm.PagedTimeSeriesPlot)
     _zero = Int(0)
     page = Range(low='_zero', high='_mx_page')
-    page_length = Range(low=100, high=100000)
+    page_length = Range(low=100, high=500000)
     _mx_page = Int
     page_up = Button()
     page_dn = Button()
@@ -585,8 +586,7 @@ class ChannelScroller(DataScroller):
         return scr
         
     def construct_ts_plot(self, t, figsize, lim, t0, **lprops):
-        if 'color' not in lprops:
-            lprops['color'] = 'b'
+        lprops.setdefault('color', 'b')
         lprops['linewidth'] = 0.5
         n_lines = self.ts_arr.shape[1]
         plot = pm.PagedTimeSeriesPlot(
@@ -623,7 +623,7 @@ class ChannelScroller(DataScroller):
             scl_ax.axis('off')
 
             ylim = plot.ax.get_ylim()
-            y_scale = 2*float(ylim[1] - ylim[0]) / len(self.chans)
+            y_scale = 2*float(ylim[1] - ylim[0]) / n_lines
             scale_step, scaling, units = \
               units_tools.best_scaling_step(y_scale, units, allow_up=True)
             bar_len = np.floor( scaling*y_scale / scale_step ) * scale_step
