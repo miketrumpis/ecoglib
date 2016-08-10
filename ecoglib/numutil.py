@@ -107,7 +107,13 @@ def sphere_samples(x, axis=-1):
     return y
 
 def fenced_out(samps, quantiles=(25,75), thresh=3.0, axis=None, low=True):
-
+    """
+    Threshold input sampled based on Tukey's box-plot heuristic. An
+    outlier is a value that lies beyond some multiple of of an
+    inter-percentile range (3 multiples of the inter-quartile range 
+    is default). If the sample has an inter-percentile range of zero, 
+    then the sample median is substituted.
+    """
     if isinstance(samps, np.ma.MaskedArray):
         samps = samps.filled(np.nan)
 
@@ -123,6 +129,12 @@ def fenced_out(samps, quantiles=(25,75), thresh=3.0, axis=None, low=True):
     quantiles = map(float, quantiles)
     q_lo, q_hi = nanpercentile(samps, quantiles, axis=-1)
     extended_range = thresh * (q_hi - q_lo)
+    if (extended_range == 0).any():
+        print 'Equal percentiles: estimating outlier range from median value'
+        m = (extended_range > 0).astype('d')
+        md_range = thresh * q_hi
+        extended_range = extended_range * m + md_range * (1 - m)
+        
     high_cutoff = q_hi + extended_range/2
     low_cutoff = q_lo - extended_range/2
     if not low:
