@@ -93,7 +93,14 @@ def downsample(x, fs, appx_fs=None, r=None, axis=-1):
 
     new_fs = fs / r
 
-    fdesign = dict(ripple=0.5, hi=0.4*new_fs, Fs=fs)
+    # design a cheby-1 lowpass filter 
+    # wp: 0.4 * new_fs
+    # ws: 0.5 * new_fs
+    # design specs with halved numbers, since filtfilt will be used
+    wp = 2 * 0.4 * new_fs / fs
+    ws = 2 * 0.5 * new_fs / fs
+    ord, wc = signal.cheb1ord(wp, ws, 0.25, 10)
+    fdesign = dict(ripple=0.25, hi=0.5 * wc * fs, Fs=fs, ord=ord)
     x_lp = filter_array(
         x, ftype='cheby1', inplace=False, 
         design_kwargs=fdesign, filt_kwargs=dict(axis=axis)
