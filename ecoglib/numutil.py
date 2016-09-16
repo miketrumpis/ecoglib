@@ -61,8 +61,6 @@ def unity_normalize(x, axis=None):
 
 def density_normalize(x, raxis=None):
     if raxis is None:
-        mn = np.nanmin(x)
-        x = x - mn
         return x / np.nansum(x)
 
     if x.ndim > 2:
@@ -80,8 +78,6 @@ def density_normalize(x, raxis=None):
 
     # roll repeat axis to last axis
     x = np.rollaxis(x, raxis, start=2)
-    mn = np.nanmin(x, 0)
-    x = x - mn
     x = x / np.nansum(x, 0)
     return np.rollaxis(x, 1, start=raxis)
 
