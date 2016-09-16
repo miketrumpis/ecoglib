@@ -686,7 +686,7 @@ class ChannelScroller(DataScroller):
 
     def _change_page(self, page):
         self.undraw_events()
-        self.page = page
+        self.page = int(page)
         if self.scl_ax:
             self.scl_ax.set_ylim(self.ts_plot.ax.get_ylim())
         self.trait_setq(window_shift=0)
