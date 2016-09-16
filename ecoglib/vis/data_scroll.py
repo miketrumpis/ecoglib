@@ -641,6 +641,8 @@ class ChannelScroller(DataScroller):
             self.scl_ax = scl_ax
         else:
             self.scl_ax = None
+        if not self.auto_scale:
+            self._set_manual_scaling()
         return plot
 
     def construct_zoom_plot(self, t, figsize, lim, **lprops):
@@ -738,7 +740,6 @@ class ChannelScroller(DataScroller):
     def _change_mx_page(self):
         self._mx_page = int( self.ts_arr.shape[0] // self.page_length ) + 1
         self.ts_plot.page_length = self.page_length
-        print self.ts_plot.page
         self.page = self.ts_plot.page
         self._change_page(self.page)
 

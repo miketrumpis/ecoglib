@@ -10,6 +10,7 @@ from matplotlib.colors import Normalize
 from matplotlib import cm
 
 from . import plot_tools as pt
+from ecoglib.numutil import nanpercentile
 
 # XXX: an incomplete decorator for the listen/set pattern of traits callbacks
 ## def set_or_listen(attr):
@@ -508,11 +509,11 @@ class PagedFunctionPlot(StaticFunctionPlot):
 
     page = Int(0)
     page_length = Int
-    stack_spacing = Float
+    stack_spacing = Float(0)
     
-    def __init__(self, t, x, page_length, stack_traces=True, **traits):
+    def __init__(
+            self, t, x, page_length, stack_traces=True, **traits):
         self.lims = (x.min(), x.max())
-        #self._spacing = np.median( np.ptp(x, axis=0) )
         self._zooming = False
         self.page_length = page_length
         self.page = 0
@@ -520,12 +521,10 @@ class PagedFunctionPlot(StaticFunctionPlot):
         self.x = x
         self.t = t
         t_init, x_init = self._data_page()
-        ## x_init = pt.safe_slice(x, 0, page_length)
-        ## t_init = pt.safe_slice(t, 0, page_length)
         super(PagedFunctionPlot, self).__init__(t_init, x_init, **traits)
         self.trait_setq(page_length=page_length)
         # xxx: probably bad form here
-        self._traces = self.static_artists[:]
+        self.traces = self.static_artists[:]
         self.page_in(self.page)
 
     def _data_page(self):
@@ -547,33 +546,32 @@ class PagedFunctionPlot(StaticFunctionPlot):
 
     @on_trait_change('page')
     def page_in(self, *page):
+        if not hasattr(self, 'traces'):
+            return
         if page:
             self.trait_setq(page=page[0])
 
+        # all vertical scaling is controlled w/in _data_page()
         tx, data_page = self._data_page()
-        for fn, line_obj in zip(data_page.T, self._traces):
+        for fn, line_obj in zip(data_page.T, self.traces):
             line_obj.set_data(tx, fn)
-        #self.trait_setq(ylim=(data_page.min(), data_page.max()))
         window = data_page[self.page_length:2*self.page_length]
+        self.center_page(quiet=True)
+        self.ax.set_xlim(self.xlim)
         self.ylim = (np.nanmin(window), np.nanmax(window))
-        self.center_page()
 
-    def center_page(self, t_off=0):
+    def center_page(self, t_off=0, quiet=False):
         # set axis range to the middle segment of the window
-        t = self._traces[0].get_data()[0]
-        #mn = np.nanmin(t); mx = np.nanmax(t)
-        #mn = self.t[self.page_length * self.page]
-        # ??
+        t = self.traces[0].get_data()[0]
         twid = t[self.page_length] - t[0]
         t0 = t[int(1.5*self.page_length)]
         t0 = t0 + t_off
-        #t_min = max(mn, t0 - twid/2)
-        #t_max = min(mx, t0 + twid/2)
         t_min = t0 - twid/2
         t_max = t0 + twid/2
-        ## t_min = max(mn, t[self.page_length])
-        ## t_max = min(mx, t[2*self.page_length-1])
-        self.xlim = (t_min, t_max)
+        if quiet:
+            self.trait_setq(xlim=(t_min, t_max))
+        else:
+            self.xlim = (t_min, t_max)
 
     @on_trait_change('page_length')
     def _repage(self, x, y, old, new):
