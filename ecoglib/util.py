@@ -405,6 +405,8 @@ def input_as_2d(in_arr=0, out_arr=-1):
         # check to see if the function ate the last dimension
         if n_out < 2:
             shp = shp[:-1]
+        elif shp[-1] != x.shape[-1]:
+            shp = shp[:-1] + (x.shape[-1],)
         x = x.reshape(shp)
         if out_arr >= 0:
             r[out_arr] = x
