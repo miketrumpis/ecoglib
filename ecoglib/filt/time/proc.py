@@ -4,12 +4,13 @@ One-stop shopping for digital filtering of arrays
 from __future__ import division
 import numpy as np
 from .design import butter_bp, cheby1_bp, cheby2_bp, notch
-from ecoglib.util import get_default_args
+from ecoglib.util import get_default_args, input_as_2d
 from sandbox.array_split import shared_ndarray
 import scipy.signal as signal
+from nitime.algorithms.autoregressive import AR_est_YW
 
 __all__ = [ 'filter_array', 'notch_all', 'downsample', 'ma_highpass',
-            'common_average_regression' ]
+            'common_average_regression', 'ar_whiten_blocks' ]
 
 def _get_poles_zeros(destype, **filt_args):
     if destype.lower().startswith('butter'):
@@ -137,3 +138,12 @@ def common_average_regression(data, mu=(), inplace=True):
     for chan, b in zip(data_r, beta):
         chan -= b * mu
     return data_r
+
+
+@input_as_2d()
+def ar_whiten_blocks(blocks, p=50):
+    bw = np.empty_like(blocks)
+    for n in xrange(len(blocks)):
+        b, _ = AR_est_YW(blocks[n], p)
+        bw[n] = signal.lfilter(np.r_[1, -b], [1], blocks[n])
+    return bw
