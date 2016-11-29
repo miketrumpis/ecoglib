@@ -56,7 +56,7 @@ class BlockedSignal(object):
         # Assuming C-contiguous, strides were previously
         # (..., nx*ny, nx, 1) * bitdepth
         # Change the strides at axis to reflect new shape
-        b_offset = np.prod(shape[axis+1:]) * bitdepth
+        b_offset = int( np.prod(shape[axis+1:]) * bitdepth )
         nstrides = strides[:axis] + \
           (L*b_offset, b_offset) + \
           strides[axis+1:]
