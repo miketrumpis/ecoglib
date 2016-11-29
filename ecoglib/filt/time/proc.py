@@ -27,12 +27,36 @@ def _get_poles_zeros(destype, **filt_args):
 
     return desfun(extra_arg, **filt_args)
 
+@input_as_2d()
 def filter_array(
         arr, ftype='butterworth', inplace=True,
         design_kwargs=dict(), filt_kwargs=dict()
         ):
+    """
+    Filter an ND array timeseries on the last dimension. For computational
+    efficiency, the timeseries are blocked into partitions (10000 points
+    by default) and split over multiple threads (not supported on Windoze).
 
-        
+    Parameters
+    ----------
+    arr : ndarray
+        Timeseries in the last dimension (can be 1D).
+    ftype : str
+        Filter type to design.
+    inplace : bool
+        If True, then arr must be a shared memory array. Otherwise a
+        shared copy will be made from the input.
+    design_kwargs : dict
+        Design parameters for the filter (e.g. lo, hi, Fs, ord)
+    filt_kwargs : dict
+        Processing parameters (e.g. filtfilt, bsize)
+
+    Returns
+    -------
+    arr_f : ndarray
+        Filtered timeseries, same shape as input.
+    
+    """
     b, a = _get_poles_zeros(ftype, **design_kwargs)
     from sandbox.split_methods import bfilter
     def_args = get_default_args(bfilter)
