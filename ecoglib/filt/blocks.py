@@ -22,10 +22,10 @@ class BlockedSignal(object):
           The signal to blockify.
         bsize : int
           The maximum blocksize for the given axis.
-        overlap : float 0 <= overlap <= 1
+        overlap : float 0 <= overlap <= 1 or int 0 < bsize
           The proportion of overlap between adjacent blocks. The (k+1)th
           block will begin at an offset of (1-overlap)*bsize points into
-          the kth block.
+          the kth block. If overlap is an integer, it will be used literally.
         axis : int (optional)
           The axis to split into blocks
         partial_block : bool
@@ -44,7 +44,10 @@ class BlockedSignal(object):
         while axis < 0:
             axis += len(shape)
         bsize = int(bsize)
-        L = int( round( (1-overlap) * bsize ) )
+        if isinstance(overlap, int) and overlap > 1:
+            L = bsize - overlap
+        else:
+            L = int( round( (1-overlap) * bsize ) )
         nblock = (shape[axis] - bsize) // L
         if partial_block and (shape[axis] > L*nblock + bsize):
             nblock += 1
