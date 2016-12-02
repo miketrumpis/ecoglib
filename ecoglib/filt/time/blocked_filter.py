@@ -1,6 +1,10 @@
 import numpy as np
 import scipy.signal as signal
+from scipy.fftpack import fft, ifft
 from scipy.linalg import LinAlgError
+
+from ecoglib.numutil import nextpow2
+from ecoglib.util import input_as_2d
 
 from ..blocks import BlockedSignal
 
@@ -67,6 +71,86 @@ def bdetrend(x, bsize=0, **kwargs):
     del xc
     del x_blk
 
+from progressbar import ProgressBar, Percentage, Bar
+@input_as_2d()
+def overlap_add(x, w, progress=False):
+
+    M = len(w)
+    N = 0
+    nfft = nextpow2(M) / 2
+    while N < M:
+        nfft *= 2
+        # segment size > M and long enough not to cause circular convolution
+        N = nfft - M + 1
+
+
+    blocks = BlockedSignal(x, N, axis=-1)
+    xf = np.zeros_like(x)
+    #blocks_f = BlockedSignal(xf, nfft, overlap=1.0 - float(N)/nfft, axis=-1)
+    blocks_f = BlockedSignal(xf, nfft, overlap=M-1, axis=-1)
+
+    nb1 = blocks.nblock
+    nb2 = blocks_f.nblock
+
+    #print M, N, nfft, nb1, nb2
+
+    # centered kernel (does not work!)
+    ## pre_z = (nfft-M) // 2
+    ## post_z = nfft - M - pre_z
+    ## kern = fft( np.r_[ np.zeros(pre_z), w, np.zeros(post_z) ] )
+
+    # not-centered kernel
+    kern = fft(np.r_[w, np.zeros(nfft-M)])
+
+    # centered padding (does not work!)
+    ## pre_z = (nfft-N) // 2
+    ## post_z = nfft - N - pre_z
+    ## z1 = np.zeros( x.shape[:-1] + (pre_z,) )
+    ## z2 = np.zeros( x.shape[:-1] + (post_z,) )
+
+    # not-centered padding
+    z = np.zeros( x.shape[:-1] + (nfft-N,) )
+
+    if progress:
+        pbar = ProgressBar(
+            widgets=[Percentage(), Bar()], maxval=min(nb1, nb2)
+            ).start()    
+    for n in xrange(nb1):
+        
+        b = blocks.block(n)
+        if b.shape[-1] == N:
+            b = fft(np.concatenate( (b, z), axis=-1 ), axis=-1)
+            #b = fft(np.concatenate( (z1, b, z2), axis=-1 ), axis=-1)
+        else:
+            # zero pad final segment
+            z_ = np.zeros( b.shape[:-1] + (nfft-b.shape[-1],) )
+            b = fft(np.concatenate( (b, z_), axis=-1 ), axis=-1)
+        b = ifft(b * kern).real
+        if n < nb2:
+            bf = blocks_f.block(n)
+            b_sl = [slice(None)] * bf.ndim
+            b_sl[-1] = slice(0, bf.shape[-1])
+        else:
+            # keep the final filtered block and advance the overlap-index
+            # within it
+            b_sl = [slice(None)] * bf.ndim
+            b_sl[-1] = slice(0, bf.shape[-1])
+        bf[:] += b[b_sl]    
+        #bf[:] += b[..., :bf.shape[-1]]
+        if progress:
+            pbar.update(n)
+    if progress:
+        pbar.finish()
+    #print b.shape, bf.shape, n
+
+    if nb2 > nb1:
+        print 'more output blocks than input blocks??'
+    
+    return xf
+        
+        
+        
+    
 def remove_modes(x, bsize=0, axis=-1, modetype='dense', n=1):
 
     # remove chronos modes discovered by SVD
