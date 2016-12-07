@@ -97,7 +97,7 @@ def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
     for n, b in sub_bunches:
         #print 'saving', n, b
         save_bunch(
-            f, os.path.join(path, n), b, compress_arrays=compress_arrays
+            f, '/'.join([path, n]), b, compress_arrays=compress_arrays
             )
     return
 
@@ -114,7 +114,7 @@ def load_bunch(f, path, shared_arrays=(), load=True):
     
     """
 
-    shared_arrays = map(lambda a: os.path.join(path, a), shared_arrays)
+    shared_arrays = map(lambda a: '/'.join([path, a]), shared_arrays)
     return traverse_table(f, path=path, shared_paths=shared_arrays, load=load)
 
 def traverse_table(f, path='/', load=True, shared_paths=()):
@@ -134,7 +134,7 @@ def traverse_table(f, path='/', load=True, shared_paths=()):
     for n in nlist:
         if isinstance(n, tables.Array):
             if load:
-                if os.path.join(path, n.name) in shared_paths:
+                if '/'.join([path, n.name]) in shared_paths:
                     arr = shared_ndarray(n.shape)
                     arr[:] = n.read()
                 else:
@@ -168,7 +168,7 @@ def traverse_table(f, path='/', load=True, shared_paths=()):
             if gname==g:
                 continue
             subbunch = traverse_table(
-                f, path=os.path.join(path, gname), load=load
+                f, path='/'.join([path, gname]), load=load
                 )
             gbunch[gname] = subbunch
             
