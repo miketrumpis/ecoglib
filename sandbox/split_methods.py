@@ -14,6 +14,8 @@ import nitime.algorithms as ntalg
 
 ### Parallelized re-definitions
 bfilter = array_split.split_at(split_arg=2)(bf.bfilter)
+overlap_add = array_split.split_at()(bf.overlap_add)
+
 multi_taper_psd = array_split.split_at(splice_at=(1,2))(
     ntalg.multi_taper_psd
     )
@@ -21,7 +23,6 @@ multi_taper_psd = array_split.split_at(splice_at=(1,2))(
 convolve1d = array_split.split_at(split_arg=0)(ndimage.convolve1d)
 
 ### Convenience wrappers
-#@array_split.split_at() # bfilter already split
 def filtfilt(arr, b, a, bsize=10000):
     """
     Docstring
