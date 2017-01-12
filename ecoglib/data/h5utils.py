@@ -96,8 +96,9 @@ def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
     # 3) repeat these steps for any bunch elements that are also bunches
     for n, b in sub_bunches:
         #print 'saving', n, b
+        subpath = path + '/' + n if path != '/' else path + n
         save_bunch(
-            f, '/'.join([path, n]), b, compress_arrays=compress_arrays
+            f, subpath, b, compress_arrays=compress_arrays
             )
     return
 
