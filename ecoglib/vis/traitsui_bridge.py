@@ -25,7 +25,12 @@ elif use.lower() == 'wx':
 from matplotlib.figure import Figure
 from matplotlib._pylab_helpers import Gcf
 
-from traitsui.qt4.editor import Editor
+try:
+    from traitsui.qt4.editor import Editor
+except RuntimeError:
+    class Editor(object):
+        pass
+
 from traitsui.basic_editor_factory import BasicEditorFactory
 from traitsui.api import Handler
 
