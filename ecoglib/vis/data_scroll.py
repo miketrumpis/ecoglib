@@ -578,9 +578,10 @@ class ChannelScroller(DataScroller):
         vtk_cmap = dset.chan_map.as_col_major()
         vtk_cmap.col_major = False
         vtk_cmap.geometry = vtk_cmap.geometry[::-1]
+        exp = getattr(dset, 'exp', None)
         scr = ChannelScroller(
             vtk_cmap.embed(dset.data, axis=0, fill=0), 
-            window, chans=vtk_cmap, exp=dset.exp, Fs=dset.Fs,
+            window, chans=vtk_cmap, exp=exp, Fs=dset.Fs,
             units=dset.units
             )
         return scr
