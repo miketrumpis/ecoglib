@@ -9,6 +9,87 @@ except ImportError:
     from sandbox.expo import StimulatedExperiment
 import sandbox.array_split as array_split
 
+def _auto_level(ttl):
+    """Iteratively refine an estimate of the high-level cluster
+    of points in a TTL signal.
+    """
+
+    n = ttl.size
+    mn = ttl.mean()
+    # refine until the current subset is < 1% of the signal
+    while float(ttl.size) / n > 1e-2:
+        ttl = ttl[ ttl > mn ]
+        if len(ttl):
+            mn = ttl.mean()
+        else:
+            break
+    return mn
+
+def process_trigger(trig_chan, thresh=.75, clean=False):
+    """Pull event timing from one or many logical-level channels.
+
+    Parameters
+    ----------
+    trig_chan : ndarray
+        Vector(s) of event timing square waves.
+    thresh : float (0.75)
+        Relative threshold for detecting a rising edge.
+
+    Returns
+    -------
+    pos_edge : ndarray
+        Sequence of event times (indices)
+    digital_trigger : ndarray
+        Binarized trigger vector
+    clean : bool
+        Check rising edge times for spurious edges (e.g. from noisy trigger)
+    """
+    trig_chan = np.atleast_2d(trig_chan)
+    if trig_chan.dtype.char != '?':
+        thresh = thresh * _auto_level(trig_chan)
+        trig_chan = trig_chan > thresh
+    digital_trigger = np.any( trig_chan, axis=0 ).astype('i')
+    pos_edge = np.where(np.diff(digital_trigger) > 0)[0] + 1
+    if clean:
+        pos_edge = clean_dirty_trigger(pos_edge)
+    return pos_edge, digital_trigger
+
+def clean_dirty_trigger(pos_edges, isi_guess=None):
+    """Clean spurious event times (with suspect inter-stimulus intervals).
+    
+    Parameters
+    ----------
+    pos_edges : array-like
+        Sequence of timestamps
+    isi_guess : int (optional)
+        Prior for ISI. Otherwise guess ISI based on 90th percentile.
+
+    Returns
+    -------
+    array
+        The pruned timestamps.
+    """
+    if len(pos_edges) < 3:
+        return pos_edges
+    df = np.diff(pos_edges)
+    if isi_guess is None:
+        isi_guess = np.percentile(df, 90)
+
+    # lose any edges that are < half of the isi_guess
+    edge_mask = np.ones(len(pos_edges), '?')
+
+    for i in xrange(len(pos_edges)):
+        if not edge_mask[i]:
+            continue
+
+        # look ahead and kill any edges that are 
+        # too close to the current edge
+        pt = pos_edges[i]
+        kill_mask = (pos_edges > pt) & (pos_edges < pt + isi_guess/2)
+        edge_mask[kill_mask] = False
+
+    return pos_edges[edge_mask]
+
 # define some trigger-locked aggregating utilities
 def trigs_and_conds(trig_code):
     if isinstance(trig_code, np.ndarray) or \
