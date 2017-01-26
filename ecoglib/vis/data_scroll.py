@@ -339,43 +339,44 @@ class DataScroller(HasTraits):
             )
         self.array_ipw = ipw
 
-
-    view = View(
-        VGroup(
-            HGroup(
-                Item(
-                    'array_scene', editor=SceneEditor(scene_class=Scene),
-                    height=200, width=200, show_label=False,
-                    enabled_when='_has_video'
+    def default_traits_view(self):
+        view = View(
+            VGroup(
+                HGroup(
+                    Item(
+                        'array_scene', editor=SceneEditor(scene_class=Scene),
+                        height=200, width=200, show_label=False,
+                        enabled_when='_has_video'
+                        ),
+                    Item(
+                        'zoom_plot', editor=tb.MPLFigureEditor(),
+                        show_label=False, width=500, height=200, resizable=True
+                        )
                     ),
-                Item(
-                    'zoom_plot', editor=tb.MPLFigureEditor(),
-                    show_label=False, width=500, height=200, resizable=True
+                HGroup(
+                    Item(
+                        'ts_plot', editor=tb.MPLFigureEditor(),
+                        show_label=False, width=600, height=100, resizable=True
+                        ),
+                    Item('fps', label='FPS'),
+                    Item('count', label='Run Clock')
+                    ),
+                HGroup(
+                    VGroup(
+                        Item('tau', label='Zoom Interval'),
+                        Item('eps', label='Amplitude Interval')
+                        ),
+                    VGroup(
+                        Item('arr_eps', label='Array Color'),
+                        Item('time', label='Time Slice', style='custom')
+                        )
                     )
                 ),
-            HGroup(
-                Item(
-                    'ts_plot', editor=tb.MPLFigureEditor(),
-                    show_label=False, width=600, height=100, resizable=True
-                    ),
-                Item('fps', label='FPS'),
-                Item('count', label='Run Clock')
-                ),
-            HGroup(
-                VGroup(
-                    Item('tau', label='Zoom Interval'),
-                    Item('eps', label='Amplitude Interval')
-                    ),
-                VGroup(
-                    Item('arr_eps', label='Array Color'),
-                    Item('time', label='Time Slice', style='custom')
-                    )
-                )
-            ),
-        resizable=True,
-        title='Data Scroller',
-        handler=tb.PingPongStartup()
-    )
+            resizable=True,
+            title='Data Scroller',
+            handler=tb.PingPongStartup()
+        )
+        return view
 
 class ColorCodedDataScroller(DataScroller):
 
@@ -759,64 +760,66 @@ class ChannelScroller(DataScroller):
         lim = self._map_eps(self.eps, (-full_limits, full_limits))
         self.zoom_plot.ylim = lim
 
-    view = View(
-        HSplit(
-            Item(
-                'ts_plot', editor=tb.MPLFigureEditor(), show_label=False,
-                width=400, height=900, resizable=True
-                ),
-            VSplit(
+    def default_traits_view(self):
+        view = View(
+            HSplit(
                 Item(
-                    'array_scene', editor=SceneEditor(scene_class=Scene),
-                    height=500, width=500, show_label=False,
-                    visible_when='_has_video'
+                    'ts_plot', editor=tb.MPLFigureEditor(), show_label=False,
+                    width=400, height=900, resizable=True
                     ),
                 VSplit(
                     Item(
-                        'zoom_plot', editor=tb.MPLFigureEditor(), 
-                        show_label=False,
-                        width=400, height=150, resizable=True
+                        'array_scene', editor=SceneEditor(scene_class=Scene),
+                        height=500, width=500, show_label=False,
+                        visible_when='_has_video'
+                        ),
+                    VSplit(
+                        Item(
+                            'zoom_plot', editor=tb.MPLFigureEditor(), 
+                            show_label=False,
+                            width=400, height=150, resizable=True
+                            ),
+                        HGroup(
+                            Item('tau', label='Zoom Width'),
+                            Item('eps', label='Array Limits')
+                            ),
+                        visible_when='show_zoom'
                         ),
                     HGroup(
-                        Item('tau', label='Zoom Width'),
-                        Item('eps', label='Array Limits')
-                        ),
-                    visible_when='show_zoom'
-                    ),
-                HGroup(
-                    VGroup(
-                        Item('page_up', label='Page FWD', show_label=False),
-                        Item('page_dn', label='Page BWD', show_label=False),
-                        HGroup(
-                            Item(
-                                'auto_scale', label='Auto Scale', 
-                                show_label=False
-                                ),
-                            Item(
-                                'channel_scale', label='Scale',
-                                show_label=False, enabled_when='not auto_scale'
+                        VGroup(
+                            Item('page_up', label='Page FWD', show_label=False),
+                            Item('page_dn', label='Page BWD', show_label=False),
+                            HGroup(
+                                Item(
+                                    'auto_scale', label='Auto Scale', 
+                                    show_label=False
+                                    ),
+                                Item(
+                                    'channel_scale', label='Scale',
+                                    show_label=False, enabled_when='not auto_scale'
+                                    )
                                 )
+                            ),
+                        VGroup(
+                            Item('page', label='Page Num'),
+                            Item('page_length', label='Page Len'),
+                            Item('window_shift', label='Shift Win'),
+                            Item('draw_stims', label='Draw Stim Events',
+                                 enabled_when='_has_stim>0'),
+                            Item('show_zoom', label='Plot CAR')
+                            ),
+                        VGroup(
+                            Item('arr_eps', label='Array Color'),
+                            Item('count', label='Run Clock'),
+                            Item('fps', label='FPS')
                             )
-                        ),
-                    VGroup(
-                        Item('page', label='Page Num'),
-                        Item('page_length', label='Page Len'),
-                        Item('window_shift', label='Shift Win'),
-                        Item('draw_stims', label='Draw Stim Events',
-                             enabled_when='_has_stim>0'),
-                        Item('show_zoom', label='Plot CAR')
-                        ),
-                    VGroup(
-                        Item('arr_eps', label='Array Color'),
-                        Item('count', label='Run Clock'),
-                        Item('fps', label='FPS')
                         )
                     )
-                )
-            ),
-        resizable=True, title='ChannelScroller',
-        handler=tb.PingPongStartup()
-    )
+                ),
+            resizable=True, title='ChannelScroller',
+            handler=tb.PingPongStartup()
+        )
+        return view
                 
                 
                  

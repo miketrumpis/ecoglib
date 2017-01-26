@@ -50,36 +50,38 @@ class ComboScroller(DataScroller):
     def _plot_scatters(self):
         self.scatter_plot.setup_scatters(self.scatter.mayavi_scene)
 
-    view = View(
-        VGroup(
-            HGroup(
-                Item(
-                    'scatter', editor=SceneEditor(scene_class=Scene),
-                    height=300, width=300, show_label=False, resizable=True
+    def default_traits_view(self):
+        view = View(
+            VGroup(
+                HGroup(
+                    Item(
+                        'scatter', editor=SceneEditor(scene_class=Scene),
+                        height=300, width=300, show_label=False, resizable=True
+                        ),
+                    Item(
+                        'array_scene', editor=SceneEditor(scene_class=Scene),
+                        height=300, width=300, show_label=False, resizable=True
+                        )
                     ),
                 Item(
-                    'array_scene', editor=SceneEditor(scene_class=Scene),
-                    height=300, width=300, show_label=False, resizable=True
+                    'ts_plot', editor=tb.MPLFigureEditor(),
+                    show_label=False, width=600, height=200, resizable=True
+                    ),
+                HGroup(
+                    Item('time', label='Time Slice', style='custom'),
+                    Item('eps', label='Amplitude Limits')
+                    ),
+                HGroup(
+                    Item('count', label='Run Clock'),
+                    Item('fps', label='FPS'),
+                    Item('arr_eps', label='Array Color Limits')
                     )
                 ),
-            Item(
-                'ts_plot', editor=tb.MPLFigureEditor(),
-                show_label=False, width=600, height=200, resizable=True
-                ),
-            HGroup(
-                Item('time', label='Time Slice', style='custom'),
-                Item('eps', label='Amplitude Limits')
-                ),
-            HGroup(
-                Item('count', label='Run Clock'),
-                Item('fps', label='FPS'),
-                Item('arr_eps', label='Array Color Limits')
-                )
-            ),
-        resizable=True,
-        title='Combo Scroller'
+            resizable=True,
+            title='Combo Scroller'
 
-        )
+            )
+        return view
 
 
 class ClassCodedComboScroller(ClassCodedDataScroller):
@@ -117,33 +119,35 @@ class ClassCodedComboScroller(ClassCodedDataScroller):
             self.scatter.mayavi_scene, scl_fn=self.labels
             )
 
-    view = View(
-        VGroup(
-            HGroup(
-                Item(
-                    'scatter', editor=SceneEditor(scene_class=Scene),
-                    height=300, width=300, show_label=False, resizable=True
+    def default_traits_view(self):
+        view = View(
+            VGroup(
+                HGroup(
+                    Item(
+                        'scatter', editor=SceneEditor(scene_class=Scene),
+                        height=300, width=300, show_label=False, resizable=True
+                        ),
+                    Item(
+                        'array_scene', editor=SceneEditor(scene_class=Scene),
+                        height=300, width=300, show_label=False, resizable=True
+                        )
                     ),
                 Item(
-                    'array_scene', editor=SceneEditor(scene_class=Scene),
-                    height=300, width=300, show_label=False, resizable=True
+                    'ts_plot', editor=tb.MPLFigureEditor(),
+                    show_label=False, width=600, height=200, resizable=True
+                    ),
+                HGroup(
+                    Item('time', label='Time Slice', style='custom'),
+                    Item('eps', label='Amplitude Limits')
+                    ),
+                HGroup(
+                    Item('count', label='Run Clock'),
+                    Item('fps', label='FPS'),
+                    Item('arr_eps', label='Array Color Limits')
                     )
                 ),
-            Item(
-                'ts_plot', editor=tb.MPLFigureEditor(),
-                show_label=False, width=600, height=200, resizable=True
-                ),
-            HGroup(
-                Item('time', label='Time Slice', style='custom'),
-                Item('eps', label='Amplitude Limits')
-                ),
-            HGroup(
-                Item('count', label='Run Clock'),
-                Item('fps', label='FPS'),
-                Item('arr_eps', label='Array Color Limits')
-                )
-            ),
-        resizable=True,
-        title='Class Coded Combo Scroller'
+            resizable=True,
+            title='Class Coded Combo Scroller'
 
-        )
+            )
+        return view

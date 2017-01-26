@@ -250,26 +250,27 @@ class ScatterScroller(HasTraits):
             return
         self.time = t
 
-    view = View(
-        VGroup(
-            Item(
-                'scatter', editor=SceneEditor(scene_class=Scene),
-                height=600, width=600, show_label=False, resizable=True
+    def default_traits_view(self):
+        view = View(
+            VGroup(
+                Item(
+                    'scatter', editor=SceneEditor(scene_class=Scene),
+                    height=600, width=600, show_label=False, resizable=True
+                    ),
+                Item(
+                    'ts_plot', editor=tb.MPLFigureEditor(),
+                    show_label=False, width=600, height=200, resizable=True
+                    ),
+                HGroup(
+                    Item('time', label='Time Slice', style='custom'),
+                    Item('fps', label='FPS'),
+                    ),
+                Item('count', label='Run Clock')
                 ),
-            Item(
-                'ts_plot', editor=tb.MPLFigureEditor(),
-                show_label=False, width=600, height=200, resizable=True
-                ),
-            HGroup(
-                Item('time', label='Time Slice', style='custom'),
-                Item('fps', label='FPS'),
-                ),
-            Item('count', label='Run Clock')
-            ),
-        resizable=True,
-        title='Scatter Scroller'
+            resizable=True,
+            title='Scatter Scroller'
 
-        )
+            )
 
 class ClassCodedScatterScroller(ScatterScroller):
     ts_plot = Instance(pm.WindowedClassSegmentedPlot)
