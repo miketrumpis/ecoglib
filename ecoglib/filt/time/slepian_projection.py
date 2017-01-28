@@ -3,6 +3,8 @@ from nitime.algorithms import dpss_windows
 from numpy.lib.stride_tricks import as_strided
 from ecoglib.util import input_as_2d
 
+__all__ = ['slepian_projection', 'moving_projection']
+
 def slepian_projection(
         data, BW, Fs, Kmax=None, w0=0, baseband=False, 
         dpss=None, save_dpss=False, min_conc=None
@@ -114,7 +116,7 @@ def moving_projection(
 
     Parameters
     ==========
-    x : ndarray (1D)
+    x : ndarray 
         Signal to filter.
     N : int
         Length of blocks (N < len(x))
@@ -144,10 +146,6 @@ def moving_projection(
     of the beginning and end of the signal window.
     
     Method from "Projection Filters for Data Analysis", D.J. Thomson, 1996
-
-    Todo
-    ====
-    Adapt to n-dimensional input.
     """
 
     M = x.shape[-1]
