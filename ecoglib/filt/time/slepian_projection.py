@@ -1,6 +1,7 @@
 import numpy as np
 from nitime.algorithms import dpss_windows
 from numpy.lib.stride_tricks import as_strided
+from ecoglib.util import input_as_2d
 
 def slepian_projection(
         data, BW, Fs, Kmax=None, w0=0, baseband=False, 
@@ -81,15 +82,24 @@ def slepian_projection(
 
 def _stagger_array(x, N):
     """
-    Stack x into N rows, with each row staggered (and zero padded)
-    by one sample.
+    Stack x into N rows. The first row is padded with N-1 zeros. The
+    remaining N-1 rows are circularly shifted one sample back. If x
+    is 2D, then the stacked matrices comprise the first two dimensions
+    of the resulting array.
     """
-    M = len(x)
-    x_pad = np.r_[ np.zeros(N-1), x, np.zeros(N-1) ]
+    shp = x.shape
+    s = shp[:-1]
+    M = shp[-1]
+    zp = np.zeros( s + (N-1,) )
+    x_pad = np.concatenate( (zp, x, zp), axis=-1 )
     B = x_pad.dtype.itemsize
-    x_strided = as_strided(x_pad, shape=(N, M+N-1), strides=(B, B))
+    st = x_pad.strides[:-1]
+    x_strided = as_strided(x_pad, shape=s + (N, M+N-1), strides=st + (B, B))
+    if x_strided.ndim > 2:
+        return x_strided.transpose(1, 2, 0).copy()
     return x_strided.copy()
 
+@input_as_2d()
 def moving_projection(
         x, N, BW, Fs=1.0, Kmax=None, weight_eigen=True, window=np.hanning
         ):
@@ -140,9 +150,9 @@ def moving_projection(
     Adapt to n-dimensional input.
     """
 
-    M = len(x)
+    M = x.shape[-1]
     T = N / Fs
-    TW = round( 2 * T * BW ) / 2.0
+    TW = int( round( 2 * T * BW ) / 2.0 )
     K = 2 * TW - 1
     dpss, eigs = dpss_windows(N, TW, K)
 
@@ -153,17 +163,20 @@ def moving_projection(
     # Y: shape (K, M + N - 1)
     # Y is the lowpass coefficients indexed by k and b
     # Y_ij = y_i(j) for ith taper and jth block
-    Y = dpss.dot(X)
+    Y = np.tensordot(dpss, X, (1, 0))
     if weight_eigen:
         w = eigs / eigs.sum()
-        Yh = (dpss.T * eigs).dot(Y)
+        Yh = np.tensordot( dpss.T * eigs, Y, (1, 0) )
     else:
-        Yh = dpss.T.dot(Y)
+        Yh = np.tensordot(dpss.T, Y, (1, 0))
     # Yh is the projection of staggered blocks.
     # Use a strided array view to unstagger the blocks
-    Yh_ = np.zeros( (N, M + 2*(N-1)) )
+    ndim = x.ndim
+    Yh_ = np.zeros( (N, M + 2*(N-1)) + Yh.shape[2:] )
     B = Yh_.dtype.itemsize
-    v = as_strided(Yh_, shape=Yh.shape, strides=( (Yh_.shape[1]+1) * B, B ))
+    d = Yh.shape[2] if ndim > 1 else 1
+    strides = ( (Yh_.shape[1] + 1) * d * B, d * B, B )[:ndim+1]
+    v = as_strided(Yh_, shape=Yh.shape, strides=strides)
     v[:] = Yh
     # Each output sample y(t) is a weighted combination of N estimates
     # from every block in X that overlapped with x(t). The previous
@@ -171,6 +184,6 @@ def moving_projection(
     # the same column. The final step is to make a weighted sum of estimates.
     w = window(N)
     w /= w.sum()
-    y = (Yh_[:, (N-1):-(N-1)] * w[:,None]).sum(0)
+    y = (Yh_[:, (N-1):-(N-1)].T * w).sum(-1)
     return y
     

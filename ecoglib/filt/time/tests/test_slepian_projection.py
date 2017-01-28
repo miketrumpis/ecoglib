@@ -87,6 +87,27 @@ def test_moving_projection_sizes():
                 y = moving_projection(x, N, 0.1)
                 assert_true( len(y) == len(x) )
             except:
-                assert_true( False, 'shapes failed: M={0}, N={0}'.format(M,N))
+                assert_true( False, 'shapes failed: M={0}, N={1}'.format(M,N))
                 
+def test_twodim_moving_projection():
+    """Check consistency in 2-dimensional calculation"""
+
+    x = np.random.randn(2000)
+    x = np.row_stack( (x,) * 10 )
+    y = moving_projection(x, 200, 5/200.)
+
+    err = y - y[0]
+    assert_true( np.sum(err**2) < 1e-8 )
+
+
+def test_multidim_moving_projection():
+    """Check consistency in multidimensional calculation"""
+
+    x_ = np.random.randn(2000)
     
+    x = np.empty( (5, 10, 2000) )
+    x[:] = x_
+    y = moving_projection(x, 200, 5/200.)
+
+    err = y - y[0, 0]
+    assert_true( np.sum(err**2) < 1e-8 )
