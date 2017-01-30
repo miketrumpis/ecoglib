@@ -101,9 +101,11 @@ def _stagger_array(x, N):
         return x_strided.transpose(1, 2, 0).copy()
     return x_strided.copy()
 
-@input_as_2d()
+@input_as_2d(out_arr=0)
 def moving_projection(
-        x, N, BW, Fs=1.0, Kmax=None, weight_eigen=True, window=np.hanning
+        x, N, BW, Fs=1.0, Kmax=None, 
+        weight_eigen=True, window=np.hanning, 
+        dpss=None, save_dpss=False
         ):
     """
     Perform the "moving" projection filter on a (relatively short)
@@ -144,6 +146,8 @@ def moving_projection(
     Since this method depends on projections of staggered blocks of 
     length N, expect poorer reconstruction accuracy within N samples
     of the beginning and end of the signal window.
+
+    Memory consumption scales rather high with many (~1000) input vectors.
     
     Method from "Projection Filters for Data Analysis", D.J. Thomson, 1996
     """
@@ -152,7 +156,16 @@ def moving_projection(
     T = N / Fs
     TW = int( round( 2 * T * BW ) / 2.0 )
     K = 2 * TW - 1
-    dpss, eigs = dpss_windows(N, TW, K)
+    if K < 1:
+        min_bw = 0.5 / T
+        err = 'BW is too small for the window size: ' \
+          'minimum BW={0}'.format(min_bw)
+        raise ValueError(err)
+    
+    if dpss is not None:
+        dpss, eigs = dpss
+    else:
+        dpss, eigs = dpss_windows(N, TW, K)
 
     # X: shape (N, M + N - 1)
     # columns are the length-N windows of x beginning at offset b
@@ -162,6 +175,7 @@ def moving_projection(
     # Y is the lowpass coefficients indexed by k and b
     # Y_ij = y_i(j) for ith taper and jth block
     Y = np.tensordot(dpss, X, (1, 0))
+    del X
     if weight_eigen:
         w = eigs / eigs.sum()
         Yh = np.tensordot( dpss.T * eigs, Y, (1, 0) )
@@ -183,5 +197,7 @@ def moving_projection(
     w = window(N)
     w /= w.sum()
     y = (Yh_[:, (N-1):-(N-1)].T * w).sum(-1)
+    if save_dpss:
+        return y, (dpss, eigs)
     return y
     
