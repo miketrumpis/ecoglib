@@ -1,26 +1,31 @@
 """This module creates a bridge between the plot modules and a traits GUI
 """
-# not a real config var yet
-use = 'qt4'
 
 # Matplotlib
 import matplotlib
-# We want matplotlib to use a QT backend
-if use.lower() == 'qt4':
-    try:
-        matplotlib.use('QtAgg')
-    except ValueError:
-        matplotlib.use('Qt4Agg')
+use = matplotlib.get_backend()
+
+# Only really tested for QT4Agg backend
+if use.lower() == u'qt4agg':
     from matplotlib.backends.backend_qt4agg import \
      FigureCanvasQTAgg as FigureCanvas
     from matplotlib.backends.backend_qt4agg import \
      NavigationToolbar2QT as NavigationToolbar
-elif use.lower() == 'wx':
-    matplotlib.use('WxAgg')
+elif use.lower() == u'qt4agg':
+    from matplotlib.backends.backend_qt5agg import \
+     FigureCanvasQTAgg as FigureCanvas
+    from matplotlib.backends.backend_qt5agg import \
+     NavigationToolbar2QT as NavigationToolbar
+elif use.lower() == 'wxagg':
     from matplotlib.backends.backend_wxagg \
       import FigureCanvasWxAgg as FigureCanvas
     from matplotlib.backends.backend_wx import \
      NavigationToolbar2Wx as NavigationToolbar
+elif use.lower() == 'agg':
+    from matplotlib.backends.backend_agg \
+      import FigureCanvasAgg as FigureCanvas
+    from matplotlib.backend_bases \
+      import NavigationToolbar2 as NavigationToolbar    
          
 from matplotlib.figure import Figure
 from matplotlib._pylab_helpers import Gcf
