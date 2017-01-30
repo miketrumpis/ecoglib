@@ -377,13 +377,18 @@ def search_results(path, filter=''):
 from decorator import decorator
 def input_as_2d(in_arr=0, out_arr=-1):
     """
-    Reshape input to be 2D and then bring output back to original
-    size (possibly with loss of last dimension).
+    A decorator to reshape input to be 2D and then bring output back 
+    to original size (possibly with loss of last dimension). 
+    Vectors will also be reshaped to (1, N) on input.
 
-    in_arr : position of argument to be reshaped
-    out_arr : (positive) position of output to be reshaped. If None, then no
-              output is reshaped. If -1, then treat the method as having
-              a single output that is reshaped
+    Parameters
+    ----------
+    in_arr : int
+        position of argument (input) to be reshaped
+    out_arr : int
+        Non-negative position of output to be reshaped. 
+        If None, then no output is reshaped. If the method's
+        return type is not a tuple, this argument has no effect.
 
     """
     
@@ -397,7 +402,7 @@ def input_as_2d(in_arr=0, out_arr=-1):
         r = fn(*args, **kwargs)
         if out_arr is None:
             return r
-        if out_arr >= 0:
+        if isinstance(r, tuple) and out_arr >= 0:
             x = r[out_arr]
         else:
             x = r
@@ -408,9 +413,8 @@ def input_as_2d(in_arr=0, out_arr=-1):
         elif shp[-1] != x.shape[-1]:
             shp = shp[:-1] + (x.shape[-1],)
         x = x.reshape(shp)
-        if out_arr >= 0:
-            r[out_arr] = x
+        if isinstance(r, tuple) and out_arr >= 0:
+            return r[:out_arr] + (x,) + r[out_arr+1:]
         else:
-            r = x
-        return r
+            return x
     return _wrap

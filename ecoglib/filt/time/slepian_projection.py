@@ -5,6 +5,7 @@ from ecoglib.util import input_as_2d
 
 __all__ = ['slepian_projection', 'moving_projection']
 
+@input_as_2d(out_arr=0)
 def slepian_projection(
         data, BW, Fs, Kmax=None, w0=0, baseband=False, 
         dpss=None, save_dpss=False, min_conc=None
@@ -37,17 +38,12 @@ def slepian_projection(
         along with the filtered timeseries
     """
     
-    shp = data.shape
-    if len(shp) < 2:
-        data = np.atleast_2d(data)
-    if len(shp) > 2:
-        data = data.reshape( shp[0] * shp[1], -1 )
     nchan, npts = data.shape
     if dpss is None:
         # find NW which is also TW
         T = npts / Fs
         # round to the nearest multiple of 1/2
-        TW = round( 2 * T * BW ) / 2.0
+        TW = int( round( 2 * T * BW ) / 2.0 )
         K = 2 * TW
         if K < 1:
             min_bw = 0.5 / T
@@ -79,8 +75,8 @@ def slepian_projection(
         else:
             bp = ( wp.dot( dpss_pf ) + wn.dot( dpss_nf ) ).real.copy()
     if save_dpss:
-        return bp.reshape(shp), dpss
-    return bp.reshape(shp)
+        return bp, dpss
+    return bp
 
 def _stagger_array(x, N):
     """
