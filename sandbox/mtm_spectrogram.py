@@ -239,7 +239,7 @@ def mtm_spectrogram(
     #pts_per_block = n // delta
     pts_per_block = int( np.ceil( (n - delta//2) / delta ) )
     overlap = pts_per_block - m // delta
-    psd_len = nblock * pts_per_block - (nblock-1)*overlap
+    psd_len = int( nblock * pts_per_block - (nblock-1)*overlap )
     psd_pl = float(overlap) / pts_per_block
     psd_matrix = np.zeros( x.shape[:-1] + (nfreq, psd_len), 'd' )
     print pts_per_block, overlap, psd_len
