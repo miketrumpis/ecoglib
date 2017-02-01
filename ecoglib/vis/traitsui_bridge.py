@@ -97,8 +97,10 @@ def _embedded_wx_figure(parent, editor, toolbar=True):
     panel.SetSizer(sizer)
     return panel
 
-embedded_figure = _embedded_qt_figure if use.lower()=='qt4' else \
-  _embedded_wx_figure
+if use.lower() in ('qt4agg', 'qt5agg'):
+    embedded_figure = _embedded_qt_figure  
+else:
+    embedded_figure = _embedded_wx_figure
 
 class _MPLFigureEditor(Editor):
     """
