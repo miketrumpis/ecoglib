@@ -21,11 +21,12 @@ elif use.lower() == 'wxagg':
       import FigureCanvasWxAgg as FigureCanvas
     from matplotlib.backends.backend_wx import \
      NavigationToolbar2Wx as NavigationToolbar
-elif use.lower() == 'agg':
+else: #elif use.lower() == 'agg':
+    # make this the fallback case
     from matplotlib.backends.backend_agg \
       import FigureCanvasAgg as FigureCanvas
     from matplotlib.backend_bases \
-      import NavigationToolbar2 as NavigationToolbar    
+      import NavigationToolbar2 as NavigationToolbar
          
 from matplotlib.figure import Figure
 from matplotlib._pylab_helpers import Gcf
