@@ -24,11 +24,18 @@ cknn_graph = Extension(
     extra_compile_args=['-O3']
     )
 
+slepian_projection = Extension(
+    'ecoglib.filt.time._slepian_projection',
+    ['ecoglib/filt/time/_slepian_projection.pyx'], 
+    include_dirs = dirs, 
+    extra_compile_args=['-O3']
+    )
+
 if __name__=='__main__':
     setup(
         name = 'ecoglib',
         version = '1.0',
-        packages = ['vis', 'graph'],
-        ext_modules = [ cknn_graph ],
+        packages = ['vis', 'graph', 'data', 'filt'],
+        ext_modules = [ cknn_graph, slepian_projection ],
         cmdclass = {'build_ext': build_ext}
     )

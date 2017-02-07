@@ -4,7 +4,7 @@ from numpy.testing import assert_almost_equal
 import numpy as np
 
 from ecoglib.filt.time.slepian_projection import \
-     slepian_projection, moving_projection
+     slepian_projection, moving_projection, _moving_projection_preserve
 
 def gen_sig(am=False, w0=80, bw=30, nfreqs=10):
     """Generate test signal with given bandwidth and center frequency.
@@ -110,4 +110,15 @@ def test_multidim_moving_projection():
     y = moving_projection(x, 200, 5/200.)
 
     err = y - y[0, 0]
+    assert_true( np.sum(err**2) < 1e-8 )
+
+def test_consistency():
+    """Check consistency between optimized and regular methods"""
+
+    x = np.random.randn(10000)
+    
+    y1 = moving_projection(x, 200, 5/200.)
+    y2 = _moving_projection_preserve(x, 200, 5/200.)
+
+    err = y1 - y2
     assert_true( np.sum(err**2) < 1e-8 )

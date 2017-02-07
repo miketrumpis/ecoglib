@@ -2,6 +2,8 @@ import numpy as np
 from nitime.algorithms import dpss_windows
 from numpy.lib.stride_tricks import as_strided
 from ecoglib.util import input_as_2d
+from sandbox.array_split import split_at
+from ._slepian_projection import lowpass_moving_projection
 
 __all__ = ['slepian_projection', 'moving_projection']
 
@@ -98,7 +100,7 @@ def _stagger_array(x, N):
     return x_strided.copy()
 
 @input_as_2d(out_arr=0)
-def moving_projection(
+def _moving_projection_preserve(
         x, N, BW, Fs=1.0, Kmax=None, 
         weight_eigen=True, window=np.hanning, 
         dpss=None, save_dpss=False
@@ -163,18 +165,133 @@ def moving_projection(
     else:
         dpss, eigs = dpss_windows(N, TW, K)
 
-    # X: shape (N, M + N - 1)
+    # X: shape (N, M + N - 1, [R]) (for R input vectors)
     # columns are the length-N windows of x beginning at offset b
     # where b in [ -(N-1), M-1 ]
     X = _stagger_array(x, N)
-    # Y: shape (K, M + N - 1)
+    # Y: shape (K, M + N - 1, [R])
+    # Y is the lowpass coefficients indexed by k and b
+    # Y_ij = y_i(j) for ith taper and jth block
+    Y = np.tensordot(dpss, X, (1, 0))
+    del X
+    if weight_eigen:
+        w = K * eigs / eigs.sum()
+        Yh = np.tensordot( dpss.T * w, Y, (1, 0) )
+    else:
+        Yh = np.tensordot(dpss.T, Y, (1, 0))
+    # Yh is the projection of staggered blocks.
+    # Use a strided array view to unstagger the blocks
+    ndim = x.ndim
+    Yh_ = np.zeros( (N, M + 2*(N-1)) + Yh.shape[2:] )
+    B = Yh_.dtype.itemsize
+    d = Yh.shape[2] if ndim > 1 else 1
+    strides = ( (Yh_.shape[1] + 1) * d * B, d * B, B )[:ndim+1]
+    v = as_strided(Yh_, shape=Yh.shape, strides=strides)
+    v[:] = Yh
+    # Each output sample y(t) is a weighted combination of N estimates
+    # from every block in X that overlapped with x(t). The previous
+    # array maneuver took these staggered estimates and aligned them into
+    # the same column. The final step is to make a weighted sum of estimates.
+    w = window(N)
+    w /= w.sum()
+    y = (Yh_[:, (N-1):-(N-1)].T * w).sum(-1)
+    if save_dpss:
+        return y, (dpss, eigs)
+    return y
+
+# parallel appears safe!
+#@split_at()
+@input_as_2d(out_arr=0)
+def moving_projection(
+        x, N, BW, Fs=1.0, Kmax=None, 
+        weight_eigen=True, window=np.hanning, 
+        dpss=None, save_dpss=False
+        ):
+    """
+    Perform the "moving" projection filter on a (relatively short)
+    signal x. The projection basis is computed for an N-dimensional 
+    space, and staggered length-N blocks of x are filtered by the 
+    projection. Since blocks are offset by one sample, each point in 
+    the output is represented N times (with zero padding at the
+    beginning and end of the signal). The final output is a weighted
+    sum of these estimates. 
+
+    Parameters
+    ==========
+    x : ndarray 
+        Signal to filter.
+    N : int
+        Length of blocks (N < len(x))
+    BW : float
+        Half bandwidth of the lowpass projection (with respect to Fs).
+        (In other words, BW sets the corner frequency.)
+    Fs : float, optional
+        Sampling frequency of x.
+    Kmax : int, optional
+        Maximum number of basis vectors for projection. Kmax < 2*N*BW/Fs - 1
+    weight_eigen : bool, optional
+        Weight the reconstruction vectors by eigenvalue (default True).
+        The lowpass energy concentration of a particular vector is
+        reflected by its eigenvalue (higher is better).
+    window : callable, optional
+        The method, if given, returns a window the length of its argument.
+        This window will be used to weight the projection values.
+
+    Returns
+    =======
+    y : ndarray
+        Lowpass projection of x.
+
+    Notes
+    =====
+    Since this method depends on projections of staggered blocks of 
+    length N, expect poorer reconstruction accuracy within N samples
+    of the beginning and end of the signal window.
+    
+    Method from "Projection Filters for Data Analysis", D.J. Thomson, 1996
+    """
+
+    M = x.shape[-1]
+    T = N / Fs
+    TW = int( round( 2 * T * BW ) / 2.0 )
+    K = 2 * TW - 1
+    if K < 1:
+        min_bw = 0.5 / T
+        err = 'BW is too small for the window size: ' \
+          'minimum BW={0}'.format(min_bw)
+        raise ValueError(err)
+    
+    if dpss is not None:
+        dpss, eigs = dpss
+    else:
+        dpss, eigs = dpss_windows(N, TW, K)
+
+    if weight_eigen:
+        wf = K * eigs / eigs.sum()
+    else:
+        wf = np.ones(K, 'd')
+
+    wt = window(N)
+    wt = wt / wt.sum()
+    y = np.zeros_like(x)
+    for i in xrange(x.shape[0]):
+        lowpass_moving_projection(x[i], dpss, wf, wt, y[i])
+    if save_dpss:
+        return y, (dpss, eigs)
+    return y
+
+    # X: shape (N, M + N - 1, [R]) (for R input vectors)
+    # columns are the length-N windows of x beginning at offset b
+    # where b in [ -(N-1), M-1 ]
+    X = _stagger_array(x, N)
+    # Y: shape (K, M + N - 1, [R])
     # Y is the lowpass coefficients indexed by k and b
     # Y_ij = y_i(j) for ith taper and jth block
     Y = np.tensordot(dpss, X, (1, 0))
     del X
     if weight_eigen:
         w = eigs / eigs.sum()
-        Yh = np.tensordot( dpss.T * eigs, Y, (1, 0) )
+        Yh = np.tensordot( dpss.T * w, Y, (1, 0) )
     else:
         Yh = np.tensordot(dpss.T, Y, (1, 0))
     # Yh is the projection of staggered blocks.
