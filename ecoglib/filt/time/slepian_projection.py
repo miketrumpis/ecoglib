@@ -3,7 +3,8 @@ from nitime.algorithms import dpss_windows
 from numpy.lib.stride_tricks import as_strided
 from ecoglib.util import input_as_2d
 from sandbox.array_split import split_at
-from ._slepian_projection import lowpass_moving_projection
+from ._slepian_projection import \
+     lowpass_moving_projection, bandpass_moving_projection
 
 __all__ = ['slepian_projection', 'moving_projection']
 
@@ -199,11 +200,11 @@ def _moving_projection_preserve(
         return y, (dpss, eigs)
     return y
 
-# parallel appears safe!
-#@split_at()
+# parallel appears safe! (also input as 2d should wrap input splitting)
 @input_as_2d(out_arr=0)
+@split_at()
 def moving_projection(
-        x, N, BW, Fs=1.0, Kmax=None, 
+        x, N, BW, Fs=1.0, f0=0, Kmax=None, baseband=True,
         weight_eigen=True, window=np.hanning, 
         dpss=None, save_dpss=False
         ):
@@ -224,7 +225,7 @@ def moving_projection(
         Length of blocks (N < len(x))
     BW : float
         Half bandwidth of the lowpass projection (with respect to Fs).
-        (In other words, BW sets the corner frequency.)
+        (In other words, BW sets the corner frequency of a lowpass.)
     Fs : float, optional
         Sampling frequency of x.
     Kmax : int, optional
@@ -249,6 +250,8 @@ def moving_projection(
     of the beginning and end of the signal window.
     
     Method from "Projection Filters for Data Analysis", D.J. Thomson, 1996
+
+    MT: test_slepian_projection demos various projections
     """
 
     M = x.shape[-1]
@@ -260,6 +263,14 @@ def moving_projection(
         err = 'BW is too small for the window size: ' \
           'minimum BW={0}'.format(min_bw)
         raise ValueError(err)
+
+    # if f0 > 0, then it also has to be > BW/2
+    if abs(f0) > 0:
+        ## if abs(f0) < BW/2.0:
+        ##     raise ValueError('A bandpass center has to satisfy abs(f0) > BW/2')
+        f0 = f0 / float(Fs)
+    else:
+        f0 = False
     
     if dpss is not None:
         dpss, eigs = dpss
@@ -273,43 +284,26 @@ def moving_projection(
 
     wt = window(N)
     wt = wt / wt.sum()
-    y = np.zeros_like(x)
-    for i in xrange(x.shape[0]):
-        lowpass_moving_projection(x[i], dpss, wf, wt, y[i])
-    if save_dpss:
-        return y, (dpss, eigs)
-    return y
-
-    # X: shape (N, M + N - 1, [R]) (for R input vectors)
-    # columns are the length-N windows of x beginning at offset b
-    # where b in [ -(N-1), M-1 ]
-    X = _stagger_array(x, N)
-    # Y: shape (K, M + N - 1, [R])
-    # Y is the lowpass coefficients indexed by k and b
-    # Y_ij = y_i(j) for ith taper and jth block
-    Y = np.tensordot(dpss, X, (1, 0))
-    del X
-    if weight_eigen:
-        w = eigs / eigs.sum()
-        Yh = np.tensordot( dpss.T * w, Y, (1, 0) )
+    if f0:
+        if baseband:
+            y = np.zeros( x.shape, 'D' )
+            y_flat = y.view(dtype='d')
+            y_re = y_flat[..., 0::2]
+            y_im = y_flat[..., 1::2]
+        else:
+            y_re = np.zeros_like(x)
+            # make dummy array to satisfy Cython signature
+            y_im = np.empty( (x.shape[0], 1), 'd' )
+        for i in xrange(x.shape[0]):
+            bandpass_moving_projection(
+                x[i], dpss, wf, wt, y_re[i], y_im[i], f0, baseband=baseband
+                )
+        if not baseband:
+            y = y_re
     else:
-        Yh = np.tensordot(dpss.T, Y, (1, 0))
-    # Yh is the projection of staggered blocks.
-    # Use a strided array view to unstagger the blocks
-    ndim = x.ndim
-    Yh_ = np.zeros( (N, M + 2*(N-1)) + Yh.shape[2:] )
-    B = Yh_.dtype.itemsize
-    d = Yh.shape[2] if ndim > 1 else 1
-    strides = ( (Yh_.shape[1] + 1) * d * B, d * B, B )[:ndim+1]
-    v = as_strided(Yh_, shape=Yh.shape, strides=strides)
-    v[:] = Yh
-    # Each output sample y(t) is a weighted combination of N estimates
-    # from every block in X that overlapped with x(t). The previous
-    # array maneuver took these staggered estimates and aligned them into
-    # the same column. The final step is to make a weighted sum of estimates.
-    w = window(N)
-    w /= w.sum()
-    y = (Yh_[:, (N-1):-(N-1)].T * w).sum(-1)
+        y = np.zeros_like(x)        
+        for i in xrange(x.shape[0]):
+            lowpass_moving_projection(x[i], dpss, wf, wt, y[i])
     if save_dpss:
         return y, (dpss, eigs)
     return y

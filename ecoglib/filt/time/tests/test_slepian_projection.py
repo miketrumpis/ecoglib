@@ -119,6 +119,16 @@ def test_consistency():
     
     y1 = moving_projection(x, 200, 5/200.)
     y2 = _moving_projection_preserve(x, 200, 5/200.)
-
+    return y1, y2
     err = y1 - y2
     assert_true( np.sum(err**2) < 1e-8 )
+
+def test_return_types():
+
+    x = np.random.randn(2000)
+
+    y1 = moving_projection(x, 200, 5/200., f0=6/200., baseband=False)
+    assert_true(y1.dtype not in np.sctypes['complex'])
+    
+    y2 = moving_projection(x, 200, 5/200., f0=6/200., baseband=True)
+    assert_true(y2.dtype in np.sctypes['complex'])
