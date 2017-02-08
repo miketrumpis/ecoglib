@@ -10,7 +10,8 @@ import scipy.signal as signal
 from nitime.algorithms.autoregressive import AR_est_YW
 
 __all__ = [ 'filter_array', 'notch_all', 'downsample', 'ma_highpass',
-            'common_average_regression', 'ar_whiten_blocks' ]
+            'common_average_regression', 'ar_whiten_blocks',
+            'harmonic_projection' ]
 
 def _get_poles_zeros(destype, **filt_args):
     if destype.lower().startswith('butter'):
@@ -78,6 +79,31 @@ def notch_all(
         arr, Fs, lines=60.0, nzo=3,
         nwid=3.0, inplace=True, nmax=-1, **filt_kwargs
         ):
+    """Apply notch filtering to a array timeseries.
+
+    Parameters
+    ----------
+    arr : ndarray
+        timeseries
+    Fs : float
+        sampling frequency
+    lines : [list of] float(s)
+        One or more lines to notch.
+    nzo : int (default 3)
+        Number of zeros for the notch filter (more zeros --> deeper notch).
+    nwid : float (default 3)
+        Affects distance of notch poles from zeros (smaller --> closer).
+        Zeros occur on the unit disk in the z-plane. Note that the 
+        stability of a digital filter depends on poles being within
+        the unit disk.
+    nmax : float (optional)
+        If set, notch all multiples of (scalar-valued) lines up to nmax.
+
+    Returns
+    -------
+    notched : ndarray
+    
+    """
     if not inplace:
         arr_f = shared_ndarray(arr.shape)
         arr_f[:] = arr
@@ -102,6 +128,42 @@ def notch_all(
     return arr_f
 
 def downsample(x, fs, appx_fs=None, r=None, axis=-1):
+    """Integer downsampling with antialiasing.
+
+    One (and only one) of the parameters 'appx_fs' and 'r' must be
+    specified to determine the downsample factor.
+
+    The anti-aliasing filter is a type-1 Chebyshev filter with small
+    passband ripple and monotonic decreasing stopband attenuation:
+
+    * pass-band corner: 0.4 * new_fs
+    * stop-band corner: 0.5 * new_fs
+    * passband ripple: 0.5 dB
+    * Nyquist attenuation: 20 dB
+
+    Parameters
+    ----------
+    x : ndarray
+        timeseries
+    fs : float
+        Original sampling frequency
+    appx_fs : float
+        Approximate resampling frequency. The timeseries will be
+        downsampled by an integer amount to meet or exceed this
+        sampling rate.
+    r : int
+        The integer downsampling rate
+    axis : int
+        The timeseries axis in 'x'
+
+    Returns
+    -------
+    y : ndarray
+        Downsampled timeseries
+    new_fs : float
+        New sampling rate
+
+    """
     if appx_fs is None and r is None:
         return x
     if appx_fs is not None and r is not None:
@@ -150,6 +212,7 @@ def ma_highpass(x, fc):
     h[n//2] += 1
     return convolve1d(x, h)
 
+@input_as_2d()
 def common_average_regression(data, mu=(), inplace=True):
     """
     Return the residual of each channel after regressing a 
@@ -166,8 +229,48 @@ def common_average_regression(data, mu=(), inplace=True):
 
 @input_as_2d()
 def ar_whiten_blocks(blocks, p=50):
+    """AR(p) Autoregressive whitening of timeseries blocks.
+    """
     bw = np.empty_like(blocks)
     for n in xrange(len(blocks)):
         b, _ = AR_est_YW(blocks[n], p)
         bw[n] = signal.lfilter(np.r_[1, -b], [1], blocks[n])
     return bw
+
+@input_as_2d()
+def harmonic_projection(data, f0, stdevs=2):
+    """Harmonic artifact cancellation through direct sinusoid projections.
+
+    This method attempts a robust projection of a signal's line noise
+    onto a single-frequency ("atomic") complex exponential. To avoid fitting
+    signal to the line atom, high amplitude samples are masked.
+
+    Parameters
+    ----------
+    data : ndarray
+        Timeseries
+    f0 : float
+        Line frequency (in normalized frequency).
+    stdevs : float
+        Threshold for amplitude masking in multiples of the standard deviation.
+
+    Returns
+    -------
+    y : ndarray
+
+    Note
+    ----
+    This method is best applied to short-ish intervals.
+
+    """
+    
+    n = data.shape[-1]
+    sigma = data.std(1)
+    m_2d = np.abs(data) > stdevs*sigma[:,None]
+    data = np.ma.masked_array(data, m_2d)
+    cs = np.cos(2*np.pi*f0*np.arange(n))
+    sn = np.sin(2*np.pi*f0*np.arange(n))
+    alpha = data.dot(cs) / (0.5 * n)
+    beta = data.dot(sn) / (0.5 * n)
+    h = alpha[:,None] * cs + beta[:,None] * sn
+    return data.data - h.data
