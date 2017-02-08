@@ -34,6 +34,8 @@ def process_trigger(trig_chan, thresh=.75, clean=False):
         Vector(s) of event timing square waves.
     thresh : float (0.75)
         Relative threshold for detecting a rising edge.
+    clean : bool
+        Check rising edge times for spurious edges (e.g. from noisy trigger)
 
     Returns
     -------
@@ -41,8 +43,6 @@ def process_trigger(trig_chan, thresh=.75, clean=False):
         Sequence of event times (indices)
     digital_trigger : ndarray
         Binarized trigger vector
-    clean : bool
-        Check rising edge times for spurious edges (e.g. from noisy trigger)
     """
     trig_chan = np.atleast_2d(trig_chan)
     if trig_chan.dtype.char != '?':
