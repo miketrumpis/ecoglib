@@ -395,6 +395,9 @@ def integrate_roc(roc_pts):
     # only keep pts on the curve where x increases
     x = x[~same_x]
     y = y[~same_x]
+    # append end points for some kind of interpolation
+    x = np.r_[0, x, 1]
+    y = np.r_[0, y, 1]
     cp = simps(y, x=x, even='avg')
     return cp
 
