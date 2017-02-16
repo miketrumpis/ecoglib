@@ -100,7 +100,7 @@ def _stagger_array(x, N):
 
 @input_as_2d(out_arr=0)
 def _moving_projection_preserve(
-        x, N, BW, Fs=1.0, Kmax=None, 
+        x, N, BW, Fs=1.0, f0=0, Kmax=None, baseband=True
         weight_eigen=True, window=np.hanning, 
         dpss=None, save_dpss=False
         ):
@@ -132,6 +132,10 @@ def _moving_projection_preserve(
     window : callable, optional
         The method, if given, returns a window the length of its argument.
         This window will be used to weight the projection values.
+    f0 : float (dummy var)
+        Non-functional
+    baseband : bool (dummy var)
+        Non-functional
 
     Returns
     =======
@@ -230,8 +234,13 @@ try:
             (In other words, BW sets the corner frequency of a lowpass.)
         Fs : float, optional
             Sampling frequency of x.
+        f0 : float, optional
+            Center frequency of the bandpass (defaut is 0 for lowpass)
         Kmax : int, optional
             Maximum number of basis vectors for projection. Kmax < 2*N*BW/Fs - 1
+        baseband : {True | False}
+            Return the complex baseband (lowpass) reconstruction of a
+            bandpass signal (only applies to f0 > 0).
         weight_eigen : bool, optional
             Weight the reconstruction vectors by eigenvalue (default True).
             The lowpass energy concentration of a particular vector is
