@@ -100,7 +100,7 @@ def _stagger_array(x, N):
 
 @input_as_2d(out_arr=0)
 def _moving_projection_preserve(
-        x, N, BW, Fs=1.0, f0=0, Kmax=None, baseband=True
+        x, N, BW, Fs=1.0, f0=0, Kmax=None, baseband=True,
         weight_eigen=True, window=np.hanning, 
         dpss=None, save_dpss=False
         ):
