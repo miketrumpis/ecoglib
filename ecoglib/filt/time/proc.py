@@ -113,7 +113,10 @@ def notch_all(
     if isinstance(lines, (float, int)):
         # repeat lines until nmax
         nf = lines
+        nmax = min( nmax, Fs/2.0 )
         lines = [ nf*i for i in xrange(1, int(nmax//nf) + 1) ]
+    else:
+        lines = filter(lambda x: x < Fs/2, lines)
 
     notch_defs = get_default_args(notch)
     notch_defs['nwid'] = nwid
