@@ -2,14 +2,38 @@ import platform
 import multiprocessing as mp
 import multiprocessing.sharedctypes
 import ctypes
-from contextlib import closing
+from contextlib import closing, contextmanager
 import warnings
 import gc
 from decorator import decorator
 import numpy as np
 
-_NO_PARA_ = False
+class ParaState(object):
 
+    def __init__(self):
+        self.state = True
+
+    def __enable(self):
+        self.state = True
+        
+    def __disable(self):
+        self.state = False
+
+    @contextmanager
+    def context(self, status):
+        prev_status = self.state
+        print 'changing status', status
+        self.state = status
+        try:
+            yield
+        except:
+            raise
+        finally:
+            print 'changing back to', prev_status
+            self.state = prev_status
+
+parallel_controller = ParaState()
+        
 # from the "array" module docstring
 """
 This module defines an object type which can efficiently represent
@@ -85,7 +109,7 @@ def split_at(
         ):
     # short circuit if the platform is Windows-based (look into doing
     # real multiproc later)
-    if n_jobs==0 or platform.system().lower().find('windows') >= 0 or _NO_PARA_:
+    if n_jobs==0 or platform.system().lower().find('windows') >= 0:
         @decorator
         def inner_split_method(method, *args, **kwargs):
             return method(*args, **kwargs)
@@ -105,7 +129,7 @@ def split_at(
     @decorator
     def inner_split_method(method, *args, **kwargs):
         # make available short-cut to not use subprocesses:
-        if kwargs.get('skip_parallel', False):
+        if not parallel_controller.state:
             return method(*args, **kwargs)
         pop_args = sorted( split_arg + shared_args )
         sh_args = list()
