@@ -135,7 +135,9 @@ def traverse_table(f, path='/', load=True, shared_paths=()):
     for n in nlist:
         if isinstance(n, tables.Array):
             if load:
-                if '/'.join([path, n.name]) in shared_paths:
+                if n.dtype.char == 'O':
+                    arr = 'Not loaded: ' + n.name
+                elif '/'.join([path, n.name]) in shared_paths:
                     arr = shared_ndarray(n.shape)
                     arr[:] = n.read()
                 else:
@@ -167,6 +169,8 @@ def traverse_table(f, path='/', load=True, shared_paths=()):
             # walk_nodes() includes the current group:
             # don't try to descend into this node!
             if gname==g:
+                continue
+            if gname=='#refs#':
                 continue
             subbunch = traverse_table(
                 f, path='/'.join([path, gname]), load=load
