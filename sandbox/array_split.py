@@ -11,7 +11,7 @@ import numpy as np
 class ParaState(object):
 
     def __init__(self):
-        self.state = True
+        self.state = not platform.system().lower().find('windows')
 
     def __enable(self):
         self.state = True
@@ -63,11 +63,16 @@ is a single character.  The following type codes are defined:
 dtype_maps_to = dict([ ('?', 'b') ])
 
 def shared_ndarray(shape, typecode='d'):
+    if not parallel_controller.state:
+        return np.empty( shape, dtype=typecode )
     N = reduce(np.multiply, shape)
     shm = mp.Array(typecode, int(N))
     return tonumpyarray(shm, shape=shape, dtype=typecode)
 
 def shared_copy(x):
+    # don't create wasteful copy if not doing parallel
+    if not parallel_controller.state:
+        return x
     typecode = dtype_maps_to.get(x.dtype.char, x.dtype.char)
     y = shared_ndarray(x.shape, typecode=typecode)
     y[:] = x.astype(typecode)
