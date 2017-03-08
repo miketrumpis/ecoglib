@@ -153,7 +153,7 @@ def ep_trigger_avg(
     pos_edge, conds = trigs_and_conds(trig_code)
     epoch_len = int( np.round(np.median(np.diff(pos_edge))) )
 
-    n_cond = conds.max()
+    n_cond = len( np.unique(conds) )
     n_pt = x.shape[1]
 
     if not (post or pre):
@@ -176,7 +176,7 @@ def ep_trigger_avg(
     avg = np.zeros( (x.shape[0], n_cond, epoch_len), x.dtype )
     n_avg = np.zeros( (x.shape[0], n_cond), 'i' )
 
-    for c in xrange(1,n_cond+1):
+    for n, c in enumerate(np.unique(conds)):
         trials = np.where(conds == c)[0]
         if not len(trials):
             continue
@@ -190,9 +190,9 @@ def ep_trigger_avg(
                 pwr, thresh=iqr_thresh, axis=1, low=False
                 )
             epochs = epochs * out_mask[:,:,None]
-            n_avg[:,c-1] = np.sum(out_mask, axis=1)
+            n_avg[:,n] = np.sum(out_mask, axis=1)
         else:
-            n_avg[:,c-1] = len(trials)
+            n_avg[:,n] = len(trials)
 
         if envelope:
             epochs = signal.hilbert(
