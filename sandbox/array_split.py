@@ -11,10 +11,8 @@ import numpy as np
 class ParaState(object):
 
     def __init__(self):
-        self._win_status = platform.system().lower().find('windows') >= 0
-        # default state is True if not using Windows
-        self.state = not self._win_status
-
+        self.state = platform.system().lower().find('windows') < 0
+        
     def __enable(self):
         self.state = True
         
@@ -24,8 +22,8 @@ class ParaState(object):
     @contextmanager
     def context(self, status):
         prev_status = self.state
-        print 'changing status', status and not self._win_status
-        self.state = status and not self._win_status
+        print 'changing status', status
+        self.state = status
         try:
             yield
         except:
