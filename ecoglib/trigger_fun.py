@@ -49,7 +49,21 @@ def process_trigger(trig_chan, thresh=.75, clean=False):
         thresh = thresh * _auto_level(trig_chan)
         trig_chan = trig_chan > thresh
     digital_trigger = np.any( trig_chan, axis=0 ).astype('i')
-    pos_edge = np.where(np.diff(digital_trigger) > 0)[0] + 1
+    pos_edge_raw = np.where(np.diff(digital_trigger) > 0)[0] + 1
+
+    # Mask out any edges with *very* small ISI.
+    # Assume uniformly distributetd ISIs, and that 5-95 percentile
+    # represents 90% of the mass and up to 10% of the mass is evenly
+    # concentrated below p(5). Reject any ISI lower than
+    # p(95) - (p(95) - p(5)) * 10 / 9
+    isi_raw = np.diff(pos_edge_raw)
+    p5, p95 = np.percentile(isi_raw, [5, 95])
+    min_credible_isi = p95 - (p95 - p5) / 0.9
+    pos_edge = clean_dirty_trigger(pos_edge_raw, isi_guess = min_credible_isi)
+    sdiff = np.setdiff1d(pos_edge_raw, pos_edge)
+    if len(sdiff):
+        print 'Warning.. spurious triggers auto-detected.'
+        print 'Rejected ISIs were', isi_raw[pos_edge_raw.searchsorted(sdiff)-1]
     if clean:
         pos_edge = clean_dirty_trigger(pos_edge)
     return pos_edge, digital_trigger
