@@ -133,12 +133,14 @@ def fenced_out(samps, quantiles=(25,75), thresh=3.0, axis=None, low=True):
         
     high_cutoff = q_hi + extended_range/2
     low_cutoff = q_lo - extended_range/2
-    if not low:
+    # don't care about warnings about comparing nans to reals
+    with np.errstate(invalid='ignore'):
         out_mask = samps < high_cutoff[...,None]
-    else:
-        out_mask = (samps < high_cutoff[...,None]) & \
-          (samps > low_cutoff[...,None])
-
+        if low:
+            out_mask &= samps > low_cutoff[...,None]
+    # be sure to reject nans as well
+    out_mask &= ~np.isnan(samps)
+            
     if axis is None:
         out_mask.shape = oshape
     else:
