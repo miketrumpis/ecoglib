@@ -141,6 +141,6 @@ try:
         return scl.rescale(img_fill, 255.0)
  
 except:
-   def inpain_pixels(*args, **kwargs):
+   def inpaint_pixels(*args, **kwargs):
        raise NotImplementedError('Could not import opencv')
 
