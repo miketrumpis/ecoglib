@@ -115,7 +115,7 @@ def tiled_axes(
 
 def calibration_axes(
         ref_ax, y_scale=None, t_scale=None, calib_ax=None, 
-        calib_unit='V', fontsize=11
+        calib_unit='V', time_units='ms', fontsize=11
         ):
 
     """
@@ -158,7 +158,7 @@ def calibration_axes(
     if t_len < 20:
         t_len *= 1e3
 
-    time_units = 'ms'
+    #time_units = 'ms'
     time_quantum = 50
     #print 'ref axis t-len:', t_len
 
@@ -450,8 +450,8 @@ def tile_traces(
             
         else: #elif plot_style=='all':
             ax.plot(tx, chan_t.T, 'b', linewidth=0.1)
-        ax.set_ylim(yl)
-        ax.set_xlim(twin)
+        ## ax.set_ylim(yl)
+        ## ax.set_xlim(twin)
         if twin[0] < 0:
             ax.axvline(x=0, color='k', linestyle='--')
         
@@ -473,7 +473,7 @@ def tile_traces(
     if title:
         fig.subplots_adjust(top=0.95)
     
-    if not missed:
+    if not len(missed):
         return fig
     calibration_axes(plotted[0], calib_ax=missed[-1], calib_unit=calib_unit)
     return fig
