@@ -9,11 +9,12 @@ from progressbar import ProgressBar, Percentage, Bar
 
 def write_frames(
         frames, fname, timer='ms', time=(), title='Array Movie', fps=5, 
-        quicktime=False, axis_toggle='on', figsize=None, **imshow_kw
+        quicktime=False, axis_toggle='on', figsize=None,
+        colorbar=False, cbar_label='',
+        **imshow_kw
         ):
     # most simple frame writer -- no tricks
-    f = pp.figure(figsize=figsize)
-    ax = f.add_subplot(111)
+    f, ax = pp.subplots(figsize=figsize)
     im = ax.imshow(frames[0], **imshow_kw)
     ax.axis('image')
     ax.axis(axis_toggle)
@@ -28,7 +29,11 @@ def write_frames(
             return (frame_im, ttl)
         return (frame_im,)
     func = lambda x: _step_time(x, frames, im)
-    f.tight_layout(pad=0)
+    if colorbar:
+        cb = pp.colorbar(im, ax=ax, use_gridspec=True)
+        cb.set_label(cbar_label)
+    f.tight_layout(pad=0.2)
+
     write_anim(
         fname, f, func, frames.shape[0], fps=fps, title=title,
         quicktime=quicktime
