@@ -595,7 +595,7 @@ class ChannelScroller(DataScroller):
             t, self.ts_arr, self.page_length, stack_traces=True,
             t0=t0, plot_line_props=lprops
             )
-        plot.n_yticks = n_lines
+        plot.n_yticks = int(n_lines)
         #plot.ax.set_yticks(np.arange(n_lines) * plot._spacing)
         ## plot.ax.set_yticks(
         ##     np.linspace(plot.ylim[0], plot.ylim[1], n_lines)
