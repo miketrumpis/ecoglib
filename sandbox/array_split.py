@@ -10,10 +10,13 @@ import numpy as np
 
 class ParaState(object):
 
-    def __init__(self):
-        self.state = platform.system().lower().find('windows') < 0
+    def __init__(self, init_state=True):
+        self.__never_para = platform.system().lower().find('windows') >= 0
+        self.state = init_state and not self.__never_para
         
     def __enable(self):
+        if self.__never_para:
+            raise RuntimeError('Object cannot be set to parallel status')
         self.state = True
         
     def __disable(self):
@@ -22,14 +25,12 @@ class ParaState(object):
     @contextmanager
     def context(self, status):
         prev_status = self.state
-        print 'changing status', status
-        self.state = status
+        self.state = status and not self.__never_para
         try:
             yield
         except:
             raise
         finally:
-            print 'changing back to', prev_status
             self.state = prev_status
 
 parallel_controller = ParaState()
