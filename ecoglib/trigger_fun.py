@@ -129,37 +129,31 @@ def ep_trigger_avg(
 
     Arguments
     ---------
-
     x: data (nchan, npts)
-
-    trig_code: sequence-type (2, stim) or StimulatedExperiment
-      First row is the trigger indices, second row is a condition 
-      ID (integer). Condition ID -1 codes for a flagged trial to 
-      be skipped. If a StimulatedExperiment, then triggers and
-      conditions are available from this object.
-
-    pre, post: ints
-      Number of pre- and post-stim samples in interval. post + pre > 0
-      default: 0 and stim-to-stim interval
-
-    sum_limit: int
-      Do partial sum up to this many terms
-
-    iqr_thresh: float
-      If set, do simple outlier detection on all groups of repeated
-      conditions based on RMS power in the epoch interval. The iqr_thresh
-      multiplies the width of the inter-quartile range to determine the
-      "inlier" range of RMS power.
-
+    trig_code : sequence-type (2, stim) or StimulatedExperiment
+        First row is the trigger indices, second row is a condition 
+        ID (integer). Condition ID -1 codes for a flagged trial to 
+        be skipped. If a StimulatedExperiment, then triggers and
+        conditions are available from this object.
+    pre, post : ints
+        Number of pre- and post-stim samples in interval. post + pre > 0
+        default: 0 and stim-to-stim interval
+    sum_limit : int
+        Do partial sum up to this many terms
+    iqr_thresh : float
+        If set, do simple outlier detection on all groups of repeated
+        conditions based on RMS power in the epoch interval. The iqr_thresh
+        multiplies the width of the inter-quartile range to determine the
+        "inlier" range of RMS power.
 
     Returns
     -------
-
-    avg: (nchan, ncond, epoch_length)
-
-    n_avg: number of triggers found for each condition
-
-    skipped: (nskip, nchan, epoch_length) epochs that were not averaged
+    avg
+        (nchan, ncond, epoch_length)
+    n_avg
+        number of triggers found for each condition
+    skipped
+        (nskip, nchan, epoch_length) epochs that were not averaged
 
     """
     x.shape = (1,) + x.shape if x.ndim == 1 else x.shape
@@ -223,27 +217,25 @@ def ep_trigger_avg(
 
 def extract_epochs(x, trig_code, selected=(), pre=0, post=0):
     """
-    Extract an array of epochs pivoted at the specified triggers.
+    Extract an array of epochs pivoted at the specified triggers. Note
+    that this method follows a garbage-in, garbage-out policy
+    regarding time stamps and epoch intervals. A ValueError will be
+    raised if the requested interval goes out of bounds in the recording.
 
     Parameters
     ----------
-
     x : data (n_chan, n_pt)
-
     trig_code : array (2, n_stim)
-      First row is the stim times, second is the condition labeling
-
-    selected : sequencef
-      Indices into trig_code for a subset of stims. If empty, return *ALL*
-      epochs (*a potentially very large array*)
-
+        First row is the stim times, second is the condition labeling
+    selected : sequence
+        Indices into trig_code for a subset of stims. If empty, return *ALL*
+        epochs (*a potentially very large array*)
     pre, post : ints
-      Number of pre- and post-stim samples in interval. post + pre > 0
-      default: 0 and stim-to-stim interval
-
+        Number of pre- and post-stim samples in interval. post + pre > 0
+        default: 0 and stim-to-stim interval
+      
     Returns
     -------
-
     epochs : array (n_chan, n_epoch, epoch_len)
 
     """
@@ -335,32 +327,3 @@ def psd_trigger_avg(
     spectra.units = units
         
     return spectra
-
-
-import nitime.algorithms as ntalg
-#@array_split.splits
-def mtm_wrap(x, **kwargs):
-    r = ntalg.multi_taper_psd(x, **kwargs)
-    fx, pxx = r[:2]
-    # array splitting is restricted to single output currently
-    return pxx
-
-## XXX: keep this for notes, but it's not very fast
-## def par_mtm_factory(view, x, **kwargs):
-##     fn_str = """
-## def mtm_call(x, **kwargs):
-##     from nitime.algorithms import multi_taper_psd
-##     r = multi_taper_psd(x, **kwargs)
-##     return r
-##     """
-##     view.execute(fn_str, block=True)
-##     view.scatter('x', x)
-##     view.push(dict(kwargs=kwargs))
-##     view.execute('r = mtm_call(x, **kwargs)', block=True)
-##     res = view.gather('r', block=True)
-##     ## blk = view.block
-##     ## view.block = True
-##     ## res = view.apply_sync(mtm_call, x, **kwargs)
-##     ## res = view.map_sync(mtm_call, x, **kwargs)
-##     ## view.block = blk
-##     return res
