@@ -30,7 +30,7 @@ import nitime.algorithms as nt_alg
 import nitime.utils as nt_ut
 import matplotlib.pyplot as pp
 import matplotlib.mlab as mlab
-import sandbox.mtm_spectrogram as mtm_spec
+import ecoglib.estimation.multitaper as mtm_spec
 
 """
 We're going to set up a FM of a sinusoid varying slowly between +/-

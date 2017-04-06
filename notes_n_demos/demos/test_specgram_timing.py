@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as pp
 import scipy.stats.distributions as dists
-import sandbox.mtm_spectrogram as mtm_spec
+import ecoglib.estimation.multitaper as mtm_spec
 
 
 Fs = 2000.

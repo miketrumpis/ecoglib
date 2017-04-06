@@ -43,7 +43,7 @@ import scipy.signal as signal
 import nitime.algorithms as nt_alg
 import nitime.utils as nt_ut
 import matplotlib.pyplot as pp
-import sandbox.mtm_spectrogram as mtm_spec
+import ecoglib.estimation.multitaper as mtm_spec
 """
 We'll set up a test signal with a red spectrum (integrated Gaussian
 noise).
