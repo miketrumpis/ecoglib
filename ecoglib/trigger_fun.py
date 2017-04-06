@@ -25,14 +25,14 @@ def _auto_level(ttl):
             break
     return mn
 
-def process_trigger(trig_chan, thresh=.75, clean=False):
+def process_trigger(trig_chan, thresh=0.5, clean=False):
     """Pull event timing from one or many logical-level channels.
 
     Parameters
     ----------
     trig_chan : ndarray
         Vector(s) of event timing square waves.
-    thresh : float (0.75)
+    thresh : float (0.5)
         Relative threshold for detecting a rising edge.
     clean : bool
         Check rising edge times for spurious edges (e.g. from noisy trigger)
