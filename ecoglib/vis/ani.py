@@ -3,6 +3,7 @@ from scipy.interpolate import interp1d
 import matplotlib.pyplot as pp
 import matplotlib.animation as _animation
 import os
+import subprocess
 import ecoglib.vis.plot_modules as pm
 import time
 from progressbar import ProgressBar, Percentage, Bar
@@ -38,7 +39,38 @@ def write_frames(
         fname, f, func, frames.shape[0], fps=fps, title=title,
         quicktime=quicktime
         )
-        
+
+def h264_encode_files(in_pattern, out, fps, quicktime=False):
+    """Use ffmpeg to encode a list of files matching a pattern
+
+    Parameters
+    ----------
+    in_pattern : str
+        ffmpeg input pattern, e.g. "path/to/frame_%03d.png" for
+        {frame_001.png, frame_002.png, ...}
+    out : str
+        Name of output video
+    fps : int
+        Frames per second of video
+    quicktime : bool {False | True}
+        Use encoding compatible with Quicktime playback (otherwise VNC
+        seems to work)
+
+    """
+
+    if os.path.splitext(out)[1] != '.mp4':
+        out = out + '.mp4'
+    if quicktime:
+        extra_args = ['-pix_fmt', 'yuv420p', '-x264opts', 'qp=1:bframes=1']
+    else:
+        extra_args = ['-pix_fmt', 'yuv422p', '-x264opts', 'qp=0:bframes=1']
+
+    args = ['ffmpeg', '-y', '-r', fps, '-i', '%s'%in_pattern,
+            '-an', '-vcodec', 'libx264']
+    args = args + extra_args + [out]
+
+    r = subprocess.call(args)
+    
 def write_anim(
         fname, fig, func, n_frame,
         title='Array Movie', fps=5, quicktime=False
