@@ -9,9 +9,12 @@ from numpy.lib.stride_tricks import as_strided
 from sandbox.split_methods import multi_taper_psd
 import ecoglib.filt.blocks as blocks
 
+from .jackknife import Jackknife
+
 __all__ = ['mtm_spectrogram_basic',
            'mtm_spectrogram',
            'mtm_complex_demodulate',
+           'bispectrum',
            'normalize_spectrogram']
 
 def _parse_mtm_args(kw_dict):
@@ -367,6 +370,101 @@ def mtm_complex_demodulate(
     x_tf = np.tensordot(xk, dpss_sub, axes=(xk_win_ax,0))
 
     return x_tf, ix, weight
+
+def bispectrum(
+        x, NW, low_bias=True, nfft=None, fmax=0.5,
+        bic=True, se=True, jackknife=True, all_samps=False
+        ):
+    """
+    Estimate the bispectrum of x using complex demodulates.
+
+    Parameters
+    ----------
+    x : ndarray (1D)
+        Compute bispectrum (or bicoherence) on this signal. Due to the
+	memory consumption of this method, only 1D is implemented.
+    NW : float
+        Time-bandwidth product (2NW should be an integer).
+    low_bais : {True | False | p < 1.0}
+        Only use eigenvalues above 0.99 (by default), or the value
+	given.
+    nfft : int
+        Number of FFT grid points
+    bic : bool {True | False}
+        Normalize the bispectrum (to yield the bicoherence).
+    se : bool {True | False}
+        Return the jack-knife standard error (sets jackknife to True).
+    jackknife : bool {True | False}
+        Use jackknife resampling for estimating the bispectrum mean
+        and standard error. The Jackknife is ALWAYS used as the
+        bicoherence ratio estimator.
+    all_samps : bool {True | False}
+        Skip all estimates and return all samples.
+
+    Returns
+    ------
+    B : ndarray (n_freq, n_freq)
+        The bispectrum (or bicoherence).
+    se : ndarray (n_freq, n_freq)
+        The jackknife standard error (if se==True)
+
+    """
+
+    N = x.shape[-1]
+    dpss, eigs = alg.dpss_windows(N, NW, 2*NW)
+    if low_bias:
+        low_bias = 0.99 if float(low_bias)==1.0 else low_bias
+        keepers = eigs > low_bias
+        dpss = dpss[keepers]
+        eigs = eigs[keepers]
+        
+    x_tf, ix, w = mtm_complex_demodulate(
+        x, NW, nfft=nfft, dpss=dpss, eigs=eigs, samp_factor=1, fmax=fmax
+        )
+
+    nf, K = x_tf.shape
+    
+    dpss = dpss * np.sqrt(eigs[:,None])
+    P = np.einsum('im,jm,km->ijk', dpss, dpss, dpss)
+    v = np.sum(P**2)
+
+
+    samps = np.einsum('i...,j...->ij...', x_tf, x_tf)
+    
+    b_tr = np.zeros( (nf, nf), dtype=x_tf.dtype )
+    tr_i, tr_j = np.tril_indices(nf)
+
+    # reflect the row indices to give the upper-left triangle:
+    # i + j < nf for all entries in this triangle
+    tr_i = nf - 1 - tr_i
+    for k in xrange(K):
+        b_tr[ (tr_i, tr_j) ] = np.take(x_tf[:,k], tr_i + tr_j)
+        samps[..., k] *= b_tr.conj()
+    samps *= (N / v)
+
+    if all_samps:
+        return samps
+    
+    if not bic and not se:
+        # shortcut jackknife even if requested -- it's the same mean
+        return samps.mean(-1)
+
+    if se:
+        jackknife = True
+
+    def _BIC_ratio(P, axis=-1):
+        D = np.mean(np.abs(P)**2, axis=axis) ** 0.5
+        return np.abs(P.mean(axis=axis)) / D
+
+    if jackknife:
+        if bic:
+            pv = Jackknife(samps).pseudovals(_BIC_ratio)
+        else:
+            pv = Jackknife(samps).pseudovals(np.mean)
+        return (pv.mean(0), pv.std(0) / K**0.5) if se else pv.mean(0)            
+    # finally, either return the mean BIC w/o SE or the mean bispectrum
+    est = _BIC_ratio(samps) if bic else samps.mean(-1)
+    return est 
 
 def normalize_spectrogram(x, baseline):
     # normalize based on the assumption of stationarity in baseline
