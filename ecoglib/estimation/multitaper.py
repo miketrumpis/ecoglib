@@ -368,35 +368,6 @@ def mtm_complex_demodulate(
 
     return x_tf, ix, weight
 
-
-def _jn(fn, sample, *fnarg, **fnkw):
-    # quick jackknife among rows of sample
-    M = sample.shape[0]
-    xtest = fn(sample[1:], *fnarg, **fnkw)
-    pseudovals = np.zeros( (M,) + xtest.shape, dtype=xtest.dtype )
-    pseudovals[0] = xtest
-    for m in xrange(1,M):
-        pseudovals[m] = fn(
-            np.row_stack( (sample[:m], sample[m+1:]) ), *fnarg, **fnkw
-            )
-    return pseudovals
-
-def jackknife_avg(samples, axis=0):
-
-    jnr = _jn(np.mean, samples, axis=axis)
-
-    M = jnr.shape[0]
-    r1 = np.mean(samples, axis=axis)
-    r2 = np.mean(jnr, axis=0)
-
-    r = M*r1 - (M-1)*r2
-    bias = (M-1) * (r2 - r1)
-
-    err = np.sqrt( (float(M-1)/M) * np.sum( (jnr - r2)**2, axis=0 ) )
-
-    return r, bias, err
-
-
 def normalize_spectrogram(x, baseline):
     # normalize based on the assumption of stationarity in baseline
     nf = x.shape[1]
