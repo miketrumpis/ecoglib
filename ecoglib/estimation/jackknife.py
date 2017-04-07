@@ -120,7 +120,7 @@ class Jackknife(object):
         NOTE! The normalization is probably wrong for delete-d JN
         """
 
-        pv = self.pseudo_vals(
+        pv = self.pseudovals(
             estimator, jn_samples=jn_samples, *e_args, **e_kwargs
             )
         N1 = float(self._array.shape[self._axis])
