@@ -58,7 +58,9 @@ class Jackknife(object):
         r = self.__choose[1]
         return comb(self._array.shape[self._axis], r)
         
-    def sample(self, estimator=None, *e_args, **e_kwargs):
+    def sample(
+            self, estimator=None, e_args=(), **e_kwargs
+            ):
         """
         Make min(N-choose-L, max_samps) jack-knife samples.
         Optionally return jack-knife samples of an estimator. The
@@ -74,16 +76,16 @@ class Jackknife(object):
             else:
                 yield samps
 
-    def all_samples(self, estimator=None, *e_args, **e_kwargs):
+    def all_samples(self, estimator=None, e_args=(), **e_kwargs):
         """Return all samples from the generator"""
-        samps = list(self.sample(estimator=estimator, *e_args, **e_kwargs))
+        samps = list(self.sample(estimator=estimator, e_args=e_args, **e_kwargs))
         return np.array(samps)
 
-    def pseudovals(self, estimator, jn_samples=(), *e_args, **e_kwargs):
+    def pseudovals(self, estimator, jn_samples=(), e_args=(), **e_kwargs):
         """Return the bias-correcting pseudovalues of the estimator"""
         if not len(jn_samples):
             jn_samples = self.all_samples(
-                estimator=estimator, *e_args, **e_kwargs
+                estimator=estimator, e_args=e_args, **e_kwargs
                 )
         e_kwargs['axis'] = self._axis
         theta = estimator(self._array, *e_args, **e_kwargs)
@@ -91,15 +93,15 @@ class Jackknife(object):
         d = N1 - self.__choose[1]
         return N1 / d * theta - (N1 - d) * jn_samples / d
         
-    def estimate(self, estimator, correct_bias=True, *e_args, **e_kwargs):
+    def estimate(self, estimator, correct_bias=True, e_args=(), **e_kwargs):
         if correct_bias:
-            pv = self.pseudovals(estimator, *e_args, **e_kwargs)
+            pv = self.pseudovals(estimator, e_args=e_args, **e_kwargs)
             return np.mean(pv, axis=0)
 
-        jn = self.all_samples(estimator=estimator, *e_args, **e_kwargs)
+        jn = self.all_samples(estimator=estimator, e_args=e_args, **e_kwargs)
         return np.mean(jn, axis=0)        
 
-    def bias(self, estimator, jn_samples=(), *e_args, **e_kwargs):
+    def bias(self, estimator, jn_samples=(), e_args=(), **e_kwargs):
         """
         Compute the jack-knife bias of an estimator.
         """
@@ -107,13 +109,13 @@ class Jackknife(object):
         e_kwargs['axis'] = self._axis
         theta = estimator(self._array, *e_args, **e_kwargs)
         pv = self.pseudovals(
-            estimator, jn_samples=jn_samples, *e_args, **e_kwargs
+            estimator, jn_samples=jn_samples, e_args=e_args, **e_kwargs
             )
         # mean of PV = theta - bias
         # bias = theta - avg{PV}
         return theta - np.mean(pv, axis=0)
 
-    def variance(self, estimator, jn_samples=(), *e_args, **e_kwargs):
+    def variance(self, estimator, jn_samples=(), e_args=(), **e_kwargs):
         """
         Compute the jack-knife bias of an estimator.
 
@@ -121,7 +123,7 @@ class Jackknife(object):
         """
 
         pv = self.pseudovals(
-            estimator, jn_samples=jn_samples, *e_args, **e_kwargs
+            estimator, jn_samples=jn_samples, e_args=e_args, **e_kwargs
             )
         N1 = float(self._array.shape[self._axis])
         return np.var(pv, axis=0) / N1
