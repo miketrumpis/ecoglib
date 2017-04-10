@@ -5,6 +5,9 @@ import numpy as np
 from scipy.special import comb
 from sklearn.model_selection import KFold
 from itertools import combinations, tee
+from contextlib import closing
+import multiprocessing as mp
+from sandbox.array_split import SharedmemManager
 
 def random_combinations(iterable, r, n):
     "Pull n random selections from itertools.combinations(iterable, r)"
@@ -18,6 +21,28 @@ def random_combinations(iterable, r, n):
         pulls.add( tuple(pool[i] for i in indices) )
     return pulls
 
+def _jackknife_sampler(index):
+    """Light array sampler using shared memory.
+
+    The multiprocess Pool is initialized so that these variables are in
+    global memory:
+
+    * shm_array
+    * axis
+    * estimator
+    * e_args
+    * e_kwargs
+    
+    """
+        
+    array = shm_array.get_ndarray()
+    samps = np.take(array, index, axis=axis)
+    if estimator is not None:
+        e_kwargs['axis'] = axis
+        return estimator(samps, *e_args, **e_kwargs)
+    return samps
+
+    
 class Jackknife(object):
     """
     Jackknife generator with leave-L-out resampling.
@@ -35,7 +60,10 @@ class Jackknife(object):
 
     """
 
-    def __init__(self, array, n_out=1, axis=-1, max_samps=-1):
+    def __init__(
+            self, array, n_out=1, axis=-1, max_samps=-1,
+            n_jobs=None, ordered_samples=False
+            ):
 
         self._array = array
         self._axis = axis
@@ -43,6 +71,8 @@ class Jackknife(object):
         self.__choose = (xrange(N), N-n_out)
         self._resampler = None
         self._max_samps = max_samps
+        self._n_jobs = n_jobs
+        self._ordered_samples = ordered_samples
 
     def _init_sampler(self):
         if self._max_samps < 0:
@@ -68,13 +98,23 @@ class Jackknife(object):
         """
 
         self._init_sampler()
-        for comb in self._resampler:
-            samps = np.take(self._array, comb, axis=self._axis)
-            if estimator is not None:
-                e_kwargs['axis'] = self._axis
-                yield estimator(samps, *e_args, **e_kwargs)
+        def _init_pool(pool_args):
+            for kw in pool_args.keys():
+                globals()[kw] = pool_args[kw]
+        pool_args = dict(shm_array=SharedmemManager(self._array, use_lock=True),
+                         axis=self._axis, estimator=estimator,
+                         e_args=e_args, e_kwargs=e_kwargs)
+        with closing(mp.Pool(processes=self._n_jobs,
+                             initializer=_init_pool,
+                             initargs=(pool_args,))) as p:
+            if self._ordered_samples:
+                for samp in p.imap(_jackknife_sampler, self._resampler):
+                    yield samp
             else:
-                yield samps
+                for samp in p.imap_unordered(
+                        _jackknife_sampler, self._resampler
+                        ):
+                    yield samp
 
     def all_samples(self, estimator=None, e_args=(), **e_kwargs):
         """Return all samples from the generator"""

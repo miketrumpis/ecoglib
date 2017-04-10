@@ -67,13 +67,13 @@ def test_sample_consistency():
     d = 4
     r = np.random.randn(N)
 
-    jn = Jackknife(r)
+    jn = Jackknife(r, ordered_samples=True)
     s1 = np.array( jn.all_samples() )
     s2 = np.array( jn.all_samples() )
     assert_true( (s1 == s2).all() )
 
     # check for random subset of N-choose-r jackknifes
-    jn = Jackknife(r, n_out=d, max_samps=5)
+    jn = Jackknife(r, n_out=d, max_samps=5, ordered_samples=True)
     s1 = np.array( jn.all_samples() )
     s2 = np.array( jn.all_samples() )
     print map(np.shape, (s1, s2))
