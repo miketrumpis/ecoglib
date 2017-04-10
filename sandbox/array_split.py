@@ -63,11 +63,19 @@ is a single character.  The following type codes are defined:
 # can only think of booleans
 dtype_maps_to = dict([ ('?', 'b') ])
 
+dtype_ctype = dict( (('F', 'f'), ('D', 'd'), ('G', 'g')) )
+ctype_dtype = dict( ( (v, k) for k, v in dtype_ctype.items() ) )
+
 def shared_ndarray(shape, typecode='d'):
     if not parallel_controller.state:
         return np.empty( shape, dtype=typecode )
     N = reduce(np.multiply, shape)
-    shm = mp.Array(typecode, int(N))
+    if typecode in dtype_ctype:
+        N *= 2
+        ctypecode = dtype_ctype[typecode]
+    else:
+        ctypecode = typecode
+    shm = mp.Array(ctypecode, int(N))
     return SharedmemManager.tonumpyarray(shm, shape=shape, dtype=typecode)
 
 def shared_copy(x):
@@ -78,9 +86,6 @@ def shared_copy(x):
     y = shared_ndarray(x.shape, typecode=typecode)
     y[:] = x.astype(typecode)
     return y
-
-dtype_ctype = dict( (('F', 'f'), ('D', 'd'), ('G', 'g')) )
-ctype_dtype = dict( ( (v, k) for k, v in dtype_ctype.items() ) )
 
 class SharedmemManager(object):
 
