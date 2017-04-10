@@ -68,7 +68,7 @@ def shared_ndarray(shape, typecode='d'):
         return np.empty( shape, dtype=typecode )
     N = reduce(np.multiply, shape)
     shm = mp.Array(typecode, int(N))
-    return tonumpyarray(shm, shape=shape, dtype=typecode)
+    return SharedmemManager.tonumpyarray(shm, shape=shape, dtype=typecode)
 
 def shared_copy(x):
     # don't create wasteful copy if not doing parallel
@@ -101,13 +101,23 @@ class SharedmemManager(object):
     def get_ndarray(self):
         if self.use_lock:
             with self.shm.get_lock():
-                return tonumpyarray(
+                return SharedmemManager.tonumpyarray(
                     self.shm, dtype=self.dtype, shape=self.shape
                     )
         else:
-            return tonumpyarray(
+            return SharedmemManager.tonumpyarray(
                 self.shm, dtype=self.dtype, shape=self.shape
                 )
+
+    @staticmethod
+    def tonumpyarray(mp_arr, dtype=float, shape=None):
+        if shape is None:
+            #global shape_
+            shape = shape_
+
+        info = mp.get_logger().info
+        info('reshaping %s'%repr(shape))
+        return np.frombuffer(mp_arr.get_obj(), dtype=dtype).reshape(shape)
 
 def split_at(
         split_arg=(0,), splice_at=(0,), 
@@ -245,15 +255,6 @@ class shared_readonly(object):
         ## with self.mem_mgr.shm.get_lock():
         shm_ndarray = self.mem_mgr.get_ndarray() 
         return shm_ndarray[idx].copy()
-
-def tonumpyarray(mp_arr, dtype=float, shape=None):
-    if shape is None:
-        #global shape_
-        shape = shape_
-    
-    info = mp.get_logger().info
-    info('reshaping %s'%repr(shape))
-    return np.frombuffer(mp_arr.get_obj(), dtype=dtype).reshape(shape)
 
 def _init_globals(
         split_arg, shm, shm_shape,
