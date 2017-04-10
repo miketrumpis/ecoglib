@@ -7,6 +7,7 @@ import nitime.utils as nt_utils
 
 from numpy.lib.stride_tricks import as_strided
 from sandbox.split_methods import multi_taper_psd
+from sandbox.array_split import shared_ndarray, split_at
 import ecoglib.filt.blocks as blocks
 
 from .jackknife import Jackknife
@@ -428,8 +429,10 @@ def bispectrum(
     P = np.einsum('im,jm,km->ijk', dpss, dpss, dpss)
     v = np.sum(P**2)
 
-
-    samps = np.einsum('i...,j...->ij...', x_tf, x_tf)
+    ## samps = np.einsum('i...,j...->ij...', x_tf, x_tf)
+    x_tf = x_tf.T.copy()
+    samps = shared_ndarray( (K, nf, nf), typecode='D' )
+    np.einsum('...i,...j->...ij', x_tf, x_tf, out=samps)
     
     b_tr = np.zeros( (nf, nf), dtype=x_tf.dtype )
     tr_i, tr_j = np.tril_indices(nf)
@@ -437,34 +440,40 @@ def bispectrum(
     # reflect the row indices to give the upper-left triangle:
     # i + j < nf for all entries in this triangle
     tr_i = nf - 1 - tr_i
-    for k in xrange(K):
-        b_tr[ (tr_i, tr_j) ] = np.take(x_tf[:,k], tr_i + tr_j)
-        samps[..., k] *= b_tr.conj()
+
+    #@split_at(split_arg=(0,1))
+    def _apply_third_product(x, tf, nf, tr_i, tr_j):
+        b_tr = np.zeros( (nf, nf), dtype=x.dtype )
+        for k in xrange(x.shape[0]):
+            b_tr[ (tr_i, tr_j) ] = np.take(tf[k], tr_i + tr_j)
+            x[k] *= b_tr.conj()
+        return x
+
+    samps = _apply_third_product(samps, x_tf, nf, tr_i, tr_j)
     samps *= (N / v)
 
     if all_samps:
         return samps
-    
-    if not bic and not se:
-        # shortcut jackknife even if requested -- it's the same mean
-        return samps.mean(-1)
 
-    if se:
-        jackknife = True
-
-    def _BIC_ratio(P, axis=-1):
+    # bi-coherence estimator
+    def _BIC_ratio(P, axis=0):
         D = np.mean(np.abs(P)**2, axis=axis) ** 0.5
         return np.abs(P.mean(axis=axis)) / D
 
-    if jackknife:
-        if bic:
-            pv = Jackknife(samps).pseudovals(_BIC_ratio)
-        else:
-            pv = Jackknife(samps).pseudovals(np.mean)
-        return (pv.mean(0), pv.std(0) / K**0.5) if se else pv.mean(0)            
-    # finally, either return the mean BIC w/o SE or the mean bispectrum
-    est = _BIC_ratio(samps) if bic else samps.mean(-1)
-    return est 
+    if se:
+        jackknife = True
+    
+    if not jackknife:
+        # not jackknife is synonymous with not se
+        est = _BIC_ratio(samps) if bic else samps.mean(0)
+        return est
+
+    # But jackknife == True does not imply se == True
+    if bic:
+        pv = Jackknife(samps, axis=0).pseudovals(_BIC_ratio)
+    else:
+        pv = Jackknife(samps, axis=0).pseudovals(np.mean)
+    return (pv.mean(0), pv.std(0) / K**0.5) if se else pv.mean(0)            
 
 def normalize_spectrogram(x, baseline):
     # normalize based on the assumption of stationarity in baseline
