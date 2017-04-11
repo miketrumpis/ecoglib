@@ -31,11 +31,19 @@ slepian_projection = Extension(
     extra_compile_args=['-O3']
     )
 
+bispectrum = Extension(
+    'ecoglib.estimation._bispectrum',
+    ['ecoglib/estimation/_bispectrum.pyx'], 
+    include_dirs = dirs, 
+    extra_compile_args=['-O3']
+    )
+
+
 if __name__=='__main__':
     setup(
         name = 'ecoglib',
         version = '1.0',
         packages = ['vis', 'graph', 'data', 'filt'],
-        ext_modules = [ cknn_graph, slepian_projection ],
+        ext_modules = [ cknn_graph, slepian_projection, bispectrum ],
         cmdclass = {'build_ext': build_ext}
     )

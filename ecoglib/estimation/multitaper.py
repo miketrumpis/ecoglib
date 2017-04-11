@@ -374,7 +374,8 @@ def mtm_complex_demodulate(
 
 def bispectrum(
         x, NW, low_bias=True, nfft=None, fmax=0.5,
-        bic=True, se=True, jackknife=True, all_samps=False
+        bic=True, se=True, jackknife=True, all_samps=False,
+        return_symmetric=False
         ):
     """
     Estimate the bispectrum of x using complex demodulates.
@@ -401,6 +402,10 @@ def bispectrum(
         bicoherence ratio estimator.
     all_samps : bool {True | False}
         Skip all estimates and return all samples.
+    return_symmetric : bool {True | False}
+        If True, return the full (f1 + f2 <= 0.5) area of the bispectrum.
+        (This option is implied if the cython-ized bispectrum method
+        cannot be loaded.)
 
     Returns
     ------
@@ -429,31 +434,55 @@ def bispectrum(
     P = np.einsum('im,jm,km->ijk', dpss, dpss, dpss)
     v = np.sum(P**2)
 
-    ## samps = np.einsum('i...,j...->ij...', x_tf, x_tf)
-    x_tf = x_tf.T.copy()
-    samps = shared_ndarray( (K, nf, nf), typecode='D' )
-    np.einsum('...i,...j->...ij', x_tf, x_tf, out=samps)
-    
-    b_tr = np.zeros( (nf, nf), dtype=x_tf.dtype )
-    tr_i, tr_j = np.tril_indices(nf)
+    x_tf = x_tf.T
+    try:
+        from ._bispectrum import calc_bispectrum
+        from scipy.sparse import csr_matrix
+        samps, row, col = calc_bispectrum(x_tf.real, x_tf.imag)
+        samps = samps.view('D')
+        samps *= (N / v)
+        def r(X):
+            if X.ndim > 1:
+                dm = np.empty( (len(X), nf, nf), dtype=X.dtype )
+                for k in xrange(len(X)):
+                    sm = csr_matrix( (X[k], (row, col)), shape=(nf, nf) )
+                    dm[k] = sm.todense()
+                    if return_symmetric:
+                        dm[k].flat[::nf+1] /= 2.0
+                        dm[k] = dm[k] + dm[k].T
+                return dm
+            sm = csr_matrix( (X, (row, col)), shape=(nf, nf) )
+            if return_symmetric:
+                dm = sm.todense()
+                dm.flat[::nf+1] /= 2.0
+                return dm + dm.T
+            return sm.todense()
+    except ImportError:
+        samps = shared_ndarray( (K, nf, nf), typecode='D' )
+        np.einsum('...i,...j->...ij', x_tf, x_tf, out=samps)
 
-    # reflect the row indices to give the upper-left triangle:
-    # i + j < nf for all entries in this triangle
-    tr_i = nf - 1 - tr_i
+        b_tr = np.zeros( (nf, nf), dtype=x_tf.dtype )
+        tr_i, tr_j = np.tril_indices(nf)
 
-    #@split_at(split_arg=(0,1))
-    def _apply_third_product(x, tf, nf, tr_i, tr_j):
-        b_tr = np.zeros( (nf, nf), dtype=x.dtype )
-        for k in xrange(x.shape[0]):
-            b_tr[ (tr_i, tr_j) ] = np.take(tf[k], tr_i + tr_j)
-            x[k] *= b_tr.conj()
-        return x
+        # reflect the row indices to give the upper-left triangle:
+        # i + j < nf for all entries in this triangle
+        tr_i = nf - 1 - tr_i
 
-    samps = _apply_third_product(samps, x_tf, nf, tr_i, tr_j)
-    samps *= (N / v)
+        #@split_at(split_arg=(0,1))
+        def _apply_third_product(x, tf, nf, tr_i, tr_j):
+            b_tr = np.zeros( (nf, nf), dtype=x.dtype )
+            for k in xrange(x.shape[0]):
+                b_tr[ (tr_i, tr_j) ] = np.take(tf[k], tr_i + tr_j)
+                x[k] *= b_tr.conj()
+            return x
+
+        samps = _apply_third_product(samps, x_tf, nf, tr_i, tr_j)
+        samps *= (N / v)
+        def r(X):
+            return X
 
     if all_samps:
-        return samps
+        return r(samps)
 
     # bi-coherence estimator
     def _BIC_ratio(P, axis=0):
@@ -466,14 +495,14 @@ def bispectrum(
     if not jackknife:
         # not jackknife is synonymous with not se
         est = _BIC_ratio(samps) if bic else samps.mean(0)
-        return est
+        return r(est)
 
     # But jackknife == True does not imply se == True
     if bic:
         pv = Jackknife(samps, axis=0).pseudovals(_BIC_ratio)
     else:
         pv = Jackknife(samps, axis=0).pseudovals(np.mean)
-    return (pv.mean(0), pv.std(0) / K**0.5) if se else pv.mean(0)            
+    return (r(pv.mean(0)), r(pv.std(0) / K**0.5)) if se else r(pv.mean(0))
 
 def normalize_spectrogram(x, baseline):
     # normalize based on the assumption of stationarity in baseline
