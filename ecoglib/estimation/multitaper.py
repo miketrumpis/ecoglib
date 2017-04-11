@@ -9,6 +9,7 @@ from numpy.lib.stride_tricks import as_strided
 from sandbox.split_methods import multi_taper_psd
 from sandbox.array_split import shared_ndarray, split_at
 import ecoglib.filt.blocks as blocks
+from ecoglib.numutil import nextpow2
 
 from .jackknife import Jackknife
 
@@ -33,6 +34,15 @@ def _parse_mtm_args(kw_dict):
     # (else BW is None and NW is not None) ... all set
     lb = kw_dict.pop('low_bias', True)
     return NW, NFFT, lb
+
+def _prepare_dpss(N, NW, low_bias=True):
+    dpss, eigs = alg.dpss_windows(N, NW, 2*NW)
+    if low_bias:
+        low_bias = 0.99 if float(low_bias)==1.0 else low_bias
+        keepers = eigs > low_bias
+        dpss = dpss[keepers]
+        eigs = eigs[keepers]
+    return dpss, eigs
 
 def mtm_spectrogram_basic(x, n, pl=0.25, detrend='', **mtm_kwargs):
     """
@@ -156,7 +166,7 @@ def mtm_spectrogram(
 
     # going to compute the family of complex demodulates for each block
     if not nfft:
-        nfft = 2**int(np.ceil(np.log2(n)))
+        nfft = nextpow2(n)
     if freqs is None:
         nfreq = nfft//2 + 1
     else:
@@ -186,14 +196,7 @@ def mtm_spectrogram(
 
     print blk_n.nblock, blk_x.nblock
 
-    dpss, eigs = alg.dpss_windows(n, NW, 2*NW)
-    if lb:
-        lb = 0.99 if float(lb)==1.0 else lb
-        print 'low_bias:', lb
-        keepers = eigs > lb
-        dpss = dpss[keepers]
-        eigs = eigs[keepers]
-
+    dpss, eigs = _prepare_dpss(n, NW, low_bias=lb)
     print 'n_tapers:', len(dpss)
     dpss_sub = dpss[..., int(delta//2)::int(delta)]
     weight = delta * dpss_sub.T.dot( dpss_sub.dot(np.ones(pts_per_block)) )
@@ -314,17 +317,11 @@ def mtm_complex_demodulate(
     N = x.shape[-1]
     
     if dpss is None:
-        dpss, eigs = alg.dpss_windows(N, NW, 2*NW)
-        if low_bias:
-            low_bias = 0.99 if float(low_bias)==1.0 else low_bias
-            keepers = eigs > low_bias
-            dpss = dpss[keepers]
-            eigs = eigs[keepers]
-
+        dpss, eigs = _prepare_dpss(N, NW, low_bias=low_bias)
             
     K = len(eigs)
     if nfft is None:
-        nfft = int(2**np.ceil(np.log2(N)))
+        nfft = nextpow2(N)
     fmax = int(round(fmax * nfft)) + 1
     xk = alg.tapered_spectra(x, dpss, NFFT=nfft)
     if adaptive:
@@ -375,7 +372,7 @@ def mtm_complex_demodulate(
 def bispectrum(
         x, NW, low_bias=True, nfft=None, fmax=0.5,
         bic=True, se=True, jackknife=True, all_samps=False,
-        return_symmetric=False
+        return_symmetric=False, return_sparse=False
         ):
     """
     Estimate the bispectrum of x using complex demodulates.
@@ -387,7 +384,7 @@ def bispectrum(
 	memory consumption of this method, only 1D is implemented.
     NW : float
         Time-bandwidth product (2NW should be an integer).
-    low_bais : {True | False | p < 1.0}
+    low_bias : {True | False | 0 < p < 1}
         Only use eigenvalues above 0.99 (by default), or the value
 	given.
     nfft : int
@@ -406,6 +403,9 @@ def bispectrum(
         If True, return the full (f1 + f2 <= 0.5) area of the bispectrum.
         (This option is implied if the cython-ized bispectrum method
         cannot be loaded.)
+    return_sparse : bool {True | False}
+        If True, return the sparse matrix (matrices). (This option is
+        only applies to the cython-ized bispectrum method.)
 
     Returns
     ------
@@ -417,12 +417,7 @@ def bispectrum(
     """
 
     N = x.shape[-1]
-    dpss, eigs = alg.dpss_windows(N, NW, 2*NW)
-    if low_bias:
-        low_bias = 0.99 if float(low_bias)==1.0 else low_bias
-        keepers = eigs > low_bias
-        dpss = dpss[keepers]
-        eigs = eigs[keepers]
+    dpss, eigs = _prepare_dpss(N, NW, low_bias=low_bias)
         
     x_tf, ix, w = mtm_complex_demodulate(
         x, NW, nfft=nfft, dpss=dpss, eigs=eigs, samp_factor=1, fmax=fmax
@@ -443,15 +438,20 @@ def bispectrum(
         samps *= (N / v)
         def r(X):
             if X.ndim > 1:
+                sm = [csr_matrix( (X_, (row, col)), shape=(nf, nf) )
+                      for X_ in X]
+                if return_sparse:
+                    return sm
                 dm = np.empty( (len(X), nf, nf), dtype=X.dtype )
                 for k in xrange(len(X)):
-                    sm = csr_matrix( (X[k], (row, col)), shape=(nf, nf) )
-                    dm[k] = sm.todense()
+                    dm[k] = sm[k].todense()
                     if return_symmetric:
                         dm[k].flat[::nf+1] /= 2.0
                         dm[k] = dm[k] + dm[k].T
                 return dm
             sm = csr_matrix( (X, (row, col)), shape=(nf, nf) )
+            if return_sparse:
+                return sm
             if return_symmetric:
                 dm = sm.todense()
                 dm.flat[::nf+1] /= 2.0
