@@ -133,13 +133,20 @@ class Jackknife(object):
         d = N1 - self.__choose[1]
         return N1 / d * theta - (N1 - d) * jn_samples / d
         
-    def estimate(self, estimator, correct_bias=True, e_args=(), **e_kwargs):
+    def estimate(
+            self, estimator, correct_bias=True, se=False,
+            e_args=(), **e_kwargs
+            ):
         if correct_bias:
-            pv = self.pseudovals(estimator, e_args=e_args, **e_kwargs)
-            return np.mean(pv, axis=0)
-
-        jn = self.all_samples(estimator=estimator, e_args=e_args, **e_kwargs)
-        return np.mean(jn, axis=0)        
+            vals = self.pseudovals(estimator, e_args=e_args, **e_kwargs)
+        else:
+            vals = self.all_samples(
+                estimator=estimator, e_args=e_args, **e_kwargs
+                )
+        if se:
+            se = np.std(vals, axis=0) / np.sqrt( len(vals) )
+            return np.mean(vals, axis=0), se
+        return np.mean(vals, axis=0)
 
     def bias(self, estimator, jn_samples=(), e_args=(), **e_kwargs):
         """
