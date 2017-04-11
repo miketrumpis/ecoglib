@@ -504,6 +504,100 @@ def bispectrum(
         pv = Jackknife(samps, axis=0).pseudovals(np.mean)
     return (r(pv.mean(0)), r(pv.std(0) / K**0.5)) if se else r(pv.mean(0))
 
+def dual_spectrum(
+        x1, x2, NW, msc=True, dpss=None, eigs=None, jackknife=True, se=False,
+        low_bias=True, nfft='auto', fmax=0.5
+        ):
+    """Estimate the dual frequency spectrum between different signals.
+
+    Parameters
+    ----------
+    x1 : ndarray (..., N)
+        (Vector) timeseries from source 1
+    x2 : ndarray (..., N)
+        (Vector) timeseries from source 2
+    NW : float
+        Time-bandwidth product defining the Slepian tapers
+    msc : {True | False}
+        Compute the magnitude-square coherence (MSC) of the
+        dual spectrum.
+    dpss : None
+        Precomputed Slepian tapers vk(N,W)
+    eigs : None
+        Eigenvalues of precomputed tapers
+    jackknife : bool
+        Use the jackknife to estimate the dual spectrum (or dual MSC)
+    se : bool
+        Also return standard error of the estimator
+        (sets jackknife to True)
+    low_bias : {True | False | 0 < p < 1}
+        Only use eigenvalues above 0.99 (by default), or the value
+    nfft : {None, int, 'auto'}
+        Number of FFT points to use (default is next-power-of-2)
+
+    Returns
+    -------
+    spec : ndarray (..., nfreq, nfreq)
+        Dual spectrum (or MSC)
+    se : ndarray (..., nfreq, nfreq)
+        Standard error (if se==True)
+    
+    """
+
+    N = x1.shape[-1]
+    assert x2.shape[-1] == N, 'need same length sequences'
+    if dpss is None:
+        dpss, eigs = _prepare_dpss(N, NW, low_bias=low_bias)
+    if nfft=='auto':
+        nfft = nextpow2(N)
+    if nfft is None:
+        nfft = N
+    assert nfft%2 == 0, 'Please use even-length fft'
+        
+    
+    x1k = alg.tapered_spectra(x1, dpss, NFFT=nfft)
+    x2k = alg.tapered_spectra(x2, dpss, NFFT=nfft)
+
+    nf = int(round( 2 * fmax * (nfft//2 + 1) ))
+
+    x1k = x1k[..., :nf]
+    x2k = x2k[..., :nf]
+
+    if se:
+        jackknife = True
+
+    if not msc:
+        #       x_{1,k}(f1)            x_{2,k}(f2)
+        #samps = x1k[..., :, :, None] * x2k[..., :, None, :].conj()
+        samps = np.einsum('...ki,...kj->...kij', x1k, x2k.conj())
+        if jackknife:
+            d_spec, err = Jackknife(samps, axis=-3).estimate(np.mean, se=True)
+        else:
+            d_spec = np.mean(samps, axis=-3)
+        return (d_spec, err) if se else d_spec
+
+    samps = np.array( [x1k, x2k] )
+    
+    def _msc_estimator(Y, axis=-3):
+        # Y is packed with y1, y2 = Y
+        y1, y2 = Y
+        #d_spec = y1[..., :, :, None] * y2[..., :, None, :].conj()
+        d_spec = np.einsum('...ki,...kj->...kij', y1, y2.conj())
+        d_spec = np.abs( d_spec.mean(axis=-3) )**2
+        # get marginal spectral densities
+        S1f = np.mean(np.abs(y1)**2, axis=-2)
+        S2f = np.mean(np.abs(y2)**2, axis=-2)
+        denom = np.einsum('...i,...j->...ij', S1f, S2f)
+        
+        return d_spec / denom
+    # seems like a slight abuse of the jackknife machinery
+    if jackknife:
+        msc, err = Jackknife(samps, axis=-2).estimate(_msc_estimator, se=True)
+        np.clip(msc, 0, 1, msc)
+    else:
+        msc = _msc_estimator(samps)
+    return (msc, err) if se else msc
+
 def normalize_spectrogram(x, baseline):
     # normalize based on the assumption of stationarity in baseline
     nf = x.shape[1]
