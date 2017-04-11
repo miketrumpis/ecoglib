@@ -1,3 +1,5 @@
+"""Spectral estimation methods for nonstationary/nonlinear timeseries"""
+
 from __future__ import division
 import numpy as np
 import scipy.signal as signal
