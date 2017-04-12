@@ -9,6 +9,8 @@ from contextlib import closing
 import multiprocessing as mp
 from sandbox.array_split import SharedmemManager
 
+__all__ = ['random_combinations', 'Jackknife']
+
 def random_combinations(iterable, r, n):
     "Pull n random selections from itertools.combinations(iterable, r)"
     if n > comb(len(iterable), r):
