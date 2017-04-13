@@ -262,7 +262,7 @@ try:
 
         Method from "Projection Filters for Data Analysis", D.J. Thomson, 1996
 
-        MT: test_slepian_projection demos various projections
+        MT: moving_projection_test.py demos various projections
         """
 
         M = x.shape[-1]
