@@ -279,6 +279,21 @@ def flat_to_flat(mn, idx, col_major=True):
     return mat_to_flat(mn, i, j, col_major=not col_major)
     
 def channel_combinations(chan_map, scale=1.0):
+    """Compute tables identifying channel-channel pairs.
+
+    Parameters
+    ----------
+    chan_map : ChannelMap
+    scale : float or pair
+        The constant pitch or the (dx, dy) pitch between electrodes
+
+    Returns
+    -------
+    chan_combs : Bunch
+        Lists of channel # and grid location of electrode pairs and
+        distance between each pair.
+    """
+    
     combs = itertools.combinations(np.arange(len(chan_map)), 2)
     chan_combs = Bunch()
     npair = spmisc.comb(len(chan_map),2,exact=1)
@@ -288,13 +303,19 @@ def channel_combinations(chan_map, scale=1.0):
     chan_combs.idx2 = np.empty((npair,2), 'i')
     chan_combs.dist = np.empty(npair)
     ii, jj = chan_map.to_mat()
+    # Distances are measured between grid locations (i1,j1) to (i2,j2)
+    # Define a (s1,s2) scaling to multiply these distances
+    if np.iterable(scale):
+        s_ = np.array( scale[::-1] )
+    else:
+        s_ = np.array( [scale, scale] )
     for n, c in enumerate(combs):
         c0, c1 = c
         chan_combs.p1[n] = c0
         chan_combs.p2[n] = c1
         idx1 = np.array( [ii[c0], jj[c0]] )
         idx2 = np.array( [ii[c1], jj[c1]] )
-        chan_combs.dist[n] = np.linalg.norm(idx1-idx2)*scale
+        chan_combs.dist[n] = np.linalg.norm( (idx1-idx2) * s_)
         chan_combs.idx1[n] = idx1
         chan_combs.idx2[n] = idx2
     return chan_combs
