@@ -11,7 +11,7 @@ if use.lower() == u'qt4agg':
      FigureCanvasQTAgg as FigureCanvas
     from matplotlib.backends.backend_qt4agg import \
      NavigationToolbar2QT as NavigationToolbar
-elif use.lower() == u'qt4agg':
+elif use.lower() == u'qt5agg':
     from matplotlib.backends.backend_qt5agg import \
      FigureCanvasQTAgg as FigureCanvas
     from matplotlib.backends.backend_qt5agg import \
@@ -128,6 +128,8 @@ class _MPLFigureEditor(Editor):
         if hasattr(mpl_fig, 'canvas') and mpl_fig.canvas is not None:
             return mpl_fig.canvas
         mpl_canvas = FigureCanvas(mpl_fig)
+        # for Qt?
+        # mpl_canvas.setParent(parent)
         return mpl_canvas
 
 class MPLFigureEditor(BasicEditorFactory):
