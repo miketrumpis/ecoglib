@@ -40,9 +40,9 @@ def cheby1_bp(ripple, lo=0, hi=0, Fs=2.0, ord=3):
     freqs, btype = _bandpass_params(lo, hi)
     return fdesign.cheby1(ord, ripple, 2*freqs/Fs, btype=btype)
     
-def cheby2_bp(rs, lo=0, hi=0, Fs=2.0, ord=3):
+def cheby2_bp(rstop, lo=0, hi=0, Fs=2.0, ord=3):
     freqs, btype = _bandpass_params(lo, hi)
-    return fdesign.cheby2(ord, rs, 2*freqs/Fs, btype=btype)
+    return fdesign.cheby2(ord, rstop, 2*freqs/Fs, btype=btype)
 
 def notch(fcut, Fs=2.0, nwid=3.0, npo=None, nzo=3):
 
