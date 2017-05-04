@@ -3,11 +3,6 @@ import scipy.ndimage as ndimage
 import ecoglib.filt.time.blocked_filter as bf
 import ecoglib.util as ut
 
-import multiprocessing as mp
-import logging
-logger = mp.log_to_stderr()
-logger.setLevel(logging.CRITICAL)
-
 import sandbox.array_split as array_split
 
 import nitime.algorithms as ntalg

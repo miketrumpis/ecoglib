@@ -1,6 +1,5 @@
 import platform
-import multiprocessing as mp
-import multiprocessing.sharedctypes
+import ecoglib.mproc as mp
 import ctypes
 from contextlib import closing, contextmanager
 import warnings
