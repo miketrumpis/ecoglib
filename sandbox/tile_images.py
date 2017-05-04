@@ -1,6 +1,6 @@
 from __future__ import division
 import numpy as np
-import matplotlib.pyplot as pp
+import matplotlib as mpl
 
 from ecoglib.util import ChannelMap, flat_to_mat, mat_to_flat
 from ecoglib.numutil import ndim_prctile
@@ -78,6 +78,7 @@ def tiled_axes(
             figsize[1] += 1
             subplots_bottom = 1.0/figsize[1]
 
+    import matplotlib.pyplot as pp
     fig, axs = pp.subplots(
         *geo, figsize=figsize, sharex=True, sharey=True, squeeze=False
         )
@@ -219,7 +220,7 @@ def calibration_axes(
     calib_ax.set_xlim(-sub_t_len/2.0, sub_t_len/2.0)
     calib_ax.axis('off')
     try:
-        pp.draw()
+        ref_ax.figure.canvas.draw()
         # offset left by 5 pts
         dx = calib_ax.transData.inverted().get_matrix()[0,0]
         dy = calib_ax.transData.inverted().get_matrix()[1,1]
@@ -264,7 +265,7 @@ def calibration_axes(
     return calib_ax
 
          
-def fill_null(ax_list, cmap=pp.cm.gray):
+def fill_null(ax_list, cmap='gray'):
     for ax in ax_list:
         ax.imshow(
             np.array([ [.85, .75], [.75, .85] ]), cmap=cmap,
@@ -275,7 +276,7 @@ def fill_null(ax_list, cmap=pp.cm.gray):
 def tile_images(
         maps, geo=(), p=(), col_major=True,
         border_axes=False, title='', 
-        fill_empty=False, fill_cmap=pp.cm.gray, 
+        fill_empty=False, fill_cmap='gray', 
         x_labels=(), y_labels=(),
         clabel='none', **imkw
         ):
@@ -287,12 +288,12 @@ def tile_images(
     if imkw.has_key('cmap'):
         cm = imkw['cmap']
         if type(cm) == np.ndarray:
-            imkw['cmap'] = pp.cm.colors.ListedColormap(cm)
+            imkw['cmap'] = mpl.colors.ListedColormap(cm)
 
     if not ( imkw.has_key('clim') or imkw.has_key('vmin') or \
              imkw.has_key('vmax') or imkw.has_key('norm') ):
         vmin = np.nanmin(maps); vmax = np.nanmax(maps)
-        imkw['norm'] = pp.Normalize(vmin, vmax)
+        imkw['norm'] = mpl.colors.Normalize(vmin, vmax)
 
     p = _build_map(p, geo, col_major)        
     geo = p.geometry
@@ -361,7 +362,7 @@ def tile_images(
         edge = 0.2
         fig.subplots_adjust(bottom=edge)
         cbar_ax = fig.add_axes([0.25, 2*edge/4, 0.5, edge/4])
-        cbar = pp.colorbar(
+        cbar = fig.colorbar(
             ax.images[0], cax=cbar_ax, orientation='horizontal'
             )
         cbar_ax.tick_params(labelsize=10)
@@ -573,6 +574,7 @@ def tile_traces_1ax(
     
     # calculate fig size, given geometry and presence of title
     figsize = ( geo[1] * tilesize[1], geo[0] * tilesize[0] + (len(title)>0) )
+    import matplotlib.pyplot as pp
     fig = pp.figure(figsize=figsize)
 
     bottom = left = 0.02
@@ -693,11 +695,3 @@ def tile_traces_1ax(
                 )
     
     return fig
-
-def tile_images_1ax(
-    maps, geo=(), p=(), col_major=True,
-    border_axes=False, title='', 
-    fill_empty=False, fill_cmap=pp.cm.gray, 
-    clabel='none', **imkw
-    ):
-    pass
