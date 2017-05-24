@@ -188,9 +188,7 @@ def ep_trigger_avg(
         trials = np.where(conds == c)[0]
         if not len(trials):
             continue
-        epochs = extract_epochs(
-            x, np.row_stack((pos_edge, conds)), trials, pre, post
-            )
+        epochs = extract_epochs(x, pos_edge, trials, pre, post)
         if iqr_thresh > 0:
             pwr = np.sqrt(np.sum(epochs**2, axis=-1))
             # analyze outlier trials per channel
@@ -215,7 +213,7 @@ def ep_trigger_avg(
         np.sqrt(avg, avg)
     return avg, n_avg
 
-def extract_epochs(x, trig_code, selected=(), pre=0, post=0):
+def extract_epochs(x, pivots, selected=(), pre=0, post=0):
     """
     Extract an array of epochs pivoted at the specified triggers. Note
     that this method follows a garbage-in, garbage-out policy
@@ -225,8 +223,9 @@ def extract_epochs(x, trig_code, selected=(), pre=0, post=0):
     Parameters
     ----------
     x : data (n_chan, n_pt)
-    trig_code : array (2, n_stim)
-        First row is the stim times, second is the condition labeling
+    pivots : array-like or StimulatedExperiment
+        A sequence of literal pivot samples, or an experiment wrapper
+        containing the timestamps. 
     selected : sequence
         Indices into trig_code for a subset of stims. If empty, return *ALL*
         epochs (*a potentially very large array*)
@@ -240,8 +239,9 @@ def extract_epochs(x, trig_code, selected=(), pre=0, post=0):
 
     """
     x = np.atleast_2d(x) if x.ndim == 1 else x
-    pos_edge, conds = trigs_and_conds(trig_code)
-    epoch_len = int( np.median(np.diff(pos_edge)) )
+    if isinstance(pivots, StimulatedExperiment):
+        pivots, _ = trigs_and_conds(pivots)
+    epoch_len = int( np.median(np.diff(pivots)) )
 
     if not (post or pre):
         post = epoch_len
@@ -253,12 +253,12 @@ def extract_epochs(x, trig_code, selected=(), pre=0, post=0):
     if len(selected):
         if hasattr(selected, 'dtype') and selected.dtype.char == '?':
             selected = np.where(selected)[0]
-        pos_edge = np.take(pos_edge, selected)
+        pivots = np.take(pivots, selected)
 
-    epochs = np.empty( (x.shape[0], len(pos_edge), epoch_len), x.dtype )
+    epochs = np.empty( (x.shape[0], len(pivots), epoch_len), x.dtype )
     epochs.fill(np.nan)
 
-    for n, k in enumerate(pos_edge):
+    for n, k in enumerate(pivots):
         idx = (slice(None), slice(k-pre, k+post))
         epochs[:,n,:] = x[idx]
 
