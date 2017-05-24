@@ -2,3 +2,4 @@
 
 from .multitaper import *
 from .jackknife import *
+from .spatial_variance import *
