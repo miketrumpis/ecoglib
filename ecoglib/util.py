@@ -209,10 +209,12 @@ class ChannelMap(list):
             self, arr=None, cbar=True, nan='//',
             fill=np.nan, ax=None, **kwargs
             ):
-        import matplotlib.pyplot as pp
         from matplotlib.colors import BoundaryNorm
+        import matplotlib.cm as cm
+        from matplotlib.patches import Rectangle
         kwargs.setdefault('origin', 'upper')
         if ax is None:
+            import matplotlib.pyplot as pp
             f = pp.figure()
             ax = pp.subplot(111)
         else:
@@ -222,8 +224,8 @@ class ChannelMap(list):
             # image self
             arr = self.embed( np.ones(len(self), 'd'), fill=fill )
             kwargs['clim'] = (0, 1)
-            kwargs['norm'] = BoundaryNorm([0, .5, 1], pp.cm.binary.N)
-            kwargs['cmap'] = pp.cm.binary
+            kwargs['norm'] = BoundaryNorm([0, .5, 1], cm.binary.N)
+            kwargs['cmap'] = cm.binary
             
         if arr.shape != self.geometry:
             arr = self.embed(arr, fill=fill)
@@ -238,11 +240,11 @@ class ChannelMap(list):
             return (x[0] * dy + y0, x[1] * dx + x0)
         if len(nan):
             for x in nans:
-                r = pp.Rectangle( s(x)[::-1], dx, dy, hatch=nan, fill=False )
+                r = Rectangle( s(x)[::-1], dx, dy, hatch=nan, fill=False )
                 ax.add_patch(r)
         #ax.set_ylim(ext[2:][::-1])
         if cbar:
-            cb = pp.colorbar(im, ax=ax, use_gridspec=True)
+            cb = f.colorbar(im, ax=ax, use_gridspec=True)
             cb.solids.set_edgecolor('face')
             return f, cb
         return f
