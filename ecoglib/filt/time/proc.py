@@ -198,7 +198,7 @@ def downsample(x, fs, appx_fs=None, r=None, axis=-1):
     sl = [ slice(None) ] * len(x.shape)
     sl[axis] = slice(0, x.shape[axis], r)
     
-    x_ds = x[ sl ].copy()
+    x_ds = x_lp[ sl ].copy()
     return x_ds, new_fs
         
 def ma_highpass(x, fc):
