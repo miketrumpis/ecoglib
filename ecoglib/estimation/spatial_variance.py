@@ -30,12 +30,19 @@ def semivariogram(F, combs, robust=True, trimmed=True):
             sv[n] = 0.5 * np.mean( (x_s1 - x_s2)**2 )
     return x, sv
 
-def ergodic_semivariogram(data, normed=True):
+def ergodic_semivariogram(data, normed=True, mask_outliers=False):
     #data = data - data.mean(1)[:,None]
     data = data - data.mean(0)
+    if mask_outliers:
+        pwr = np.apply_along_axis(np.linalg.norm, 0, data)
+        m = fenced_out(pwr)
+        data = data[:, m]
     cxx = np.einsum('ik,jk->ij', data, data)
     cxx /= data.shape[1]
     var = cxx.diagonal()
+    if normed:
+        cxx /= np.outer(var, var) ** 0.5
+        var[:] = 1.0
     return 0.5 * (var[:,None] + var) - cxx
     
     ## # zero mean for temporal expectation
