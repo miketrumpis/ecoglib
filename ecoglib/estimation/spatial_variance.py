@@ -42,7 +42,7 @@ def ergodic_semivariogram(data, normed=True, mask_outliers=False):
     var = cxx.diagonal()
     if normed:
         cxx /= np.outer(var, var) ** 0.5
-        var[:] = 1.0
+        var = np.ones_like(var)
     return 0.5 * (var[:,None] + var) - cxx
     
     ## # zero mean for temporal expectation
