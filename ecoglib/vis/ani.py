@@ -1,12 +1,14 @@
 import numpy as np
 from scipy.interpolate import interp1d
-import matplotlib.pyplot as pp
+from matplotlib.figure import Figure
+from matplotlib.gridspec import GridSpec
 import matplotlib.animation as _animation
 import os
 import subprocess
 import ecoglib.vis.plot_modules as pm
 import time
 from progressbar import ProgressBar, Percentage, Bar
+import warnings
 
 def write_frames(
         frames, fname, timer='ms', time=(), title='Array Movie', fps=5, 
@@ -15,7 +17,8 @@ def write_frames(
         **imshow_kw
         ):
     # most simple frame writer -- no tricks
-    f, ax = pp.subplots(figsize=figsize)
+    f = Figure(figsize=figsize)
+    ax = f.add_subplot(111)
     im = ax.imshow(frames[0], **imshow_kw)
     ax.axis('image')
     ax.axis(axis_toggle)
@@ -31,9 +34,11 @@ def write_frames(
         return (frame_im,)
     func = lambda x: _step_time(x, frames, im)
     if colorbar:
-        cb = pp.colorbar(im, ax=ax, use_gridspec=True)
+        cb = f.colorbar(im, ax=ax, use_gridspec=True)
         cb.set_label(cbar_label)
-    f.tight_layout(pad=0.2)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        f.tight_layout(pad=0.2)
 
     write_anim(
         fname, f, func, frames.shape[0], fps=fps, title=title,
@@ -100,7 +105,6 @@ def write_anim(
             ).start()
         for n in xrange(n_frame):
             func(n)
-            ## pp.draw()
             writer.grab_frame()
             pbar.update(n)
         pbar.finish()
@@ -112,22 +116,32 @@ def dynamic_frames_and_series(
         stack_traces=True, interp=1,
         imshow_kw={}, line_props={},
         title='Array Movie', vertical=True,
-        image_sz=0.5, figsize=()
+        image_sz=0.5, figsize=(), pyplot=True
         ):
     # returns a function that can be used to step through
     # figure frames
+    if pyplot:
+        import matplotlib.pyplot as pp
+        fig_fn = pp.figure
+    else:
+        fig_fn = Figure
+        
     image_sz = int( 100 * image_sz )
     trace_sz = 100 - image_sz
     if vertical:
         figsize = figsize or (5, 10)
-        fig = pp.figure(figsize=figsize)
-        frame_ax = pp.subplot2grid( (100, 1), (0, 0), rowspan=image_sz )
-        trace_ax = pp.subplot2grid( (100, 1), (image_sz, 0), rowspan=trace_sz )
+        fig = fig_fn(figsize=figsize)        
+        s = GridSpec((100, 1)).new_subplotspec((0, 0), rowspan=image_sz)
+        frame_ax = fig.add_subplot(s)
+        s = GridSpec((100, 1)).new_subplotspec((image_sz, 0), rowspan=trace_sz)
+        trace_ax = fig.add_subplot(s)
     else:
         figsize = figsize or (8, 8)
-        fig = pp.figure(figsize=figsize)
-        frame_ax = pp.subplot2grid( (1, 100), (0, 0), colspan=image_sz )
-        trace_ax = pp.subplot2grid( (1, 100), (0, image_sz), colspan=trace_sz )
+        fig = fig_fn(figsize=figsize)
+        s = GridSpec((1, 100)).new_subplotspec((0, 0), colspan=image_sz)
+        frame_ax = fig.add_subplot(s)
+        s = GridSpec((1, 100)).new_subplotspec((0, image_sz), colspan=trace_sz)
+        trace_ax = fig.add_subplot(s)
     
     if tx is None:
         tx = np.arange(len(series))
