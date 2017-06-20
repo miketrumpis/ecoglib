@@ -1,5 +1,5 @@
 """Iterators and tools for jackknife estimators"""
-
+import sys
 import random
 import numpy as np
 from scipy.special import comb
@@ -22,6 +22,10 @@ def random_combinations(iterable, r, n):
         indices = sorted(random.sample(xrange(L), r))
         pulls.add( tuple(pool[i] for i in indices) )
     return pulls
+
+def _init_pool(pool_args):
+    for kw in pool_args.keys():
+        globals()[kw] = pool_args[kw]
 
 def _jackknife_sampler(index):
     """Light array sampler using shared memory.
@@ -100,9 +104,15 @@ class Jackknife(object):
         """
 
         self._init_sampler()
-        def _init_pool(pool_args):
-            for kw in pool_args.keys():
-                globals()[kw] = pool_args[kw]
+        if sys.platform == 'win32':
+            for comb in self._resampler:
+                samps = np.take(self._array, comb, axis=self._axis)
+                if estimator is not None:
+                    e_kwargs['axis'] = self._axis
+                    yield estimator(samps, *e_args, **e_kwargs)
+                else:
+                    yield samps
+            return
         pool_args = dict(shm_array=SharedmemManager(self._array, use_lock=True),
                          axis=self._axis, estimator=estimator,
                          e_args=e_args, e_kwargs=e_kwargs)
