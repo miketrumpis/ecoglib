@@ -201,7 +201,7 @@ def downsample(x, fs, appx_fs=None, r=None, axis=-1):
     x_ds = x_lp[ sl ].copy()
     return x_ds, new_fs
         
-def ma_highpass(x, fc):
+def ma_highpass(x, fc, progress=False, fir_filt=False):
     """
     Implement a stable FIR highpass filter using a moving average.
     """
@@ -214,6 +214,8 @@ def ma_highpass(x, fc):
     h.fill( -1.0 / n )
     h[n//2] += 1
     return convolve1d(x, h)
+    if fir_filt:
+        return h
 
 @input_as_2d()
 def common_average_regression(data, mu=(), inplace=True):
