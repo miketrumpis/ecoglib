@@ -12,6 +12,21 @@ from sandbox.array_split import shared_ndarray
 
 _h5_seq_types = (str, list, int, float, complex, bool)
 
+class HDF5Bunch(Bunch):
+    
+    def __init__(self, fh, *args, **kwargs):
+        # first argument is required: a file handle
+        self.__file = fh
+        super(HDF5Bunch, self).__init__(*args, **kwargs)
+
+    def __del__(self):
+        print 'attempting close'
+        if self.__file.isopen:
+            print 'closing'
+            self.__file.close()
+        else:
+            print 'too late'
+
 def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
     """
     Save a Bunch type to an HDF5 group in a new or existing table.
@@ -122,11 +137,20 @@ def traverse_table(f, path='/', load=True, shared_paths=()):
     # Walk nodes and stuff arrays into the bunch.
     # If we encouter a group, then loop back into this method
     if not isinstance(f, tables.file.File):
-        with closing(tables.open_file(f)) as f:
+        if load:
+            with closing(tables.open_file(f)) as f:
+                return traverse_table(
+                    f, path=path, load=load, shared_paths=shared_paths
+                    )
+        else:
+            f = tables.open_file(f)
             return traverse_table(
                 f, path=path, load=load, shared_paths=shared_paths
                 )
-    gbunch = Bunch()
+    if load:
+        gbunch = Bunch()
+    else:
+        gbunch = HDF5Bunch(f)
     (p, g) = os.path.split(path)
     if g=='':
         g = p
