@@ -110,6 +110,9 @@ def fenced_out(samps, quantiles=(25,75), thresh=3.0, axis=None, low=True):
     is default). If the sample has an inter-percentile range of zero, 
     then the sample median is substituted.
     """
+
+    samps = np.asanyarray(samps)
+    
     if isinstance(samps, np.ma.MaskedArray):
         samps = samps.filled(np.nan)
 
