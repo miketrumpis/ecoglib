@@ -68,6 +68,8 @@ def mtm_spectrogram_basic(x, n, pl=0.25, detrend='', **mtm_kwargs):
     
     """
 
+    if x.ndim < 3:
+        x = x.reshape( (1,) + x.shape )
     mtm_kwargs.setdefault('adaptive', True)
     mtm_kwargs.setdefault('jackknife', False)
     xb = blocks.BlockedSignal(x, n, overlap=pl, partial_block=False)
@@ -87,7 +89,7 @@ def mtm_spectrogram_basic(x, n, pl=0.25, detrend='', **mtm_kwargs):
     # align the bins at the middle of the strips
     tx += 0.5 * n / Fs
 
-    return tx, fx, psds.transpose(0, 2, 1)
+    return tx, fx, psds.transpose(0, 2, 1).squeeze()
 
 def mtm_spectrogram(
         x, n, pl=0.25, detrend='', Fs=1.0, adaptive=True, samp_factor=1,
