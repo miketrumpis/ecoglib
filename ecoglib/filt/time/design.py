@@ -9,7 +9,9 @@ from scipy import poly
 __all__ = [ 'butter_bp', 
             'cheby1_bp', 
             'cheby2_bp', 
-            'notch', 
+            'notch',
+            'ellip_bp',
+            'savgol',
             'plot_filt',
             'continuous_amplitude_linphase' ]
 
@@ -43,6 +45,73 @@ def cheby1_bp(ripple, lo=0, hi=0, Fs=2.0, ord=3):
 def cheby2_bp(rstop, lo=0, hi=0, Fs=2.0, ord=3):
     freqs, btype = _bandpass_params(lo, hi)
     return fdesign.cheby2(ord, rstop, 2*freqs/Fs, btype=btype)
+
+def ellip_bp(atten, ripple, lo=0, hi=0, hp_width=0, lp_width=0, Fs=2.0):
+    if hp_width == 0 and lo > 0:
+        hp_width = 0.1 * (hi - lo)
+        if lo - hp_width <= 0:
+            # set hp_width to halfway between 0 and lo
+            hp_width = 0.5 * lo
+            print 'bad HP stopband, adjusting to {0:.1f}'.format(hp_width)
+    if lp_width == 0 and hi > 0:
+        lp_width = 0.1 * (hi - lo)
+        if hi + lp_width >= Fs/2:
+            # make lp_width to halfway between hi and Nyquist
+            lp_width = 0.5 * (Fs/2 - hi)
+            print 'bad LP stopband, adjusting to {0:.1f}'.format(lp_width)
+    if lo > 0 and hi > 0:
+        # bandpass design
+        wp = np.array([lo, hi]) * 2 / Fs
+        ws = np.array([lo - hp_width, hi + lp_width]) * 2 / Fs
+        btype = 'bandpass'
+    elif lo > 0:
+        # highpass design
+        wp = 2 * lo / Fs
+        ws = 2 * (lo-hp_width) / Fs
+        btype = 'highpass'
+    elif hi > 0:
+        # lowpass design
+        wp = 2 * hi / Fs
+        ws = 2 * (hi + lp_width) / Fs
+        btype = 'lowpass'
+
+    order, wn = signal.ellipord(wp, ws, ripple, atten)
+    return signal.ellip(order, ripple, atten, wn, btype=btype)
+
+def savgol(T, ord=3, Fs=1.0, smoothing=True):
+    """Return a Savitzky-Golay FIR filter for smoothing or residuals.
+
+    Parameters
+    ----------
+    T : float
+        Window length (in seconds if sampling rate is given).
+    ord : int
+        Order of local polynomial.
+    Fs : float
+        Sampling rate
+    smoothing : bool
+        Filter coefficients yield local polynomial fits by default.
+        Alternatively, the local polynomial can be subtracted from
+        the signal if smoothing==False
+
+    Returns
+    -------
+    b : array
+        FIR filter
+    a : constant (1)
+        denominator of filter polynomial
+    
+    """
+
+    N = int(T * Fs)
+    N += 1 - N % 2
+    b = signal.savgol_coeffs(N, ord)
+    if not smoothing:
+        b *= -1
+        # midpoint add one?
+        b[ N//2 ] += 1
+        #b[0] += 1
+    return b, 1
 
 def notch(fcut, Fs=2.0, nwid=3.0, npo=None, nzo=3):
 
