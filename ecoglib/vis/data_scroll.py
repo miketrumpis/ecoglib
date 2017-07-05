@@ -522,7 +522,7 @@ class ChannelScroller(DataScroller):
     ts_plot = Instance(pm.PagedTimeSeriesPlot)
     _zero = Int(0)
     page = Range(low='_zero', high='_mx_page')
-    page_length = Range(low=100, high=500000)
+    page_length = Range(low=10, high=500000)
     _mx_page = Int
     page_up = Button()
     page_dn = Button()

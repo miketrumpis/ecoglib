@@ -536,7 +536,7 @@ class PagedFunctionPlot(StaticFunctionPlot):
             self.t, start, 3*self.page_length, fill='extend'
             )
         if self.x.ndim > 1 and self.stack_traces:
-            if not self.stack_spacing:
+            if self.stack_spacing < 0:
                 window = data_page[self.page_length:2*self.page_length]
                 spacing = np.median( np.ptp(window, axis=0) )
             else:
