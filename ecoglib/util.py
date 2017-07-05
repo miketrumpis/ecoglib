@@ -10,8 +10,8 @@ import scipy.misc as spmisc
 
 # ye olde Bunch object
 class Bunch(dict):
-    def __init__(self,**kw):
-        dict.__init__(self,kw)
+    def __init__(self, *args, **kw):
+        dict.__init__(self, *args, **kw)
         self.__dict__ = self
 
     def __repr__(self):
