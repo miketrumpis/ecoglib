@@ -131,16 +131,16 @@ def dynamic_frames_and_series(
     if vertical:
         figsize = figsize or (5, 10)
         fig = fig_fn(figsize=figsize)        
-        s = GridSpec((100, 1)).new_subplotspec((0, 0), rowspan=image_sz)
+        s = GridSpec(100, 1).new_subplotspec((0, 0), rowspan=image_sz)
         frame_ax = fig.add_subplot(s)
-        s = GridSpec((100, 1)).new_subplotspec((image_sz, 0), rowspan=trace_sz)
+        s = GridSpec(100, 1).new_subplotspec((image_sz, 0), rowspan=trace_sz)
         trace_ax = fig.add_subplot(s)
     else:
         figsize = figsize or (8, 8)
         fig = fig_fn(figsize=figsize)
-        s = GridSpec((1, 100)).new_subplotspec((0, 0), colspan=image_sz)
+        s = GridSpec(1, 100).new_subplotspec((0, 0), colspan=image_sz)
         frame_ax = fig.add_subplot(s)
-        s = GridSpec((1, 100)).new_subplotspec((0, image_sz), colspan=trace_sz)
+        s = GridSpec(1, 100).new_subplotspec((0, image_sz), colspan=trace_sz)
         trace_ax = fig.add_subplot(s)
     
     if tx is None:
@@ -200,7 +200,7 @@ def dynamic_frames_and_series(
         
             
 def animate_frames_and_series(
-        frames, series, **kwargs
+        frames, series, blit=False, **kwargs
         ):
 
     fps = kwargs.pop('fps', 5)
@@ -208,6 +208,6 @@ def animate_frames_and_series(
     # blit don't seem to work
     ani = _animation.FuncAnimation(
         fig, func, frames=frames.shape[0],
-        interval=1000.0/fps, blit=False
+        interval=1000.0/fps, blit=blit
         )
     return ani

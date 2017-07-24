@@ -509,10 +509,9 @@ class PagedFunctionPlot(StaticFunctionPlot):
 
     page = Int(0)
     page_length = Int
-    stack_spacing = Float(0)
+    stack_spacing = Float(-1)
     
-    def __init__(
-            self, t, x, page_length, stack_traces=True, **traits):
+    def __init__(self, t, x, page_length, stack_traces=True, **traits):
         self.lims = (x.min(), x.max())
         self._zooming = False
         self.page_length = page_length
