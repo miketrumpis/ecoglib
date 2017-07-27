@@ -160,9 +160,13 @@ def traverse_table(f, path='/', load=True, scan=False, shared_paths=()):
                     )
         else:
             f = tables.open_file(f)
-            return traverse_table(
-                f, path=path, load=load, shared_paths=shared_paths
-                )
+            try:
+                return traverse_table(
+                    f, path=path, load=load, shared_paths=shared_paths
+                    )
+            except:
+                f.close()
+                raise
     if load or scan:
         gbunch = Bunch()
     else:
