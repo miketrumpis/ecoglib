@@ -1,4 +1,4 @@
-from distutils.core import setup, Extension
+from setuptools import setup, Extension, find_packages
 from numpy.distutils.command import build_src
 import Cython
 import Cython.Compiler.Main
@@ -42,8 +42,10 @@ bispectrum = Extension(
 if __name__=='__main__':
     setup(
         name = 'ecoglib',
-        version = '1.0',
-        packages = ['vis', 'graph', 'data', 'filt'],
+        version = '0.1',
+        packages = ['ecoglib.vis', 'ecoglib.graph',
+                    'ecoglib.data', 'ecoglib.filt',
+                    'ecoglib.estimation', 'sandbox'],
         ext_modules = [ cknn_graph, slepian_projection, bispectrum ],
         cmdclass = {'build_ext': build_ext}
     )
