@@ -9,7 +9,7 @@ except ImportError:
     from sandbox.expo import StimulatedExperiment
 import sandbox.array_split as array_split
 
-def _auto_level(ttl):
+def _auto_level(ttl, verbose=False):
     """Iteratively refine an estimate of the high-level cluster
     of points in a TTL signal.
     """
@@ -17,8 +17,15 @@ def _auto_level(ttl):
     n = ttl.size
     mn = ttl.mean()
     # refine until the current subset is < 1% of the signal
-    while float(ttl.size) / n > 1e-2:
+    #while float(ttl.size) / n > 1e-3:
+    # refine until the current subset is less than 1000 pts (good heuristic??)
+    while float(ttl.size) > 1000:
         ttl = ttl[ ttl > mn ]
+        if verbose:
+            mn = ttl.mean()
+            sz = len(ttl)
+            pct = 100 * float(sz) / n
+            print 'new level: {0:.2f}; subset size: {1} ({2:.1f} %)'.format(mn, sz, pct)
         if len(ttl):
             mn = ttl.mean()
         else:
