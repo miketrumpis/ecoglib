@@ -53,25 +53,33 @@ def map_intersection(maps):
     return bin_map.astype('?')
     
 class ChannelMap(list):
-    def __init__(self, chan_map, geo, col_major=True):
+    def __init__(self, chan_map, geo, col_major=True, pitch=1.0):
         list.__init__(self)
         self[:] = chan_map
         self.col_major = col_major
         self.geometry = geo
+        self.pitch = pitch
+        self.__combs = None
 
     @staticmethod
-    def from_mask(mask, col_major=True):
+    def from_mask(mask, col_major=True, pitch=1.0):
         # create a ChannelMap from a binary grid
         i, j = mask.nonzero()
         geo = mask.shape
         map = mat_to_flat(geo, i, j, col_major=col_major)
-        return ChannelMap(map, geo, col_major=col_major)
+        return ChannelMap(map, geo, col_major=col_major, pitch=pitch)
+
+    @property
+    def site_combinations(self):
+        if self.__combs is None:
+            self.__combs = channel_combinations(self, scale=self.pitch)
+        return self.__combs
     
     def as_row_major(self):
         if self.col_major:
             return ChannelMap(
                 flat_to_flat(self.geometry, self[:]),
-                self.geometry, col_major=False
+                self.geometry, col_major=False, pitch=self.pitch
                 )
         return self
 
@@ -79,7 +87,7 @@ class ChannelMap(list):
         if not self.col_major:
             return ChannelMap(
                 flat_to_flat(self.geometry, self[:], col_major=False),
-                self.geometry, col_major=True
+                self.geometry, col_major=True, pitch=self.pitch
                 )
         return self
 
@@ -125,14 +133,14 @@ class ChannelMap(list):
             return mask
         
         return ChannelMap(
-            [self[i] for i in sub],
-            self.geometry, col_major=self.col_major
+            [self[i] for i in sub], self.geometry,
+            col_major=self.col_major, pitch=self.pitch
             )
 
     def __getslice__(self, i, j):
         return ChannelMap(
             super(ChannelMap, self).__getslice__(i,j),
-            self.geometry, col_major=self.col_major
+            self.geometry, col_major=self.col_major, pitch=self.pitch
             )
 
     def embed(self, data, axis=0, fill=np.nan):
