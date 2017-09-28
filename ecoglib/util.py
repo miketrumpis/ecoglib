@@ -427,22 +427,28 @@ def input_as_2d(in_arr=0, out_arr=-1):
 
     Parameters
     ----------
-    in_arr : int
-        position of argument (input) to be reshaped
+    in_arr : int (sequence)
+        position of argument(s) (input) to be reshaped
     out_arr : int
         Non-negative position of output to be reshaped. 
         If None, then no output is reshaped. If the method's
         return type is not a tuple, this argument has no effect.
 
     """
+
+    if not np.iterable(in_arr):
+        in_arr = (in_arr,)
     
     @decorator
     def _wrap(fn, *args, **kwargs):
         args = list(args)
-        x = args[in_arr]
-        shp = x.shape
-        x = x.reshape(-1, shp[-1])
-        args[in_arr] = x
+        shapes = list()
+        for p in in_arr:
+            x = args[p]
+            shp = x.shape
+            x = x.reshape(-1, shp[-1])
+            args[p] = x
+            shapes.append(shp)
         r = fn(*args, **kwargs)
         if out_arr is None:
             return r
@@ -450,6 +456,9 @@ def input_as_2d(in_arr=0, out_arr=-1):
             x = r[out_arr]
         else:
             x = r
+        # now relying on the 1st encountered shape to
+        # represent the output shape
+        shp = shapes[0]
         n_out = len(x.shape)
         # check to see if the function ate the last dimension
         if n_out < 2:
