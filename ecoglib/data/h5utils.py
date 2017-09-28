@@ -20,10 +20,15 @@ class HDF5Bunch(Bunch):
         self.__file = fh
 
     def close(self):
+        # Need to recurse into sub-bunches (?)
+        # The file handle should be shared with sub-bunches
+        sb = filter( lambda x: isinstance(x, HDF5Bunch), self.values() )
+        for b in sb:
+            b.close()
         if self.__file.isopen:
             self.__file.close()
-        else:
-            print 'already closed?', self.__file
+        ## else:
+        ##     print 'already closed?', self.__file
         
     def __del__(self):
         self.close()
@@ -154,12 +159,12 @@ def traverse_table(f, path='/', load=True, scan=False, shared_paths=()):
     # If we encouter a group, then loop back into this method
     if not isinstance(f, tables.file.File):
         if load or scan:
-            with closing(tables.open_file(f)) as f:
+            with closing(tables.open_file(f, mode='r')) as f:
                 return traverse_table(
                     f, path=path, load=load, shared_paths=shared_paths
                     )
         else:
-            f = tables.open_file(f)
+            f = tables.open_file(f, mode='r')
             try:
                 return traverse_table(
                     f, path=path, load=load, shared_paths=shared_paths
