@@ -38,6 +38,12 @@ bispectrum = Extension(
     extra_compile_args=['-O3']
     )
 
+semivariance = Extension(
+    'ecoglib.estimation._semivariance',
+    ['ecoglib/estimation/_semivariance.pyx'], 
+    include_dirs = dirs, 
+    extra_compile_args=['-O3']
+    )
 
 if __name__=='__main__':
     setup(
@@ -46,6 +52,9 @@ if __name__=='__main__':
         packages = ['ecoglib.vis', 'ecoglib.graph',
                     'ecoglib.data', 'ecoglib.filt',
                     'ecoglib.estimation', 'sandbox'],
-        ext_modules = [ cknn_graph, slepian_projection, bispectrum ],
+        ext_modules = [ cknn_graph,
+                        slepian_projection,
+                        bispectrum,
+                        semivariance ],
         cmdclass = {'build_ext': build_ext}
     )
