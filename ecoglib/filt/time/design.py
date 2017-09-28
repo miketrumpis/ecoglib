@@ -130,13 +130,13 @@ def notch(fcut, Fs=2.0, nwid=3.0, npo=None, nzo=3):
 
 def plot_filt(
         b, a, Fs=2.0, n=2048, log=True, logx=False, db=False, 
-        filtfilt=False, phase=False, ax=None, **plot_kws
+        filtfilt=False, phase=False, ax=None, minx=1e-5, **plot_kws
         ):
     import matplotlib.pyplot as pp
 
     if logx:
         hi = np.log10( Fs/2. )
-        lo = hi - 4
+        lo = np.log10(minx)
         w = np.logspace(lo, hi, n)
     else:
         w = np.linspace(0, Fs/2.0, n) 
