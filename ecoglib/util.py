@@ -104,6 +104,19 @@ class ChannelMap(list):
         return flat_to_mat(self.geometry, self[c], col_major=self.col_major)
 
     def subset(self, sub, as_mask=False):
+        """
+        Behavior depends on the type of "sub":
+
+        Most commonly, sub is a sequence (list, tuple, array) of subset
+        indices.
+        
+        ChannelMap: return the subset map for the intersecting sites
+
+        ndarray: if NOT subset indices (i.e. a binary mask), then the
+        mask is converted to indices. If the array is a 2D binary mask,
+        then site-lookup is used.
+        
+        """
         if isinstance(sub, type(self)):
             # check that it's a submap
             submap = map_intersection([self, sub])
