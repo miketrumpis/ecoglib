@@ -134,11 +134,15 @@ try:
         elif mask is None:
             return img
 
+        m, n = img.shape
+        img = np.pad(img, radius, mode='reflect')
+        mask = np.pad(mask, radius, mode='reflect')
+
         scl = Scaler(img)
         img_fill = cv2.inpaint(
             scl.quantize(img).astype('B'), mask, radius, method
             )
-        return scl.rescale(img_fill, 255.0)
+        return scl.rescale(img_fill, 255.0)[radius:radius+m, radius:radius+n]
  
 except:
    def inpaint_pixels(*args, **kwargs):
