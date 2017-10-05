@@ -28,11 +28,17 @@ def _auto_level(ttl, verbose=False):
             print 'new level: {0:.2f}; subset size: {1} ({2:.1f} %)'.format(mn, sz, pct)
         if len(ttl):
             mn = ttl.mean()
+            # it's possible there are > 1000 values all clipped
+            # to the same high level, in which case lower the
+            # current level by a hair and break
+            if np.abs( mn - ttl.max() ) < 1e-8:
+                mn *= 0.99
+                break
         else:
             break
     return mn
 
-def process_trigger(trig_chan, thresh=0.5, clean=False):
+def process_trigger(trig_chan, thresh=0.5, uniform=True, clean=False):
     """Pull event timing from one or many logical-level channels.
 
     Parameters
@@ -41,6 +47,9 @@ def process_trigger(trig_chan, thresh=0.5, clean=False):
         Vector(s) of event timing square waves.
     thresh : float (0.5)
         Relative threshold for detecting a rising edge.
+    uniform : bool
+        If (quasi-) periodic triggers, then use a uniform distribution
+        heuristic to debounce triggers
     clean : bool
         Check rising edge times for spurious edges (e.g. from noisy trigger)
 
@@ -56,21 +65,25 @@ def process_trigger(trig_chan, thresh=0.5, clean=False):
         thresh = thresh * _auto_level(trig_chan)
         trig_chan = trig_chan > thresh
     digital_trigger = np.any( trig_chan, axis=0 ).astype('i')
-    pos_edge_raw = np.where(np.diff(digital_trigger) > 0)[0] + 1
+    pos_edge = np.where(np.diff(digital_trigger) > 0)[0] + 1
 
-    # Mask out any edges with *very* small ISI.
-    # Assume uniformly distributetd ISIs, and that 5-95 percentile
-    # represents 90% of the mass and up to 10% of the mass is evenly
-    # concentrated below p(5). Reject any ISI lower than
-    # p(95) - (p(95) - p(5)) * 10 / 9
-    isi_raw = np.diff(pos_edge_raw)
-    p5, p95 = np.percentile(isi_raw, [5, 95])
-    min_credible_isi = p95 - (p95 - p5) / 0.9
-    pos_edge = clean_dirty_trigger(pos_edge_raw, isi_guess = min_credible_isi)
-    sdiff = np.setdiff1d(pos_edge_raw, pos_edge)
-    if len(sdiff):
-        print 'Warning.. spurious triggers auto-detected.'
-        print 'Rejected ISIs were', isi_raw[pos_edge_raw.searchsorted(sdiff)-1]
+    if uniform:
+        # Mask out any edges with *very* small ISI.
+        # Assume uniformly distributetd ISIs, and that 5-95 percentile
+        # represents 90% of the mass and up to 10% of the mass is evenly
+        # concentrated below p(5). Reject any ISI lower than
+        # p(95) - (p(95) - p(5)) * 10 / 9
+        isi_raw = np.diff(pos_edge)
+        p5, p95 = np.percentile(isi_raw, [5, 95])
+        min_credible_isi = p95 - (p95 - p5) / 0.9
+        pos_edge_ = clean_dirty_trigger(pos_edge,
+                                        isi_guess = min_credible_isi)
+        sdiff = np.setdiff1d(pos_edge, pos_edge_)
+        if len(sdiff):
+            print 'Warning.. spurious triggers auto-detected.'
+            rej = pos_edge.searchsorted(sdiff)-1
+            print 'Rejected ISIs were', isi_raw[rej]
+        pos_edge = pos_edge_
     if clean:
         pos_edge = clean_dirty_trigger(pos_edge)
     return pos_edge, digital_trigger
