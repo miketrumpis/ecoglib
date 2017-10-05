@@ -70,60 +70,38 @@ def semivariogram(
             if not cloud:
                 sv[n] = np.nan
             continue
-        if cloud:
-            sv.extend( np.abs(x_s1 - x_s2)**2 )
-            cx.extend( [x[n]] * Nd[n] )
-        elif robust:
+        if robust:
             avg_var = np.power(np.abs( x_s1 - x_s2 ), 0.5).mean() ** 4
             sv[n] = avg_var / 2 / (0.457 + 0.494 / Nd[n])
         else:
             sv[n] = 0.5 * np.mean( (x_s1 - x_s2)**2 )
-    if cloud:
-        x = cx
     if counts:
         return x, sv, Nd
     return x, sv
 
-from ._semivariance import triu_diffs
-def _pairwise_semivariance(F, robust=False, trimmed=False):
+try:
+    from ._semivariance import triu_diffs
+    def _pairwise_semivariance(F, robust=False, trimmed=False):
 
-    N, P = F.shape
-    diffs = triu_diffs(F, axis=0)
-    if trimmed:
-        m = fenced_out(diffs)
-        diffs = np.ma.masked_array(diffs, mask=~m)
-        Nd = P - diffs.mask.sum(1)
-    else:
-        Nd = np.ones(N, 'i') * P
-    if robust:
-        avg_var = np.power( np.abs(diffs), 0.5 ).mean(1) ** 4
-        sv = avg_var / 2 / (0.457 + 0.494 / Nd)
-    else:
-        sv = 0.5 * np.mean( diffs**2, axis=1 )
+        N, P = F.shape
+        diffs = triu_diffs(F, axis=0)
+        if trimmed:
+            m = fenced_out(diffs)
+            diffs = np.ma.masked_array(diffs, mask=~m)
+            Nd = P - diffs.mask.sum(1)
+        else:
+            Nd = np.ones(N, 'i') * P
+        if robust:
+            avg_var = np.power( np.abs(diffs), 0.5 ).mean(1) ** 4
+            sv = avg_var / 2 / (0.457 + 0.494 / Nd)
+        else:
+            sv = 0.5 * np.mean( diffs**2, axis=1 )
+
+        return sv, Nd
+except ImportError:
+    def _pairwise_semivariance(*args, **kwargs):
+        raise NotImplementedError('Cythonized "triu_diffs" method required.')
     
-    return sv, Nd
-
-
-def semivariogram2(data, normed=True, mask_outliers=False, matrix=True):
-    if normed:
-        data = data / np.std(data, axis=1, keepdims=1)
-
-    diffs = triu_diffs(data, axis=0)
-    if mask_outliers:
-        m = fenced_out(diffs)
-        diffs = np.ma.masked_array(diffs, mask=~m)
-
-    semivar = 0.5 * diffs.var(axis=1)
-
-    if not matrix:
-        return semivar
-    
-    N = len(data)
-    idx = np.triu_indices(N, k=1)
-    sv = np.zeros( (N, N) )
-    sv[idx] = semivar
-    return sv + sv.T
-
 def ergodic_semivariogram(data, normed=True, mask_outliers=False):
     #data = data - data.mean(1)[:,None]
     if mask_outliers:
