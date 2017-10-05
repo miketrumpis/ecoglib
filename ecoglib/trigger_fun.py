@@ -233,7 +233,7 @@ def ep_trigger_avg(
         np.sqrt(avg, avg)
     return avg, n_avg
 
-def extract_epochs(x, pivots, selected=(), pre=0, post=0):
+def extract_epochs(x, pivots, selected=(), pre=0, post=0, fill=np.nan):
     """
     Extract an array of epochs pivoted at the specified triggers. Note
     that this method follows a garbage-in, garbage-out policy
@@ -276,12 +276,23 @@ def extract_epochs(x, pivots, selected=(), pre=0, post=0):
         pivots = np.take(pivots, selected)
 
     epochs = np.empty( (x.shape[0], len(pivots), epoch_len), x.dtype )
-    epochs.fill(np.nan)
+    epochs.fill(fill)
 
     for n, k in enumerate(pivots):
-        idx = (slice(None), slice(k-pre, k+post))
-        epochs[:,n,:] = x[idx]
-
+        if k - pre < 0:
+            start_put = pre - k
+            pre = k
+        else:
+            start_put = 0
+        if k + post >= x.shape[1]:
+            stop_put = x.shape[1] - k + pre
+            post = x.shape[1] - k
+        else:
+            stop_put = pre + post
+        
+        grab_idx = (slice(None), slice(k-pre, k+post))
+        put_idx = (slice(None), n, slice(start_put, stop_put))
+        epochs[put_idx] = x[grab_idx]
     
     return epochs
 
