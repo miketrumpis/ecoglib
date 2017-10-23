@@ -486,7 +486,7 @@ from matplotlib.patches import Polygon
 def tile_traces_1ax(
         traces, geo=(), p=(), yl=(), twin=(), plot_style='sample',
         col_major=True, title='', tilesize=(1,1), calib_unit='V',
-        x_labels=(), y_labels=(), table_style='matrix', **line_kws
+        x_labels=(), y_labels=(), table_style='matrix', ax=None, **line_kws
         ):
 
     """
@@ -571,19 +571,25 @@ def tile_traces_1ax(
             return geo[0] - v - 1
         else:
             return v
-    
-    # calculate fig size, given geometry and presence of title
-    figsize = ( geo[1] * tilesize[1], geo[0] * tilesize[0] + (len(title)>0) )
-    import matplotlib.pyplot as pp
-    fig = pp.figure(figsize=figsize)
 
-    bottom = left = 0.02
-    top = 0.98
-    right = 0.85
-    if title:
-        top = 1 - 1.0/figsize[1]
+    if ax is None:
+        # calculate fig size, given geometry and presence of title
+        figsize = ( geo[1] * tilesize[1],
+                    geo[0] * tilesize[0] + (len(title)>0) )
+        import matplotlib.pyplot as pp
+        fig = pp.figure(figsize=figsize)
 
-    ax = fig.add_axes( [left, bottom, right-left, top-bottom] )
+        bottom = left = 0.02
+        top = 0.98
+        right = 0.85
+        if title:
+            top = 1 - 1.0/figsize[1]
+
+        ax = fig.add_axes( [left, bottom, right-left, top-bottom] )
+        redraw = False
+    else:
+        fig = ax.figure
+        redraw = True
     ax.set_ylim( yl[0] - txtgap_y, yl[0] + geo[0] * ywid )
     ax.set_xlim( twin[0] - tpad - txtgap_x, twin[0] + geo[1] * twid )
 
@@ -653,7 +659,7 @@ def tile_traces_1ax(
 
     ax.add_collection(lines)
 
-    if twin[0] < 0:
+    if twin[0] < 0 and twin[1] > 0:
         vert_line = np.array( [ [0, yl[0]], [0, yl[1]] ] )
         trig_lines = LineCollection(
             [ vert_line ] * traces.shape[0],
@@ -669,9 +675,10 @@ def tile_traces_1ax(
             0.5, .95, title, fontsize=18, 
             va='baseline', ha='center'
             )
-    calibration_axes(
-        ax, y_scale=ywid, calib_unit=calib_unit, t_scale=twin[1]-twin[0]
-        )
+    if not redraw:
+        calibration_axes(
+            ax, y_scale=ywid, calib_unit=calib_unit, t_scale=twin[1]-twin[0]
+            )
 
     if len(x_labels) == geo[1]:
         y0 = yl[0] - txtgap_y
