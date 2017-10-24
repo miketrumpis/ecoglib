@@ -224,7 +224,10 @@ class _MovedImports(object):
     ChannelMap = RelocatedImport('ChannelMap', 'ecoglib.channel_map')
     map_intersection = RelocatedImport(
         'map_intersection', 'ecoglib.channel_map')
+    channel_combinations = RelocatedImport(
+        'channel_combinations', 'ecoglib.channel_map')
 
 _MV = _MovedImports()    
 ChannelMap = _MV.ChannelMap
 map_intersection = _MV.map_intersection
+channel_combinations = _MV.channel_combinations
