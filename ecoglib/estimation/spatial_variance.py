@@ -3,8 +3,44 @@ from ecoglib.numutil import fenced_out
 
 __all__ = ['semivariogram']
 
+def adapt_bins(bsize, dists, return_map=False):
+
+    bins = [dists.min()]
+    while bins[-1] + bsize < dists.max():
+        bins.append( bins[-1] + bsize )
+    bins = np.array(bins)
+    converged = False
+    n = 0
+    while not converged:
+        diffs = np.abs( dists - bins[:, None] )
+        bin_assignment = diffs.argmin(0)
+        new_bins = [ dists[ bin_assignment==b ].mean()
+                     for b in xrange(len(bins)) ]
+        new_bins = np.array(new_bins)
+        new_bins = new_bins[ np.isfinite(new_bins) ]
+        if len(new_bins) == len(bins):
+            dx = np.linalg.norm( bins - new_bins )
+            converged = dx < 1e-5
+        bins = new_bins
+        if n > 20:
+            break
+        n += 1
+    # sometimes the maximum distance to a bin can be greater than the
+    # bin size -- seems to only happen on last distance group (probably
+    # because of very low weighting). 
+    ## diffs = np.abs( dists - bins[:, None] )
+    ## print diffs.min(0).max()
+    ## mx_diff = diffs.min(0).argmax()
+    ## print dists[mx_diff]
+    if return_map:
+        diffs = np.abs( dists - bins[:, None] )
+        bin_assignment = diffs.argmin(0)
+        return bins, bins[bin_assignment]
+    return bins
+
 def semivariogram(
-        F, combs, robust=True, trimmed=True, cloud=False, counts=False
+        F, combs, xbin=None, robust=True,
+        trimmed=True, cloud=False, counts=False
         ):
     """
     Classical semivariogram estimator with option for Cressie's robust
@@ -20,6 +56,9 @@ def semivariogram(
         points. combs.p1 and combs.p2 are (site_i, site_j) indices.
         combs.dist is the distance ||site_i - site_j||. This object
         can be found from the ChannelMap.site_combinations attribute.
+    xbin : float (optional)
+        Bin site distances with this spacing, rather than the default
+        of using all unique distances on the grid.
     robust : Bool
         If True, use Cressie's formula for robust semivariance
         estimation. Else use mean-square difference.
@@ -38,6 +77,8 @@ def semivariogram(
         lags
     sv : ndarray,
         semivariance
+    Nd : ndarray
+        bin counts (only if counts==True)
     
     """
     # F is an n_site field of values
@@ -51,11 +92,19 @@ def semivariogram(
             return x, sv, Nd
         return x, sv
     else:
-        x = np.unique(combs.dist)
-        Nd = np.zeros(len(x), 'i')
-        sv = np.empty_like(x)
+        if xbin is None:
+            x = np.unique(combs.dist)
+            Nd = np.zeros(len(x), 'i')
+            sv = np.empty_like(x)
+        else:
+            x, assignment = adapt_bins(xbin, combs.dist, return_map=True)
+            Nd = np.zeros(len(x), 'i')
+            sv = np.empty(len(x))
     for n in xrange(len(x)):
-        m = combs.dist == x[n]
+        if xbin is None:
+            m = combs.dist == x[n]
+        else:
+            m = assignment == x[n]
         x_s1 = F[ combs.p1[m] ].ravel()
         x_s2 = F[ combs.p2[m] ].ravel()
         if trimmed:
