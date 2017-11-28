@@ -388,7 +388,7 @@ class CoordinateChannelMap(ChannelMap):
         raise NotImplementedError
     
 
-def channel_combinations(chan_map, scale=1.0):
+def channel_combinations(chan_map, scale=1.0, precision=4):
     """Compute tables identifying channel-channel pairs.
 
     Parameters
@@ -396,6 +396,8 @@ def channel_combinations(chan_map, scale=1.0):
     chan_map : ChannelMap
     scale : float or pair
         The constant pitch or the (dx, dy) pitch between electrodes
+        precision : number of decimals for distance calculation (it seems
+        some distances are not uniquely determined in floating point).
 
     Returns
     -------
@@ -426,7 +428,8 @@ def channel_combinations(chan_map, scale=1.0):
         chan_combs.p2[n] = c1
         idx1 = np.array( [ii[c0], jj[c0]] )
         idx2 = np.array( [ii[c1], jj[c1]] )
-        chan_combs.dist[n] = np.linalg.norm( (idx1-idx2) * s_)
+        chan_combs.dist[n] = np.round(np.linalg.norm( (idx1-idx2) * s_),
+                                      decimals=precision)
         chan_combs.idx1[n] = idx1
         chan_combs.idx2[n] = idx2
     return chan_combs
