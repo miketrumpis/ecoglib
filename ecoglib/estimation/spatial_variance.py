@@ -87,6 +87,8 @@ def semivariogram(
         # xxx: this relies on comb.dist and triu_diffs both using
         # upper-triangle convention
         x = combs.dist
+        if F.ndim == 1:
+            F = F[:, None]
         sv, Nd = _pairwise_semivariance(F, robust=robust, trimmed=trimmed)
         if counts:
             return x, sv, Nd
