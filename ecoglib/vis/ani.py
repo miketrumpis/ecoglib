@@ -5,23 +5,26 @@ from matplotlib.gridspec import GridSpec
 import matplotlib.animation as _animation
 import os
 import subprocess
-import ecoglib.vis.plot_modules as pm
-import time
 from progressbar import ProgressBar, Percentage, Bar
 import warnings
 
-def write_frames(
-        frames, fname, timer='ms', time=(), title='Array Movie', fps=5, 
-        quicktime=False, axis_toggle='on', figsize=None,
-        colorbar=False, cbar_label='',
+def _setup_animated_frames(
+        frames, timer='ms', time=(), axis_toggle='on',
+        figsize=None, colorbar=False, cbar_label='', figure_canvas=True,
         **imshow_kw
         ):
-    # most simple frame writer -- no tricks
-    f = Figure(figsize=figsize)
+    if figure_canvas:
+        from matplotlib.pyplot import figure
+        f = figure(figsize=figsize)
+    else:
+        f = Figure(figsize=figsize)
     ax = f.add_subplot(111)
     im = ax.imshow(frames[0], **imshow_kw)
     ax.axis('image')
     ax.axis(axis_toggle)
+    if isinstance(time, bool) and time:
+        time = np.arange(len(frames))
+        timer = 'samp'
     if len(time):
         ttl = ax.set_title('{0:.2f} {1}'.format(time[0], timer))
     else:
@@ -40,11 +43,26 @@ def write_frames(
         warnings.simplefilter('ignore')
         f.tight_layout(pad=0.2)
 
+    return f, func
+
+def write_frames(
+        frames, fname, fps=5, quicktime=False, qtdpi=300,
+        title='Array movie', **anim_kwargs
+        ):
+
+    f, func = _setup_animated_frames(frames, figure_canvas=False, **anim_kwargs)
     write_anim(
         fname, f, func, frames.shape[0], fps=fps, title=title,
-        quicktime=quicktime
+        quicktime=quicktime, qtdpi=qtdpi
         )
 
+def animate_frames(frames, fps=5, blit=False, **anim_kwargs):
+    f, func = _setup_animated_frames(frames, figure_canvas=True, **anim_kwargs)
+    anim = _animation.FuncAnimation(
+        f, func, frames=len(frames), interval=1000.0 / fps, blit=blit
+        )
+    return anim
+    
 def h264_encode_files(in_pattern, out, fps, quicktime=False):
     """Use ffmpeg to encode a list of files matching a pattern
 
@@ -78,20 +96,19 @@ def h264_encode_files(in_pattern, out, fps, quicktime=False):
     
 def write_anim(
         fname, fig, func, n_frame,
-        title='Array Movie', fps=5, quicktime=False
+        title='Array Movie', fps=5, quicktime=False, qtdpi=300
         ):
 
     FFMpegWriter = _animation.writers['ffmpeg']
     metadata = dict(title=title, artist='ecoglib')
     writer = FFMpegWriter(
-        fps=fps, metadata=metadata, codec='libx264'
+        fps=fps, metadata=metadata, codec='h264'
         )
     if quicktime:
         # do arguments that are quicktime compatible
         extra_args = ['-pix_fmt', 'yuv420p', '-qp', '1']
         # yuv420p looks a bit crappy, but upping the res helps
-        #dpi = 300
-        dpi = fig.dpi
+        dpi = qtdpi
     else:
         # yuv422p seems pretty good
         extra_args = ['-pix_fmt', 'yuv422p', '-qp', '0']
