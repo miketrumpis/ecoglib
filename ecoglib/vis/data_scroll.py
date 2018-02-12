@@ -588,6 +588,7 @@ class ChannelScroller(DataScroller):
         return scr
         
     def construct_ts_plot(self, t, figsize, lim, t0, **lprops):
+        from matplotlib.ticker import Locator
         lprops.setdefault('color', 'b')
         lprops['linewidth'] = 0.5
         n_lines = self.ts_arr.shape[1]
@@ -602,22 +603,23 @@ class ChannelScroller(DataScroller):
         ##     )
         #from matplotlib.ticker import LinearLocator
         #plot.ax.yaxis.set_major_locator(LinearLocator(numticks=n_lines))
-        if isinstance(self.chans, ut.ChannelMap):
-            # these indices are potentially transposed due to VTk hack
-            # <but impossible to know!!>
-            ii, jj = self.chans.to_mat()
-            #jj, ii = zip(*sorted(zip(jj, ii)))
-            ii, jj = zip(*sorted(zip(ii, jj)))
-            c_num = self.chans.lookup(ii, jj)
+        if n_lines < Locator.MAXTICKS:
+            if isinstance(self.chans, ut.ChannelMap):
+                # these indices are potentially transposed due to VTk hack
+                # <but impossible to know!!>
+                ii, jj = self.chans.to_mat()
+                #jj, ii = zip(*sorted(zip(jj, ii)))
+                ii, jj = zip(*sorted(zip(ii, jj)))
+                c_num = self.chans.lookup(ii, jj)
 
-            plot.ax.set_yticklabels(
-                ['%d: (%d, %d)'%x for x in zip(c_num, jj, ii)],
-                fontsize=8
-                )
-        else:
-            plot.ax.set_yticklabels( 
-                ['%s'%n for n in xrange(n_lines)], fontsize=8
-                )
+                plot.ax.set_yticklabels(
+                    ['%d: (%d, %d)'%x for x in zip(c_num, jj, ii)],
+                    fontsize=8
+                    )
+            else:
+                plot.ax.set_yticklabels( 
+                    ['%s'%n for n in xrange(n_lines)], fontsize=8
+                    )
         if self.units:
             units = self.units
             pos = plot.ax.get_position()
