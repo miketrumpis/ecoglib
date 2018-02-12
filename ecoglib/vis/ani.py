@@ -212,7 +212,8 @@ def dynamic_frames_and_series(
     func = lambda x: _step_time(
         x, tx, frames, f_img, time_mark, f_idx=frame_times
         )
-    fig.tight_layout()
+    if fig.canvas is not None:
+        fig.tight_layout()
     return fig, func
         
             
