@@ -163,16 +163,104 @@ except ImportError:
     def _pairwise_semivariance(*args, **kwargs):
         raise NotImplementedError('Cythonized "triu_diffs" method required.')
     
-def ergodic_semivariogram(data, normed=True, mask_outliers=False):
+
+def fast_semivariogram(
+        F, combs, xbin=None, trimmed=True, cloud=False, counts=False, se=False
+        ):
+    """
+    Classical semivariogram estimator with option for Cressie's robust
+    estimator. Can also return a semivariogram "cloud".
+
+    Parameters
+    ----------
+
+    F : ndarray, (N, ...)
+        One or more samples of N field values.
+    combs : Bunch
+        Object representing the site-site pairs between N field
+        points. combs.p1 and combs.p2 are (site_i, site_j) indices.
+        combs.dist is the distance ||site_i - site_j||. This object
+        can be found from the ChannelMap.site_combinations attribute.
+    xbin : float (optional)
+        Bin site distances with this spacing, rather than the default
+        of using all unique distances on the grid.
+    trimmed : Bool
+        Perform outlier detection for extreme values.
+    cloud : Bool
+        Return (robust, trimmed) estimates for all pairs.
+    counts : Bool
+        If True, then return the bin-counts for observations at each
+        lag in x. If cloud is True, then Nd is the count of inlier
+        differences for each pair.
+    se : Bool
+        Return the standard error of the mean.
+
+    Returns
+    -------
+    x : ndarray
+        lags
+    sv : ndarray,
+        semivariance
+    Nd : ndarray
+        bin counts (only if counts==True)
+    se : ndarray
+        standard error (only if se==True)
+    
+    """
+    # F is an n_site field of values
+    # combs is a channel combination bunch
+
+
+    sv_matrix = ergodic_semivariogram(F, normed=False,
+                                      mask_outliers=trimmed)
+    x = combs.dist
+    sv = sv_matrix[ np.triu_indices(len(sv_matrix), k=1) ]
+    
+    if cloud:
+        if counts:
+            return x, sv, 1
+        return x, sv
+
+    if xbin is None:
+        xb = np.unique(combs.dist)
+        yb = [ sv[ x == u ] for u in xb ]
+    else:
+        xb, assignment = adapt_bins(xbin, combs.dist, return_map=True)
+        yb = [ sv[ assignment == u ] for u in xb ]
+    Nd = np.array(map(len, yb))
+
+    semivar = np.array( map(np.mean, yb) )
+    serr = np.array( map(lambda x: np.std(x) / np.sqrt(len(x)), yb) )
+    if counts and se:
+        return xb, semivar, Nd, serr
+    if se:
+        return xb, semivar, serr
+    if counts:
+        return xb, semivar, Nd
+    return xb, semivar
+
+def ergodic_semivariogram(data, normed=False, mask_outliers=True,
+                          zero_field=True):
     #data = data - data.mean(1)[:,None]
+    if zero_field:
+        data = data - data.mean(0)
     if mask_outliers:
-        pwr = np.apply_along_axis(np.linalg.norm, 0, data)
-        m = fenced_out(pwr)
-        data = data[:, m]
+        if isinstance(mask_outliers, bool):
+            thresh = 4.0
+        else:
+            thresh = mask_outliers
+        ## pwr = np.apply_along_axis(np.linalg.norm, 0, data)
+        ## m = fenced_out(pwr)
+        ## data = data[:, m]
+        m = fenced_out(data, thresh=thresh)
+        dm = np.zeros_like(data)
+        np.putmask(dm, m, data)
+        data = dm
+        
     if normed:
         data = data / np.std(data, axis=1, keepdims=1)
     #data = data - data.mean(0)
-    data = data - data.mean()
+    #data = data - data.mean()
     cxx = np.einsum('ik,jk->ij', data, data)
     cxx /= data.shape[1]
     var = cxx.diagonal()
