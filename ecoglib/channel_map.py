@@ -292,11 +292,14 @@ class CoordinateChannelMap(ChannelMap):
 
     def lookup(self, y, x):
         coords = np.array( self )
-        dist = np.apply_along_axis(
-            np.linalg.norm, 1, coords - np.array([y, x])
-            )
-        site = np.argmin( dist )
-        return site
+        sites = np.c_[y, x]
+        chans = []
+        for s in sites:
+            dist = np.apply_along_axis(
+                np.linalg.norm, 1, coords - s #np.array([y, x])
+                )
+            chans.append( np.argmin( dist ) )
+        return np.array(chans).squeeze()
 
     def rlookup(self, c):
         return self[c]
