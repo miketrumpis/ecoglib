@@ -307,14 +307,15 @@ try:
                 y_im = np.empty( (x.shape[0], 1), 'd' )
             for i in xrange(x.shape[0]):
                 bandpass_moving_projection(
-                    x[i], dpss, wf, wt, y_re[i], y_im[i], f0, baseband=baseband
+                    x[i].astype('d'), dpss, wf, wt, y_re[i], y_im[i],
+                    f0, baseband=baseband
                     )
             if not baseband:
                 y = y_re
         else:
             y = np.zeros_like(x)        
             for i in xrange(x.shape[0]):
-                lowpass_moving_projection(x[i], dpss, wf, wt, y[i])
+                lowpass_moving_projection(x[i].astype('d'), dpss, wf, wt, y[i])
         if save_dpss:
             return y, (dpss, eigs)
         return y
