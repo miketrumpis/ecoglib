@@ -446,10 +446,10 @@ def channel_combinations(chan_map, scale=1.0, precision=4):
         c0, c1 = c
         chan_combs.p1[n] = c0
         chan_combs.p2[n] = c1
-        idx1 = np.array( [ii[c0], jj[c0]] )
-        idx2 = np.array( [ii[c1], jj[c1]] )
-        chan_combs.dist[n] = np.round(np.linalg.norm( (idx1-idx2) * s_),
-                                      decimals=precision)
-        chan_combs.idx1[n] = idx1
-        chan_combs.idx2[n] = idx2
+        chan_combs.idx1[n] = ii[c0], jj[c0]
+        chan_combs.idx2[n] = ii[c1], jj[c1]
+
+    d = np.abs( chan_combs.idx1 - chan_combs.idx2 ) * s_
+    dist = ( d**2 ).sum(1) ** 0.5
+    chan_combs.dist = np.round(dist, decimals=precision)
     return chan_combs
