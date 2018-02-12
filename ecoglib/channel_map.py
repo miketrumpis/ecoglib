@@ -235,7 +235,7 @@ class ChannelMap(list):
             # image self
             arr = self.embed( np.ones(len(self), 'd'), fill=fill )
             kwargs.setdefault('clim', (0, 1))
-            kwargs.setdefault('norm', BoundaryNorm([0, 0.5, 1], 2))
+            kwargs.setdefault('norm', BoundaryNorm([0, 0.5, 1], 256))
             kwargs.setdefault('cmap', cm.binary)
             
         if arr.shape != self.geometry:
@@ -337,7 +337,7 @@ class CoordinateChannelMap(ChannelMap):
         if arr is None:
             arr = np.ones_like(y)
             clim = (0, 1)
-            norm = BoundaryNorm([0, 0.5, 1.0], 2)
+            norm = BoundaryNorm([0, 0.5, 1.0], 256)
             cmap = 'binary_r'
             interpolate = False
 
