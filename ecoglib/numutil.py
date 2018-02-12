@@ -112,7 +112,7 @@ def fenced_out(samps, quantiles=(25,75), thresh=3.0, axis=None, low=True):
     """
 
     samps = np.asanyarray(samps)
-    
+    thresh = float(thresh)
     if isinstance(samps, np.ma.MaskedArray):
         samps = samps.filled(np.nan)
 
