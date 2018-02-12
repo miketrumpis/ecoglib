@@ -97,9 +97,7 @@ def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
                 path, key, atom=atom, shape=val.shape, filters=filters
                 )
             ca[:] = val
-            
-
-        elif type(val) in _h5_seq_types:
+        elif isinstance(val, _h5_seq_types):
             try:
                 f.create_array(path, key, val)
             except TypeError, ValueError:
