@@ -125,7 +125,7 @@ def equalize_groups(x, group_sizes, axis=0, fill=np.nan, reshape=True):
         y_slice[axis] = g
         y_slice[axis+1] = slice(0, group_sizes[g])
         x_slice[axis] = slice(steps[g], steps[g+1])
-        y[y_slice] = x[x_slice]
+        y[tuple(y_slice)] = x[tuple(x_slice)]
     if not reshape:
         new_shape[axis] *= mx_size
         new_shape.pop(axis+1)
