@@ -40,7 +40,7 @@ def adapt_bins(bsize, dists, return_map=False):
 
 def semivariogram(
         F, combs, xbin=None, robust=True,
-        trimmed=True, cloud=False, counts=False
+        trimmed=True, cloud=False, counts=False, se=False
         ):
     """
     Classical semivariogram estimator with option for Cressie's robust
@@ -70,6 +70,8 @@ def semivariogram(
         If True, then return the bin-counts for observations at each
         lag in x. If cloud is True, then Nd is the count of inlier
         differences for each pair.
+    se : Bool
+        Return the standard error of the mean.
 
     Returns
     -------
@@ -79,6 +81,8 @@ def semivariogram(
         semivariance
     Nd : ndarray
         bin counts (only if counts==True)
+    se : ndarray
+        standard error (only if se==True)
     
     """
     # F is an n_site field of values
@@ -102,6 +106,7 @@ def semivariogram(
             x, assignment = adapt_bins(xbin, combs.dist, return_map=True)
             Nd = np.zeros(len(x), 'i')
             sv = np.empty(len(x))
+        serr = np.empty(len(x))
     for n in xrange(len(x)):
         if xbin is None:
             m = combs.dist == x[n]
@@ -126,6 +131,11 @@ def semivariogram(
             sv[n] = avg_var / 2 / (0.457 + 0.494 / Nd[n])
         else:
             sv[n] = 0.5 * np.mean( (x_s1 - x_s2)**2 )
+        serr[n] = np.std( (x_s1 - x_s1)**2 ) / np.sqrt(len(x_s1))
+    if counts and se:
+        return x, sv, Nd, serr
+    if se:
+        return x, sv, serr
     if counts:
         return x, sv, Nd
     return x, sv
@@ -141,7 +151,7 @@ try:
             diffs = np.ma.masked_array(diffs, mask=~m)
             Nd = P - diffs.mask.sum(1)
         else:
-            Nd = np.ones(N, 'i') * P
+            Nd = np.ones(diffs.shape[0], 'i') * P
         if robust:
             avg_var = np.power( np.abs(diffs), 0.5 ).mean(1) ** 4
             sv = avg_var / 2 / (0.457 + 0.494 / Nd)
