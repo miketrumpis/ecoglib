@@ -77,7 +77,7 @@ class ChannelMap(list):
         from .util import flat_to_mat
         return flat_to_mat(self.geometry, self[c], col_major=self.col_major)
 
-    def subset(self, sub, as_mask=False):
+    def subset(self, sub, as_mask=False, map_intersect=False):
         """
         Behavior depends on the type of "sub":
 
@@ -105,7 +105,19 @@ class ChannelMap(list):
                 # Get the channels/indices of the subset of sites.
                 # This needs to be sorted to look up the subset of
                 # channels in sequence
-                sub = np.sort(self.lookup(*sub.nonzero()))
+                if map_intersect:
+                    # allow 2d binary map to cover missing sites
+                    ii, jj = sub.nonzero()
+                    sites = []
+                    for i, j in zip(ii, jj):
+                        try:
+                            sites.append(self.lookup(i, j))
+                        except ValueError:
+                            pass
+                else:
+                    # if this looks up missing sites, then raise
+                    sites = self.lookup(*sub.nonzero())
+                sub = np.sort( sites )
             elif sub.ndim==1:
                 if sub.dtype.kind in ('b',):
                     sub = sub.nonzero()[0]
