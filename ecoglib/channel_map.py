@@ -139,10 +139,15 @@ class ChannelMap(list):
 
     def __getslice__(self, i, j):
         cls = type(self)
-        return cls(
-            super(cls, self).__getslice__(i,j),
+        new_map = cls(
+            super(ChannelMap, self).__getslice__(i,j),
             self.geometry, col_major=self.col_major, pitch=self.pitch
             )
+        import sys
+        # Keep the pre-computed combinations IFF the entire map is copied
+        if i==0 and j==sys.maxint and self._combs is not None:
+            new_map._combs = self._combs.copy()
+        return new_map
 
     def embed(self, data, axis=0, fill=np.nan):
         """
