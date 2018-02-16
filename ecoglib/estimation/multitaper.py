@@ -68,7 +68,7 @@ def mtm_spectrogram_basic(x, n, pl=0.25, detrend='', **mtm_kwargs):
     
     """
 
-    if x.ndim < 3:
+    if x.ndim < 2:
         x = x.reshape( (1,) + x.shape )
     mtm_kwargs.setdefault('adaptive', True)
     mtm_kwargs.setdefault('jackknife', False)
