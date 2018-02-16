@@ -1,5 +1,6 @@
 import os
 import inspect
+from matplotlib.backends.backend_pdf import PdfPages
 
 def rst_image_markup(relpath, name, extensions):
 
@@ -63,6 +64,7 @@ class ScriptPlotter(object):
         path = os.path.abspath(path)
         self.fig_path = os.path.join(path, name)
         self.fig_cache = list()
+        self.pages_cache = list()
         self.fig_text = list()
         self.formats = map(lambda x: x.strip('.'), formats)
         self.dpi = dpi
@@ -83,6 +85,10 @@ class ScriptPlotter(object):
         self.fig_cache.append( (f, name, fig_kwargs) )
         self.fig_text.append( rst_text )
 
+    def save_many(self, figs, name):
+        """Save a PdfPages with the list of figures"""
+        self.pages_cache.append( (figs, name) )
+
     def _save_cache(self):
         if not os.path.exists(self.fig_path):
             os.makedirs(self.fig_path)
@@ -95,6 +101,13 @@ class ScriptPlotter(object):
                 f_file = os.path.join(e_path, name)+'.'+ext
                 print 'saving', f_file
                 f.savefig(f_file, dpi=dpi, **kwargs)
+        if len(self.pages_cache):
+            e_path = os.path.join(self.fig_path, 'pdf')
+            for pages in self.pages_cache:
+                figs, name = pages
+                with PdfPages( os.path.join(e_path, name) + '.pdf' ) as pdf:
+                    for f in figs:
+                        pdf.savefig(f)
 
     def _fixup_rst(self, fname, line, context):
         rst_source = open(fname).readlines()
