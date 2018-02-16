@@ -5,6 +5,7 @@ cimport numpy as np
 cimport cython
 
 @cython.boundscheck(False)
+@cython.wraparound(False)
 def triu_diffs(np.ndarray[np.float64_t, ndim=2] x, axis=0):
 
 	while axis < 0:

@@ -20,6 +20,7 @@ cdef inline void cplx_tri_prod( double a, double b,
     return
 
 @cython.boundscheck(False)
+@cython.wraparound(False)
 def calc_bispectrum(
         np.ndarray[np.float64_t, ndim=2] tf_re,
         np.ndarray[np.float64_t, ndim=2] tf_im

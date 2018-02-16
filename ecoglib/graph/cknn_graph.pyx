@@ -4,6 +4,8 @@ import scipy.sparse as sparse
 cimport numpy as np
 from kernels import gauss_affinity
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def knn_graph(
         np.ndarray[np.int32_t, ndim=2] neighbors,
         np.ndarray[np.float64_t, ndim=2] dists=None,
