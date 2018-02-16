@@ -3,8 +3,10 @@
 import numpy as np
 cimport numpy as np
 cimport cython
+from libc.math cimport sqrt, cos, sin, pi
 
 @cython.boundscheck(False)
+@cython.wraparound(False)
 def lowpass_moving_projection(
         np.ndarray[np.float64_t, ndim=1] x,
         np.ndarray[np.float64_t, ndim=2] dpss,
@@ -86,6 +88,7 @@ def lowpass_moving_projection(
         t += 1
 
 @cython.boundscheck(False)
+@cython.wraparound(False)
 def bandpass_moving_projection(
         np.ndarray[np.float64_t, ndim=1] x,
         np.ndarray[np.float64_t, ndim=2] dpss,
@@ -144,8 +147,8 @@ def bandpass_moving_projection(
     cdef np.ndarray[np.float64_t, ndim=1] sn = np.empty( (N,), 'd' )
     cdef np.ndarray[np.float64_t, ndim=1] cs = np.empty( (N,), 'd' )
     for n in xrange(N):
-        sn[n] = np.sin(2*np.pi*f0*n)
-        cs[n] = np.cos(2*np.pi*f0*n)
+        sn[n] = sin(2*pi*f0*n)
+        cs[n] = cos(2*pi*f0*n)
             
     # calculate y_k(b) = inner( dpss*(k), x(b) )
     # = sum_n dpss(k,n) * x(b+n) n = 0, N-1
@@ -200,8 +203,10 @@ def bandpass_moving_projection(
                 yp_i[t] += y_im * weights_n[n]
                 b += 1
             # need to multiply by 2exp{-i*2PI*f*t} ? 
-            cs_t = np.sqrt(2) * np.cos(2*np.pi*f0*t)
-            sn_t = -np.sqrt(2) * np.sin(2*np.pi*f0*t)
+            #cs_t = np.sqrt(2) * np.cos(2*np.pi*f0*t)
+            #sn_t = -np.sqrt(2) * np.sin(2*np.pi*f0*t)
+            cs_t = sqrt(2) * cos(2*pi*f0*t)
+            sn_t = -sqrt(2) * sin(2*pi*f0*t)
             y_re = (yp_r[t] * cs_t - yp_i[t] * sn_t)
             y_im = (yp_r[t] * sn_t + yp_i[t] * cs_t)
             yp_r[t] = y_re

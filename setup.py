@@ -20,7 +20,7 @@ dirs = list(numpy_include_dirs)
 cknn_graph = Extension(
     'ecoglib.graph.cknn_graph',
     ['ecoglib/graph/cknn_graph.pyx'], 
-    include_dirs = dirs, 
+    include_dirs = dirs,
     extra_compile_args=['-O3']
     )
 
@@ -28,6 +28,7 @@ slepian_projection = Extension(
     'ecoglib.filt.time._slepian_projection',
     ['ecoglib/filt/time/_slepian_projection.pyx'], 
     include_dirs = dirs, 
+    libraries=['m'],
     extra_compile_args=['-O3']
     )
 
