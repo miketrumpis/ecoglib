@@ -159,13 +159,15 @@ def traverse_table(f, path='/', load=True, scan=False, shared_paths=()):
         if load or scan:
             with closing(tables.open_file(f, mode='r')) as f:
                 return traverse_table(
-                    f, path=path, load=load, shared_paths=shared_paths
+                    f, path=path, load=load, scan=scan,
+                    shared_paths=shared_paths
                     )
         else:
             f = tables.open_file(f, mode='r')
             try:
                 return traverse_table(
-                    f, path=path, load=load, shared_paths=shared_paths
+                    f, path=path, load=load, scan=scan,
+                    shared_paths=shared_paths
                     )
             except:
                 f.close()
