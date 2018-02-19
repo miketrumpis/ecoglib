@@ -2,6 +2,7 @@ import numpy as np
 import scipy.sparse as sparse
 
 cimport numpy as np
+cimport cython
 from kernels import gauss_affinity
 
 @cython.boundscheck(False)
