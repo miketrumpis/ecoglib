@@ -46,6 +46,11 @@ semivariance = Extension(
     extra_compile_args=['-O3']
     )
 
+with open('requirements.txt') as f:
+    reqs = f.readlines()
+    reqs = map(str.strip, reqs)
+    reqs = filter(None, reqs)
+
 if __name__=='__main__':
     setup(
         name = 'ecoglib',
@@ -57,5 +62,6 @@ if __name__=='__main__':
                         slepian_projection,
                         bispectrum,
                         semivariance ],
-        cmdclass = {'build_ext': build_ext}
+        cmdclass = {'build_ext': build_ext},
+        install_requires=reqs
     )
