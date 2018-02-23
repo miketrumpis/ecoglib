@@ -313,7 +313,7 @@ try:
             if not baseband:
                 y = y_re
         else:
-            y = np.zeros_like(x)        
+            y = np.zeros(x.shape, 'd')
             for i in xrange(x.shape[0]):
                 lowpass_moving_projection(x[i].astype('d'), dpss, wf, wt, y[i])
         if save_dpss:
