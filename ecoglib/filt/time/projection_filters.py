@@ -8,7 +8,7 @@ __all__ = ['slepian_projection', 'moving_projection']
 
 @input_as_2d(out_arr=0)
 def slepian_projection(
-        data, BW, Fs, Kmax=None, w0=0, baseband=False, 
+        data, BW, Fs, Kmax=None, w0=0, baseband=False, onesided=False,
         dpss=None, save_dpss=False, min_conc=None
         ):
     """
@@ -22,8 +22,8 @@ def slepian_projection(
     data : ndarray
         Last dimension is timeseries
     BW : float
-        Bandwidth in Hz of the Slepian functions 
-        (and therefore the bandpass)
+        Half bandwidth of the lowpass projection (with respect to Fs).
+        (In other words, BW sets the corner frequency of a lowpass.)
     Fs : float
         Sampling rate of the timeseries
     Kmax : int
@@ -32,6 +32,10 @@ def slepian_projection(
         Center frequency of the bandpass (defaut is lowpass)
     baseband : bool
         Reconstruct bandpass signal in baseband
+    onesided : bool
+        If making a centered bandpass projection, do one-sided or not.
+        For example, a one-sided baseband reconstruction is similar
+        to a combination of bandpass filtering and Hilbert transform.
     dpss : ndarray
         Pre-computed Slepian functions for given time-bandwidth product
     save_dpss : bool
@@ -66,15 +70,22 @@ def slepian_projection(
     else:
         t = np.arange(npts)
         dpss_pf = np.exp(2j * np.pi * w0 * t / Fs) * dpss
-        dpss_nf = np.exp(-2j * np.pi * w0 * t / Fs) * dpss
-        nrm = np.sqrt( ( dpss_nf * dpss_nf.conj() ).sum(-1) )
-        dpss_nf /= nrm[:, None]
+        # this really should already be normalized
+        nrm = np.sqrt( ( dpss_pf * dpss_pf.conj() ).sum(-1) )
+        #dpss_nf = np.exp(-2j * np.pi * w0 * t / Fs) * dpss
+        #nrm = np.sqrt( ( dpss_nf * dpss_nf.conj() ).sum(-1) )
+        #dpss_nf /= nrm[:, None]
+        dpss_pf /= nrm[:, None]
         wp = data.dot( dpss_pf.conj().T )
-        wn = data.dot( dpss_nf.conj().T )
+        #wn = data.dot( dpss_nf.conj().T )
         if baseband:
-            bp = ( wp.dot( dpss ) + wn.dot( dpss ) ).real.copy()
+            #bp = ( wp.dot( dpss ) + wn.dot( dpss ) ).real.copy()
+            bp = 2 * wp.dot( dpss )
         else:
-            bp = ( wp.dot( dpss_pf ) + wn.dot( dpss_nf ) ).real.copy()
+            bp = 2 * wp.dot( dpss_pf )
+            #bp = ( wp.dot( dpss_pf ) + wn.dot( dpss_nf ) ).real.copy()
+        if not onesided:
+            bp = bp.real
     if save_dpss:
         return bp, dpss
     return bp

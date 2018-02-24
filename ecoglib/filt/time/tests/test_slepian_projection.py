@@ -3,11 +3,14 @@ from nose.tools import assert_true, assert_equal
 from numpy.testing import assert_almost_equal
 import numpy as np
 
-from ecoglib.filt.time.slepian_projection import \
+from ecoglib.filt.time.projection_filters import \
      slepian_projection, moving_projection, _moving_projection_preserve
 
 def gen_sig(am=False, w0=80, bw=30, nfreqs=10):
-    """Generate test signal with given bandwidth and center frequency.
+    """Generate test signal with given bandwidth. The band is
+    shifted to w0 either through amplitude modulation or by
+    adding w0 to the zero-centered frequencies.
+    
     The sampling frequency is 1000 Hz.
     """
     freqs = (np.random.rand(10) - 0.5) * bw
@@ -43,6 +46,16 @@ def test_narrowband_recon():
     rel_error = np.sum(err**2) / np.sum(nb[150:-150]**2)
     assert_true( rel_error < 1e-3 )
 
+def test_narrowband_rejection():
+    """Does the projection filter miss an out-of-band narrowband signal?"""
+    nb = gen_sig()
+    # Narrow-band signal extends from 65-95 Hz
+    # This slepian projector extends from 100 - 200 Hz and
+    # should reject the narrow-band signal reasonably well
+    nb_est = slepian_projection(nb, 50, 1000.0, w0=150)
+    rel_leak = np.sum(nb_est[150:-150]**2) / np.sum(nb[150:-150]**2)
+    assert_true( rel_leak < 1e-3 )
+
 def test_bandpass_power():
     """Does the projection remove the correct amount of broadband power?"""
     sg = np.random.randn(2000)
@@ -65,6 +78,30 @@ def test_shapes():
     assert_equal(slepian_projection(sg_1d, 20, 1000.0).shape, sg_1d.shape)
     assert_equal(slepian_projection(sg_2d, 20, 1000.0).shape, sg_2d.shape)
     assert_equal(slepian_projection(sg_3d, 20, 1000.0).shape, sg_3d.shape)
+
+def test_projection_return_types():
+
+    x = np.random.randn(2000)
+
+    # basic lowpass
+    y1 = slepian_projection(x, 100, 1e3)
+    assert_true(y1.dtype not in np.sctypes['complex'])
+
+    # basic bandpass twosided
+    y1 = slepian_projection(x, 100, 1e3, w0=150)
+    assert_true(y1.dtype not in np.sctypes['complex'])
+
+    # bandpass onesided
+    y1 = slepian_projection(x, 100, 1e3, w0=150, onesided=True)
+    assert_true(y1.dtype in np.sctypes['complex'])
+    
+    # bandpass demodulated
+    y1 = slepian_projection(x, 100, 1e3, w0=150, baseband=True)
+    assert_true(y1.dtype not in np.sctypes['complex'])
+
+    # bandpass onesided
+    y1 = slepian_projection(x, 100, 1e3, w0=150, baseband=True, onesided=True)
+    assert_true(y1.dtype in np.sctypes['complex'])
 
 def test_moving_projection_recon():
     """Does the projection filter preserve a lowpass signal?"""
