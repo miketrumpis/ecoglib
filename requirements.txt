@@ -27,4 +27,5 @@ six
 statsmodels
 traits
 traitsui
-
+nose
+cython
