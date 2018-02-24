@@ -131,7 +131,7 @@ def semivariogram(
             sv[n] = avg_var / 2 / (0.457 + 0.494 / Nd[n])
         else:
             sv[n] = 0.5 * np.mean( (x_s1 - x_s2)**2 )
-        serr[n] = np.std( (x_s1 - x_s1)**2 ) / np.sqrt(len(x_s1))
+        serr[n] = np.std( 0.5 * (x_s1 - x_s2)**2 ) / np.sqrt(len(x_s1))
     if counts and se:
         return x, sv, Nd, serr
     if se:
