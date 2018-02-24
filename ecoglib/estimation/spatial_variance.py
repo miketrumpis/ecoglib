@@ -165,7 +165,8 @@ except ImportError:
     
 
 def fast_semivariogram(
-        F, combs, xbin=None, trimmed=True, cloud=False, counts=False, se=False
+        F, combs, xbin=None, trimmed=True,
+        cloud=False, counts=False, se=False, **kwargs
         ):
     """
     Classical semivariogram estimator with option for Cressie's robust
@@ -212,7 +213,7 @@ def fast_semivariogram(
 
 
     sv_matrix = ergodic_semivariogram(F, normed=False,
-                                      mask_outliers=trimmed)
+                                      mask_outliers=trimmed, **kwargs)
     x = combs.dist
     sv = sv_matrix[ np.triu_indices(len(sv_matrix), k=1) ]
     
@@ -262,7 +263,12 @@ def ergodic_semivariogram(data, normed=False, mask_outliers=True,
     #data = data - data.mean(0)
     #data = data - data.mean()
     cxx = np.einsum('ik,jk->ij', data, data)
-    cxx /= data.shape[1]
+    if mask_outliers:
+        m = m.astype('i')
+        N = np.einsum('ik,jk->ij', m, m)
+    else:
+        N = data.shape[1]
+    cxx /= N
     var = cxx.diagonal()
     ## if normed:
     ##     cxx /= np.outer(var, var) ** 0.5
