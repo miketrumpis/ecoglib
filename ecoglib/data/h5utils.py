@@ -157,6 +157,12 @@ def traverse_table(f, path='/', load=True, scan=False, shared_paths=()):
     # If we encouter a group, then loop back into this method
     if not isinstance(f, tables.file.File):
         if load or scan:
+            # technically there is no distinction between
+            # a) load==True and scan==True
+            # b) load==True and scan==False
+            #
+            # If scan is True, then perhaps load should be
+            # forced False here, e.g. load = not scan
             with closing(tables.open_file(f, mode='r')) as f:
                 return traverse_table(
                     f, path=path, load=load, scan=scan,
