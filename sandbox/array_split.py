@@ -119,8 +119,8 @@ class SharedmemManager(object):
             #global shape_
             shape = shape_
 
-        info = mp.get_logger().info
-        info('reshaping %s'%repr(shape))
+        ## info = mp.get_logger().info
+        ## info('reshaping %s'%repr(shape))
         return np.frombuffer(mp_arr.get_obj(), dtype=dtype).reshape(shape)
 
 def split_at(
@@ -294,19 +294,19 @@ def _init_globals(
     method_ = method
     global args_
     args_ = args
-    info = mp.get_logger().info
-    info(repr(map(type, args)))
+    ## info = mp.get_logger().info
+    ## info(repr(map(type, args)))
 
     global kwdict_
     kwdict_ = kwdict
 
-    info = mp.get_logger().info
-    info('applied global variables')
+    ## info = mp.get_logger().info
+    ## info('applied global variables')
     
 def _global_method_wrap(aslice):
     arrs = [arr_.get_ndarray() for arr_ in shared_arr_]
     
-    info = mp.get_logger().info
+    ## info = mp.get_logger().info
     
     spliced_in = zip( 
         split_arg_+shared_args_, 
@@ -328,11 +328,11 @@ def _global_method_wrap(aslice):
     args = tuple(args)
     #info(repr(map(type, args)))
 
-    info(
-        'applying method {0} to slice {1} at position {2}'.format(
-            method_, aslice, split_arg_
-            )
-        )
+    ## info(
+    ##     'applying method {0} to slice {1} at position {2}'.format(
+    ##         method_, aslice, split_arg_
+    ##         )
+    ##     )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         r = method_(*args, **kwdict_)
