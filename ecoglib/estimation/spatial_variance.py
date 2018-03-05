@@ -116,7 +116,8 @@ def semivariogram(
         x_s2 = F[ combs.p2[m] ].ravel()
         if trimmed:
             # trim outliers from the population of samples at this lag
-            m = fenced_out( np.r_[x_s1, x_s2] ).reshape(2, len(x_s1))
+            t = 4 if isinstance(trimmed, bool) else trimmed
+            m = fenced_out( np.r_[x_s1, x_s2], thresh=t ).reshape(2, len(x_s1))
             m = m[0] & m[1]
             # keep only pairs where both samples are inliers
             x_s1 = x_s1[m]
@@ -216,17 +217,19 @@ def fast_semivariogram(
                                       mask_outliers=trimmed, **kwargs)
     x = combs.dist
     sv = sv_matrix[ np.triu_indices(len(sv_matrix), k=1) ]
-    
+    sv = np.ma.masked_invalid(sv)
+    x = np.ma.masked_array(x, sv.mask).compressed()
+    sv = sv.compressed()
     if cloud:
         if counts:
             return x, sv, 1
         return x, sv
 
     if xbin is None:
-        xb = np.unique(combs.dist)
+        xb = np.unique(x)
         yb = [ sv[ x == u ] for u in xb ]
     else:
-        xb, assignment = adapt_bins(xbin, combs.dist, return_map=True)
+        xb, assignment = adapt_bins(xbin, x, return_map=True)
         yb = [ sv[ assignment == u ] for u in xb ]
     Nd = np.array(map(len, yb))
 
