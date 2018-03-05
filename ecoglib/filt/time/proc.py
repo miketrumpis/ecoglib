@@ -130,7 +130,7 @@ def notch_all(
             )
     return arr_f
 
-def downsample(x, fs, appx_fs=None, r=None, axis=-1):
+def downsample(x, fs, appx_fs=None, r=None):
     """Integer downsampling with antialiasing.
 
     One (and only one) of the parameters 'appx_fs' and 'r' must be
@@ -156,8 +156,6 @@ def downsample(x, fs, appx_fs=None, r=None, axis=-1):
         sampling rate.
     r : int
         The integer downsampling rate
-    axis : int
-        The timeseries axis in 'x'
 
     Returns
     -------
@@ -195,10 +193,8 @@ def downsample(x, fs, appx_fs=None, r=None, axis=-1):
         x, ftype='cheby1', inplace=False, 
         design_kwargs=fdesign, filt_kwargs=dict(axis=axis)
         )
-    sl = [ slice(None) ] * len(x.shape)
-    sl[axis] = slice(0, x.shape[axis], r)
     
-    x_ds = x_lp[ sl ].copy()
+    x_ds = x_lp[..., ::r].copy()
     return x_ds, new_fs
         
 def ma_highpass(x, fc, progress=False, fir_filt=False):
