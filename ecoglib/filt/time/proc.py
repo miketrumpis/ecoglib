@@ -196,7 +196,62 @@ def downsample(x, fs, appx_fs=None, r=None):
     
     x_ds = x_lp[..., ::r].copy()
     return x_ds, new_fs
-        
+
+def upsample(x, fs, appx_fs=None, r=None, interp='sinc'):
+    if appx_fs is None and r is None:
+        return x
+    if appx_fs is not None and r is not None:
+        raise ValueError('only specify new fs or resample factor, not both')
+
+    if appx_fs is not None:
+        # new sampling interval must be a multiple of old sample interval,
+        # so find the closest match that is <= appx_fs
+        r = int( np.floor(appx_fs / fs) )
+
+    x_up = shared_ndarray(x.shape[:-1] + (r * x.shape[-1],), x.dtype.char)
+    x_up[..., ::r] = x
+
+    new_fs = fs * r
+
+    from ecoglib.filt.blocks import BlockedSignal
+    from scipy.fftpack import fft, ifft, fftfreq
+    from scipy.interpolate import interp1d
+
+    if interp == 'sinc':
+        x_up *= r
+        op_size = 2**16
+        xb = BlockedSignal(x_up, op_size, partial_block=True)
+        for block in xb.fwd():
+            Xf = fft(block, axis=-1)
+            freq = fftfreq(Xf.shape[-1]) * new_fs
+            Xf[..., np.abs(freq) > fs/2.0] = 0
+            block[:] = ifft(Xf).real
+        return x_up, new_fs
+    elif interp == 'linear':
+        # always pick up the first and last sample when skipping by r
+        op_size = r * 10000 + 1
+        t = np.arange(op_size)
+        xb = BlockedSignal(x_up, op_size, overlap=1, partial_block=True)
+        for block in xb.fwd():
+            N = block.shape[-1]
+            fn = interp1d(t[:N][::r], block[..., ::r], axis=-1,
+                          bounds_error=False, fill_value=0,
+                          assume_sorted=True)
+            block[:] = fn(t[:N])
+        return x_up, new_fs
+    
+    # design a cheby-1 lowpass filter 
+    # wp: 0.4 * new_fs
+    # ws: 0.5 * new_fs
+    # design specs with halved numbers, since filtfilt will be used
+    wp = 2 * 0.4 * fs / new_fs
+    ws = 2 * 0.5 * fs / new_fs
+    ord, wc = signal.cheb1ord(wp, ws, 0.25, 10)
+    fdesign = dict(ripple=0.25, hi=0.5 * wc * new_fs, Fs=new_fs, ord=ord)
+    filter_array(x_up, ftype='cheby1', inplace=True, design_kwargs=fdesign)
+    x_up *= r
+    return x_up, new_fs
+    
 def ma_highpass(x, fc, progress=False, fir_filt=False):
     """
     Implement a stable FIR highpass filter using a moving average.
