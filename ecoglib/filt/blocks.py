@@ -44,7 +44,7 @@ class BlockedSignal(object):
         while axis < 0:
             axis += len(shape)
         bsize = int(bsize)
-        if isinstance(overlap, int) and overlap > 1:
+        if isinstance(overlap, int) and overlap > 0:
             L = bsize - overlap
         else:
             L = int( round( (1-overlap) * bsize ) )
