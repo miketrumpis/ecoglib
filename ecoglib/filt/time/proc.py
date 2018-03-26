@@ -176,8 +176,8 @@ def downsample(x, fs, appx_fs=None, r=None):
         r = int( np.ceil(fs / appx_fs) )
 
     
-    num_pts = x.shape[axis] // r
-    num_pts += int( ( x.shape[axis] - num_pts*r ) > 0 )
+    num_pts = x.shape[-1] // r
+    num_pts += int( ( x.shape[-1] - num_pts*r ) > 0 )
 
     new_fs = fs / r
 
@@ -190,8 +190,7 @@ def downsample(x, fs, appx_fs=None, r=None):
     ord, wc = signal.cheb1ord(wp, ws, 0.25, 10)
     fdesign = dict(ripple=0.25, hi=0.5 * wc * fs, Fs=fs, ord=ord)
     x_lp = filter_array(
-        x, ftype='cheby1', inplace=False, 
-        design_kwargs=fdesign, filt_kwargs=dict(axis=axis)
+        x, ftype='cheby1', inplace=False, design_kwargs=fdesign
         )
     
     x_ds = x_lp[..., ::r].copy()
