@@ -432,8 +432,8 @@ def channel_combinations(chan_map, scale=1.0, precision=4):
     npair = spmisc.comb(len(chan_map),2,exact=1)
     chan_combs.p1 = np.empty(npair, 'i')
     chan_combs.p2 = np.empty(npair, 'i')
-    chan_combs.idx1 = np.empty((npair,2), 'i')
-    chan_combs.idx2 = np.empty((npair,2), 'i')
+    chan_combs.idx1 = np.empty((npair, 2), 'd')
+    chan_combs.idx2 = np.empty((npair, 2), 'd')
     chan_combs.dist = np.empty(npair)
     ii, jj = chan_map.to_mat()
     # Distances are measured between grid locations (i1,j1) to (i2,j2)
@@ -452,4 +452,10 @@ def channel_combinations(chan_map, scale=1.0, precision=4):
     d = np.abs( chan_combs.idx1 - chan_combs.idx2 ) * s_
     dist = ( d**2 ).sum(1) ** 0.5
     chan_combs.dist = np.round(dist, decimals=precision)
+    idx1 = chan_combs.idx1.astype('i')
+    if (idx1 == chan_combs.idx1).all():
+        chan_combs.idx1 = idx1
+    idx2 = chan_combs.idx2.astype('i')
+    if (idx2 == chan_combs.idx2).all():
+        chan_combs.idx2 = idx2
     return chan_combs
