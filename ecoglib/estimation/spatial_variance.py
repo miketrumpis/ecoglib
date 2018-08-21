@@ -170,8 +170,8 @@ def fast_semivariogram(
         cloud=False, counts=False, se=False, **kwargs
         ):
     """
-    Classical semivariogram estimator with option for Cressie's robust
-    estimator. Can also return a semivariogram "cloud".
+    Semivariogram estimator with stationarity assumptions, enabling
+    faster "flipped" covariance computation.
 
     Parameters
     ----------
