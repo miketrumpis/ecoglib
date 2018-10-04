@@ -49,7 +49,7 @@ semivariance = Extension(
 with open('requirements.txt') as f:
     reqs = f.readlines()
     reqs = map(str.strip, reqs)
-    reqs = filter(None, reqs)
+    reqs = filter(lambda x: 'mayavi' not in x, reqs)
 
 if __name__=='__main__':
     setup(
