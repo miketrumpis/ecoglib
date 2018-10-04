@@ -55,13 +55,11 @@ if __name__=='__main__':
     setup(
         name = 'ecoglib',
         version = '0.1',
-        packages = ['ecoglib.vis', 'ecoglib.graph',
-                    'ecoglib.data', 'ecoglib.filt',
-                    'ecoglib.estimation', 'sandbox'],
-        ext_modules = [ cknn_graph,
-                        slepian_projection,
-                        bispectrum,
-                        semivariance ],
+        packages = find_packages(exclude=['demos', 'notes_n_demos', 'build']),
+        ext_modules = [cknn_graph,
+                       slepian_projection,
+                       bispectrum,
+                       semivariance],
         cmdclass = {'build_ext': build_ext},
         install_requires=reqs
     )
