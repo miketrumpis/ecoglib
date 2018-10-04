@@ -49,7 +49,13 @@ semivariance = Extension(
 with open('requirements.txt') as f:
     reqs = f.readlines()
     reqs = map(str.strip, reqs)
-    reqs = filter(lambda x: 'mayavi' not in x, reqs)
+    def _del_soft_reqs(s):
+        if 'mayavi' in s.lower():
+            return False
+        if 'pyside' in s.lower():
+            return False
+        return True
+    reqs = filter(_del_soft_reqs, reqs)
 
 if __name__=='__main__':
     setup(
