@@ -243,8 +243,7 @@ def fast_semivariogram(
         return xb, semivar, Nd
     return xb, semivar
 
-def ergodic_semivariogram(data, normed=False, mask_outliers=True,
-                          zero_field=True):
+def ergodic_semivariogram(data, normed=False, mask_outliers=True, zero_field=True, covar=False):
     #data = data - data.mean(1)[:,None]
     if zero_field:
         data = data - data.mean(0)
@@ -263,8 +262,6 @@ def ergodic_semivariogram(data, normed=False, mask_outliers=True,
         
     if normed:
         data = data / np.std(data, axis=1, keepdims=1)
-    #data = data - data.mean(0)
-    #data = data - data.mean()
     cxx = np.einsum('ik,jk->ij', data, data)
     if mask_outliers:
         m = m.astype('i')
@@ -273,19 +270,6 @@ def ergodic_semivariogram(data, normed=False, mask_outliers=True,
         N = data.shape[1]
     cxx /= N
     var = cxx.diagonal()
-    ## if normed:
-    ##     cxx /= np.outer(var, var) ** 0.5
-    ##     var = np.ones_like(var)
+    if covar:
+        return cxx
     return 0.5 * (var[:,None] + var) - cxx
-    
-    ## # zero mean for temporal expectation
-    ## dzm = data - data.mean(-1)[:,None]
-    ## #dzm = data - data.mean(0)
-    ## # I think this adjustment is ok -- this enforces the assumption
-    ## # that every site has similar marginal statistics
-    ## ## var = dzm.var(-1)
-    ## ## dzm = dzm / np.sqrt(var)[:,None]
-    ## cxx = np.cov(dzm, bias=1)
-    ## var = cxx.diagonal()
-    ## var = 0.5 * (var[:,None] + var)
-    ## return var - cxx
