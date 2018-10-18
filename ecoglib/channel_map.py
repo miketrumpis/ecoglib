@@ -29,14 +29,30 @@ class ChannelMap(list):
         self.pitch = pitch
         self._combs = None
 
+
+    @staticmethod
+    def from_index(ij, shape, col_major=True, pitch=1.0):
+        """Return a ChannelMap from a list of matrix index pairs (e.g. [(0, 3), (2, 1), ...])
+        and a matrix shape (e.g. (5, 5)).
+        """
+
+        from .util import mat_to_flat
+        i, j = zip(*ij)
+        map = mat_to_flat(shape, i, j, col_major=col_major)
+        return ChannelMap(map, shape, col_major=col_major, pitch=pitch)
+
+
     @staticmethod
     def from_mask(mask, col_major=True, pitch=1.0):
-        # create a ChannelMap from a binary grid
+        """Create a ChannelMap from a binary grid. Note: the data channels must be aligned
+        with the column-major or row-major raster order of this binary mask
+        """
+
         i, j = mask.nonzero()
+        ij = zip(i, j)
         geo = mask.shape
-        from .util import mat_to_flat
-        map = mat_to_flat(geo, i, j, col_major=col_major)
-        return ChannelMap(map, geo, col_major=col_major, pitch=pitch)
+        return ChannelMap.from_index(ij, geo, col_major=col_major, pitch=pitch)
+
 
     @property
     def site_combinations(self):
