@@ -5,12 +5,16 @@ import numpy as np
 import tables
 from tables import NoSuchNodeError
 import os
+import types
 from contextlib import closing
 
 from ecoglib.util import Bunch
 from sandbox.array_split import shared_ndarray
 
-_h5_seq_types = (str, list, int, float, complex, bool)
+
+_h5_seq_types = types.StringTypes + (types.ListType, types.IntType, types.FloatType, types.ComplexType,
+                                     types.BooleanType)
+
 
 class HDF5Bunch(Bunch):
     
@@ -32,6 +36,7 @@ class HDF5Bunch(Bunch):
         
     def __del__(self):
         self.close()
+
 
 def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
     """
@@ -97,7 +102,7 @@ def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
                 path, key, atom=atom, shape=val.shape, filters=filters
                 )
             ca[:] = val
-        elif isinstance(val, _h5_seq_types):
+        elif type(val) in _h5_seq_types:
             try:
                 f.create_array(path, key, val)
             except TypeError, ValueError:
@@ -120,6 +125,7 @@ def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
             f, subpath, b, compress_arrays=compress_arrays
             )
     return
+
 
 def load_bunch(f, path='/', shared_arrays=(), load=True, scan=False):
     """
@@ -151,6 +157,7 @@ def load_bunch(f, path='/', shared_arrays=(), load=True, scan=False):
     return traverse_table(
         f, path=path, shared_paths=shared_arrays, load=load, scan=scan
         )
+
 
 def traverse_table(f, path='/', load=True, scan=False, shared_paths=()):
     # Walk nodes and stuff arrays into the bunch.
