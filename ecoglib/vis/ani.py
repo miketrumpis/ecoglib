@@ -9,8 +9,9 @@ from progressbar import ProgressBar, Percentage, Bar
 import warnings
 
 def _setup_animated_frames(
-        frames, timer='ms', time=(), axis_toggle='on',
-        figsize=None, colorbar=False, cbar_label='', figure_canvas=True,
+        frames, timer='ms', time=(), static_title='', axis_toggle='on',
+        figsize=None, colorbar=False, cbar_label='', cbar_orientation='vertical',
+        figure_canvas=True,
         **imshow_kw
         ):
     if figure_canvas:
@@ -27,6 +28,9 @@ def _setup_animated_frames(
         timer = 'samp'
     if len(time):
         ttl = ax.set_title('{0:.2f} {1}'.format(time[0], timer))
+    elif static_title:
+        ax.set_title(static_title)
+        ttl = None
     else:
         ttl = None
     def _step_time(num, frames, frame_im):
@@ -37,7 +41,7 @@ def _setup_animated_frames(
         return (frame_im,)
     func = lambda x: _step_time(x, frames, im)
     if colorbar:
-        cb = f.colorbar(im, ax=ax, use_gridspec=True)
+        cb = f.colorbar(im, ax=ax, use_gridspec=True, orientation=cbar_orientation)
         cb.set_label(cbar_label)
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
