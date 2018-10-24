@@ -121,7 +121,7 @@ def semivariogram(
             # mask differences (not raw samples)
             m = fenced_out(diffs, thresh=t)
             diffs = diffs[m]
-       Nd[n] = len(diffs)
+        Nd[n] = len(diffs)
         if not Nd[n]:
             if not cloud:
                 sv[n] = np.nan
