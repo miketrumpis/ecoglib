@@ -114,25 +114,24 @@ def semivariogram(
             m = assignment == x[n]
         x_s1 = F[ combs.p1[m] ].ravel()
         x_s2 = F[ combs.p2[m] ].ravel()
+        diffs = x_s1 - x_s2
         if trimmed:
             # trim outliers from the population of samples at this lag
             t = 4 if isinstance(trimmed, bool) else trimmed
-            m = fenced_out( np.r_[x_s1, x_s2], thresh=t ).reshape(2, len(x_s1))
-            m = m[0] & m[1]
-            # keep only pairs where both samples are inliers
-            x_s1 = x_s1[m]
-            x_s2 = x_s2[m]
-        Nd[n] = len(x_s1)
+            # mask differences (not raw samples)
+            m = fenced_out(diffs, thresh=t)
+            diffs = diffs[m]
+       Nd[n] = len(diffs)
         if not Nd[n]:
             if not cloud:
                 sv[n] = np.nan
             continue
         if robust:
-            avg_var = np.power(np.abs( x_s1 - x_s2 ), 0.5).mean() ** 4
+            avg_var = np.power(np.abs(diffs), 0.5).mean() ** 4
             sv[n] = avg_var / 2 / (0.457 + 0.494 / Nd[n])
         else:
-            sv[n] = 0.5 * np.mean( (x_s1 - x_s2)**2 )
-        serr[n] = np.std( 0.5 * (x_s1 - x_s2)**2 ) / np.sqrt(len(x_s1))
+            sv[n] = 0.5 * np.mean(diffs ** 2)
+        serr[n] = np.std(0.5 * (diffs ** 2)) / np.sqrt(Nd[n])
     if counts and se:
         return x, sv, Nd, serr
     if se:
