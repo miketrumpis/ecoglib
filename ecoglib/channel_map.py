@@ -183,7 +183,7 @@ class ChannelMap(list):
             array.fill(fill)
         slicing = [slice(None)] * len(shape)
         slicing[axis] = self.as_row_major()[:]
-        array[slicing] = data
+        array[tuple(slicing)] = data
         shape.pop(axis)
         shape.insert(axis, self.geometry[1])
         shape.insert(axis, self.geometry[0])
