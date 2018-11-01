@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.ndimage as ndimage
 import scipy.signal as signal
+from skimage.restoration.inpaint import inpaint_biharmonic
 from ..blocks import BlockedSignal
 
 def pixel_corrections(
@@ -113,6 +114,7 @@ def pixel_corrections(
 
     return arr.squeeze()
 
+
 class Scaler(object):
     def __init__(self, realval):
         self.min = realval.min()
@@ -123,28 +125,36 @@ class Scaler(object):
     def rescale(self, x, mx, mn=0):
         return (x - mn) / float(mx - mn) * (self.max - self.min) + self.min
 
-try:
-    import cv2
-    def inpaint_pixels(img, mask=None, radius=3, method=cv2.INPAINT_TELEA):
 
-        if isinstance(img, np.ma.MaskedArray):
-            mask = img.mask
-            img = img.data
+def inpaint_pixels(img, mask=None, pad_radius=3):
+    """Inpaint pixels
 
-        elif mask is None:
-            return img
+    Parameters
+    ----------
+    img: 2D array
+    mask: 2D binary array
+        Per maskedarray convention, where mask[i, j] is True marks a missing pixel to be filled.
+    pad_radius: int, optional
+        The reach of reflected matrix padding (to aid prediction of edge pixels).
 
-        m, n = img.shape
-        img = np.pad(img, radius, mode='reflect')
-        mask = np.pad(mask, radius, mode='reflect')
+    Returns
+    -------
+    filled_image: 2D array
 
-        scl = Scaler(img)
-        img_fill = cv2.inpaint(
-            scl.quantize(img).astype('B'), mask, radius, method
-            )
-        return scl.rescale(img_fill, 255.0)[radius:radius+m, radius:radius+n]
- 
-except:
-   def inpaint_pixels(*args, **kwargs):
-       raise NotImplementedError('Could not import opencv')
+    """
+
+    if isinstance(img, np.ma.MaskedArray):
+        mask = img.mask
+        img = img.data
+
+    if mask is None:
+        return img
+    else:
+        mask = (mask > 0).astype('i')
+
+    m, n = img.shape
+    img = np.pad(img, pad_radius, mode='reflect')
+    mask = np.pad(mask, pad_radius, mode='reflect')
+    filled = inpaint_biharmonic(img, mask, multichannel=False)
+    return filled[pad_radius:pad_radius + m, pad_radius:pad_radius + n]
 
