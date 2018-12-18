@@ -1,7 +1,7 @@
 """This module creates a bridge between the plot modules and a traits GUI
 """
 
-# Matplotlib
+import os
 import matplotlib
 use = matplotlib.get_backend()
 
@@ -29,7 +29,6 @@ else: #elif use.lower() == 'agg':
       import NavigationToolbar2 as NavigationToolbar
          
 from matplotlib.figure import Figure
-from matplotlib._pylab_helpers import Gcf
 
 try:
     from traitsui.qt4.editor import Editor
@@ -64,7 +63,13 @@ def assign_canvas(editor):
     return mpl_canvas
 
 def _embedded_qt_figure(parent, editor, toolbar=True):
-    from PySide.QtGui import QVBoxLayout, QWidget
+    if os.environ['QT_API'].lower() == 'pyqt5':
+        from PyQt5.QtWidgets import QVBoxLayout, QWidget
+    elif os.environ['QT_API'].lower() == 'pyqt':
+        try:
+            from PySide.QtGui import QVBoxLayout, QWidget
+        except ImportError:
+            from PyQt4.QtGui import QVBoxLayout, QWidget
 
     panel = QWidget(parent.parentWidget())
     canvas = assign_canvas(editor)
