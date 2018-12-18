@@ -5,7 +5,7 @@ from matplotlib.gridspec import GridSpec
 import matplotlib.animation as _animation
 import os
 import subprocess
-from progressbar import ProgressBar, Percentage, Bar
+from tqdm import trange
 import warnings
 
 def _setup_animated_frames(
@@ -100,7 +100,7 @@ def h264_encode_files(in_pattern, out, fps, quicktime=False):
     
 def write_anim(
         fname, fig, func, n_frame,
-        title='Array Movie', fps=5, quicktime=False, qtdpi=300
+        title='Array Movie', fps=5, quicktime=False, qtdpi=300, progress=False
         ):
 
     FFMpegWriter = _animation.writers['ffmpeg']
@@ -121,14 +121,14 @@ def write_anim(
     fname = fname.split('.mp4')[0]
     with writer.saving(fig, fname+'.mp4', dpi):
         print 'Writing {0} frames'.format(n_frame)
-        pbar = ProgressBar(
-            widgets=[Percentage(), Bar()], maxval=n_frame
-            ).start()
-        for n in xrange(n_frame):
+        if progress:
+            itr = trange(n_frame)
+        else:
+            itr = xrange(n_frame)
+        for n in itr:
             func(n)
             writer.grab_frame()
-            pbar.update(n)
-        pbar.finish()
+
 
 def dynamic_frames_and_series(
         frames, series, timer='ms',
