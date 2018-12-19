@@ -65,7 +65,7 @@ def assign_canvas(editor):
 def _embedded_qt_figure(parent, editor, toolbar=True):
     if os.environ['QT_API'].lower() == 'pyqt5':
         from PyQt5.QtWidgets import QVBoxLayout, QWidget
-    elif os.environ['QT_API'].lower() == 'pyqt':
+    elif os.environ['QT_API'].lower() in ('pyside', 'pyqt'):
         try:
             from PySide.QtGui import QVBoxLayout, QWidget
         except ImportError:
