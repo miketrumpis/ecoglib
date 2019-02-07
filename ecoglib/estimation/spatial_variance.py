@@ -40,7 +40,7 @@ def adapt_bins(bsize, dists, return_map=False):
 
 def semivariogram(
         F, combs, xbin=None, robust=True,
-        trimmed=True, cloud=False, counts=False, se=False
+        trimmed=True, cloud=False, counts=False, se=False, slowcloud=False
         ):
     """
     Classical semivariogram estimator with option for Cressie's robust
@@ -88,43 +88,43 @@ def semivariogram(
     # F is an n_site field of values
     # combs is a channel combination bunch
     if cloud:
-        # xxx: this relies on comb.dist and triu_diffs both using
-        # upper-triangle convention
-        x = combs.dist
-        if F.ndim == 1:
-            F = F[:, None]
-        sv, Nd = _pairwise_semivariance(F, robust=robust, trimmed=trimmed)
-        if counts:
-            return x, sv, Nd
-        return x, sv
+        x_set = []
+        y_set = []
+    if xbin is None:
+        x = np.unique(combs.dist)
+        Nd = np.zeros(len(x), 'i')
+        sv = np.empty_like(x)
     else:
-        if xbin is None:
-            x = np.unique(combs.dist)
-            Nd = np.zeros(len(x), 'i')
-            sv = np.empty_like(x)
-        else:
-            x, assignment = adapt_bins(xbin, combs.dist, return_map=True)
-            Nd = np.zeros(len(x), 'i')
-            sv = np.empty(len(x))
-        serr = np.empty(len(x))
+        x, assignment = adapt_bins(xbin, combs.dist, return_map=True)
+        Nd = np.zeros(len(x), 'i')
+        sv = np.empty(len(x))
+    serr = np.empty(len(x))
     for n in xrange(len(x)):
         if xbin is None:
-            m = combs.dist == x[n]
+            pair_mask = combs.dist == x[n]
         else:
-            m = assignment == x[n]
-        x_s1 = F[ combs.p1[m] ].ravel()
-        x_s2 = F[ combs.p2[m] ].ravel()
+            pair_mask = assignment == x[n]
+        x_s1 = F[combs.p1[pair_mask]]
+        x_s2 = F[combs.p2[pair_mask]]
         diffs = x_s1 - x_s2
         if trimmed:
             # trim outliers from the population of samples at this lag
             t = 4 if isinstance(trimmed, bool) else trimmed
             # mask differences (not raw samples)
-            m = fenced_out(diffs, thresh=t)
-            diffs = diffs[m]
+            trim_mask = fenced_out(diffs, thresh=t)
+            if cloud:
+                diffs = np.ma.masked_array(diffs, mask=~trim_mask)
+            else:
+                # this should flatten the diffs
+                diffs = diffs[trim_mask]
+        if cloud:
+            diff_var = 0.5 * diffs.var(1)
+            y_set.append(diff_var)
+            Nd[n] = len(diff_var)
+            x_set.append([x[n]] * Nd[n])
+            continue
         Nd[n] = len(diffs)
         if not Nd[n]:
-            if not cloud:
-                sv[n] = np.nan
             continue
         if robust:
             avg_var = np.power(np.abs(diffs), 0.5).mean() ** 4
@@ -132,6 +132,9 @@ def semivariogram(
         else:
             sv[n] = 0.5 * np.mean(diffs ** 2)
         serr[n] = np.std(0.5 * (diffs ** 2)) / np.sqrt(Nd[n])
+    if cloud:
+        x = np.concatenate(x_set)
+        sv = np.concatenate(y_set)
     if counts and se:
         return x, sv, Nd, serr
     if se:
@@ -147,7 +150,9 @@ try:
         N, P = F.shape
         diffs = triu_diffs(F, axis=0)
         if trimmed:
-            m = fenced_out(diffs)
+            # trim outliers from the population of samples at this lag
+            t = 4 if isinstance(trimmed, bool) else trimmed
+            m = fenced_out(diffs, thresh=t)
             diffs = np.ma.masked_array(diffs, mask=~m)
             Nd = P - diffs.mask.sum(1)
         else:
