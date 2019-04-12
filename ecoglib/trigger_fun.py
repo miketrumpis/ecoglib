@@ -233,6 +233,67 @@ def ep_trigger_avg(
         np.sqrt(avg, avg)
     return avg, n_avg
 
+
+def iter_epochs(x, pivots, selected=(), pre=0, post=0, fill=np.nan):
+    """
+    Generator that yields epochs pivoted at the specified triggers.
+
+    Parameters
+    ----------
+    x : data (n_chan, n_pt)
+    pivots : array-like or StimulatedExperiment
+        A sequence of literal pivot samples, or an experiment wrapper
+        containing the timestamps.
+    selected : sequence
+        Indices into trig_code for a subset of stims. If empty, return *ALL*
+        epochs (*a potentially very large array*)
+    pre, post : ints
+        Number of pre- and post-stim samples in interval. post + pre > 0
+        default: 0 and stim-to-stim interval
+
+    """
+
+
+    x = np.atleast_2d(x) if x.ndim == 1 else x
+    if isinstance(pivots, StimulatedExperiment):
+        pivots, _ = trigs_and_conds(pivots)
+    epoch_len = int(np.median(np.diff(pivots)))
+
+    if not (post or pre):
+        post = epoch_len
+
+    epoch_len = int(round(post + pre))
+    pre = int(round(pre))
+    post = epoch_len - pre
+
+    if len(selected):
+        if hasattr(selected, 'dtype') and selected.dtype.char == '?':
+            selected = np.where(selected)[0]
+        pivots = np.take(pivots, selected)
+
+    epoch = np.empty((x.shape[0], epoch_len), x.dtype)
+
+    for k in pivots:
+        if k - pre < 0:
+            start_put = pre - k
+            pre = k
+        else:
+            start_put = 0
+        if k + post >= x.shape[1]:
+            stop_put = x.shape[1] - k + pre
+            post = x.shape[1] - k
+        else:
+            stop_put = pre + post
+
+        grab_idx = (slice(None), slice(k - pre, k + post))
+        put_idx = (slice(None), slice(start_put, stop_put))
+        if start_put > 0 or stop_put < pre + post:
+            epoch.fill(fill)
+        epoch[put_idx] = x[grab_idx]
+        yield epoch.copy()
+    return
+
+
 def extract_epochs(x, pivots, selected=(), pre=0, post=0, fill=np.nan):
     """
     Extract an array of epochs pivoted at the specified triggers. Note
@@ -275,26 +336,13 @@ def extract_epochs(x, pivots, selected=(), pre=0, post=0, fill=np.nan):
             selected = np.where(selected)[0]
         pivots = np.take(pivots, selected)
 
-    epochs = np.empty( (x.shape[0], len(pivots), epoch_len), x.dtype )
-    epochs.fill(fill)
+    epochs = np.empty((x.shape[0], len(pivots), epoch_len), x.dtype)
 
-    for n, k in enumerate(pivots):
-        if k - pre < 0:
-            start_put = pre - k
-            pre = k
-        else:
-            start_put = 0
-        if k + post >= x.shape[1]:
-            stop_put = x.shape[1] - k + pre
-            post = x.shape[1] - k
-        else:
-            stop_put = pre + post
-        
-        grab_idx = (slice(None), slice(k-pre, k+post))
-        put_idx = (slice(None), n, slice(start_put, stop_put))
-        epochs[put_idx] = x[grab_idx]
-    
+    gen_epochs = iter_epochs(x, pivots, pre=pre, post=post, fill=fill)
+    for n, e in enumerate(gen_epochs):
+        epochs[:, n, :] = e
     return epochs
+
 
 ## from array_split_test import mtm_lite
 
