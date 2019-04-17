@@ -3,6 +3,8 @@ import scipy.signal as signal
 from scipy.fftpack import fft, ifft
 from scipy.linalg import LinAlgError
 
+from tqdm import trange
+
 from ecoglib.numutil import nextpow2
 from ecoglib.util import input_as_2d
 
@@ -74,7 +76,7 @@ def bdetrend(x, bsize=0, **kwargs):
     del xc
     del x_blk
 
-from progressbar import ProgressBar, Percentage, Bar
+
 @input_as_2d()
 def overlap_add(x, w, progress=False):
 
@@ -115,10 +117,10 @@ def overlap_add(x, w, progress=False):
     z = np.zeros( x.shape[:-1] + (nfft-N,) )
 
     if progress:
-        pbar = ProgressBar(
-            widgets=[Percentage(), Bar()], maxval=min(nb1, nb2)
-            ).start()    
-    for n in xrange(nb1):
+        itr = trange(nb1)
+    else:
+        itr = xrange(nb1)
+    for n in itr:
         
         b = blocks.block(n)
         if b.shape[-1] == N:
@@ -140,10 +142,6 @@ def overlap_add(x, w, progress=False):
             b_sl[-1] = slice(0, bf.shape[-1])
         bf[:] += b[b_sl]    
         #bf[:] += b[..., :bf.shape[-1]]
-        if progress:
-            pbar.update(n)
-    if progress:
-        pbar.finish()
     #print b.shape, bf.shape, n
 
     if nb2 > nb1:
