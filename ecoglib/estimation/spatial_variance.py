@@ -38,6 +38,44 @@ def adapt_bins(bsize, dists, return_map=False):
         return bins, bins[bin_assignment]
     return bins
 
+
+def binned_variance(x, y, binsize=None):
+    if binsize is None:
+        xu = np.unique(x)
+    else:
+        xu, x = adapt_bins(binsize, x, return_map=True)
+    return xu, [ y[x==u] for u in xu ]
+
+
+def _get_scale_method(scale_type):
+    def iqr(sample):
+        return np.nanpercentile(sample, [25, 75])
+    def sd(sample):
+        return np.std(sample)
+    def sem(sample):
+        return sd(sample) / np.sqrt(len(sample))
+    # XXX: bootstrap TODO
+
+    methods = {'iqr': iqr, 'sd': sd, 'std': sd, 'sem': sem}
+    if scale_type.lower() not in methods:
+        raise ValueError('scale function {} not implemented'.format(scale_type))
+    return methods[scale_type.lower()]
+
+
+def binned_variance_aggregate(xb, y_tab, mid_type='mean', scale_type='sem'):
+    mid_fn = {'mean': np.mean,
+              'median': np.median}
+    if mid_type.lower() not in mid_fn:
+        raise ValueError('middle function {} not implemented'.format(mid_type))
+    mid_fn = mid_fn.get(mid_type.lower())
+    scale_fn = _get_scale_method(scale_type)
+
+    y_mid = np.array([mid_fn(y) for y in y_tab if len(y) > 1])
+    y_scale = np.array([scale_fn(y) for y in y_tab if len(y) > 1])
+    xb = np.array([xb[i] for i in xrange(len(xb)) if len(y_tab[i]) > 1])
+    return xb, y_mid, y_scale
+
+
 def semivariogram(
         F, combs, xbin=None, robust=True,
         trimmed=True, cloud=False, counts=False, se=False, slowcloud=False
@@ -118,7 +156,8 @@ def semivariogram(
                 # this should flatten the diffs
                 diffs = diffs[trim_mask]
         if cloud:
-            diff_var = 0.5 * diffs.var(1)
+            # this should be compressed -- in the event that a pair has no valid differences
+            diff_var = (0.5 * diffs.var(1)).compressed()
             y_set.append(diff_var)
             Nd[n] = len(diff_var)
             x_set.append([x[n]] * Nd[n])
@@ -220,7 +259,7 @@ def fast_semivariogram(
     sv_matrix = ergodic_semivariogram(F, normed=False,
                                       mask_outliers=trimmed, **kwargs)
     x = combs.dist
-    sv = sv_matrix[ np.triu_indices(len(sv_matrix), k=1) ]
+    sv = sv_matrix[np.triu_indices(len(sv_matrix), k=1)]
     sv = np.ma.masked_invalid(sv)
     x = np.ma.masked_array(x, sv.mask).compressed()
     sv = sv.compressed()
@@ -229,16 +268,9 @@ def fast_semivariogram(
             return x, sv, 1
         return x, sv
 
-    if xbin is None:
-        xb = np.unique(x)
-        yb = [ sv[ x == u ] for u in xb ]
-    else:
-        xb, assignment = adapt_bins(xbin, x, return_map=True)
-        yb = [ sv[ assignment == u ] for u in xb ]
+    xb, yb = binned_variance(x, sv, binsize=xbin)
     Nd = np.array(map(len, yb))
-
-    semivar = np.array( map(np.mean, yb) )
-    serr = np.array( map(lambda x: np.std(x) / np.sqrt(len(x)), yb) )
+    xb, semivar, serr = binned_variance_aggregate(xb, yb)
     if counts and se:
         return xb, semivar, Nd, serr
     if se:
