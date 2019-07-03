@@ -291,18 +291,21 @@ class CoordinateChannelMap(ChannelMap):
         """
         list.__init__(self)
         self[:] = coordinates
-        if isinstance(geometry, (str, unicode)) and geometry.lower() == 'auto':
-            yy, xx = zip(*self)
-            # repurpose geometry to specify rectangle (??)
-            # maintain "matrix" style coordinates, i.e. (y, x) <==> (i, j)
-            self.geometry = (min(yy), max(yy), min(xx), max(xx))
-        else:
-            self.geometry = geometry
+        yy, xx = zip(*self)
+        self.boundary = (min(yy), max(yy), min(xx), max(xx))
         self._combs = None
         self.pitch = pitch
         # this is nonsense, but to satisfy parent class
         self.col_major = col_major
-        
+        if isinstance(geometry, (str, unicode)) and geometry.lower() == 'auto':
+            y_gap = max(yy) - min(yy)
+            x_gap = max(xx) - min(xx)
+            self._combs = channel_combinations(self, scale=self.pitch)
+            min_pitch = self._combs.dist.min()
+            self.geometry = int(np.round(y_gap / min_pitch)), int(np.round(x_gap / min_pitch))
+        else:
+            self.geometry = geometry
+
     def to_mat(self):
         return map(np.array, zip(*self))
 
@@ -312,9 +315,9 @@ class CoordinateChannelMap(ChannelMap):
         chans = []
         for s in sites:
             dist = np.apply_along_axis(
-                np.linalg.norm, 1, coords - s #np.array([y, x])
+                np.linalg.norm, 1, coords - s
                 )
-            chans.append( np.argmin( dist ) )
+            chans.append(np.argmin(dist))
         return np.array(chans).squeeze()
 
     def rlookup(self, c):
@@ -340,7 +343,7 @@ class CoordinateChannelMap(ChannelMap):
 
     def image(
             self, arr=None, cbar=True, ax=None, interpolate='linear',
-            grid_pts=100, norm=None, clim=None, cmap='gray',
+            grid_pts=None, norm=None, clim=None, cmap='viridis',
             scatter_kw={}, contour_kw={}
             ):
         y, x = self.to_mat()
@@ -366,12 +369,14 @@ class CoordinateChannelMap(ChannelMap):
             arrg, coords = self.embed(arr, interpolate=interpolate,
                                       grid_pts=grid_pts, grid_coords=True)
             xg, yg = coords
-            CS = ax.contourf(xg, yg, arrg, 10, clim=clim,
+            CS = ax.contourf(xg, yg, arrg, 10, vmin=clim[0], vmax=clim[1],
                              cmap=cmap, norm=norm, **contour_kw)
             if cbar:
                 cb = f.colorbar(CS, ax=ax, use_gridspec=True)
                 cb.solids.set_edgecolor('face')
 
+        scatter_kw.setdefault('edgecolors', 'k')
+        scatter_kw.setdefault('linewidths', 1.0)
         sct = ax.scatter(x, y, c=arr, norm=norm, cmap=cmap, **scatter_kw)
         if cbar:
             if not interpolate:
@@ -381,7 +386,7 @@ class CoordinateChannelMap(ChannelMap):
         return f
             
     def embed(
-            self, data, axis=0, interpolate='linear', grid_pts=100,
+            self, data, axis=0, interpolate='linear', grid_pts=None,
             grid_coords=False
             ):
         """
@@ -390,13 +395,16 @@ class CoordinateChannelMap(ChannelMap):
         """
         y, x = self.to_mat()
         triang = Triangulation(x, y)
-        g = self.geometry
-        yg = np.linspace(g[0], g[1], grid_pts)
-        xg = np.linspace(g[2], g[3], grid_pts)
+        g = self.boundary
+        if grid_pts is None:
+            grid_pts = self.geometry
+        elif not np.iterable(grid_pts):
+            grid_pts = (grid_pts, grid_pts)
+        else:
+            pass
+        yg = np.linspace(g[0], g[1], grid_pts[0])
+        xg = np.linspace(g[2], g[3], grid_pts[1])
         xg, yg = np.meshgrid(xg, yg, indexing='xy')
-        #xg = xg.ravel()
-        #yg = yg.ravel()
-        #arrg = griddata(x, y, arr, xg, yg)
         def f(x, interp_mode):
             xgr = xg.ravel()
             ygr = yg.ravel()
@@ -404,8 +412,7 @@ class CoordinateChannelMap(ChannelMap):
                 interp = LinearTriInterpolator(triang, x)
             else:
                 interp = CubicTriInterpolator(triang, x)
-            return interp(xgr, ygr).reshape(grid_pts, grid_pts)
-        #arrg = interp(xg.ravel(), yg.ravel()).reshape(grid_pts, grid_pts)
+            return interp(xgr, ygr).reshape(grid_pts)
         arrg = np.apply_along_axis(f, axis, data, interpolate)
         return ( arrg, (xg, yg) ) if grid_coords else arrg
     
@@ -441,29 +448,29 @@ def channel_combinations(chan_map, scale=1.0, precision=4):
         Lists of channel # and grid location of electrode pairs and
         distance between each pair.
     """
-    
-    combs = itertools.combinations(np.arange(len(chan_map)), 2)
+
+    combs = np.array(list(itertools.combinations(range(len(chan_map)), 2)))
+    combs = combs[combs[:, 1] > combs[:, 0]]
     from .util import Bunch
     chan_combs = Bunch()
-    npair = spmisc.comb(len(chan_map),2,exact=1)
+    npair = spmisc.comb(len(chan_map),2, exact=1)
+    npair = len(combs)
     chan_combs.p1 = np.empty(npair, 'i')
     chan_combs.p2 = np.empty(npair, 'i')
     chan_combs.idx1 = np.empty((npair, 2), 'd')
     chan_combs.idx2 = np.empty((npair, 2), 'd')
     chan_combs.dist = np.empty(npair)
     ii, jj = chan_map.to_mat()
+    chan_combs.p1 = combs[:, 0]
+    chan_combs.p2 = combs[:, 1]
+    chan_combs.idx1 = np.c_[np.take(ii, combs[:, 0]), np.take(jj, combs[:, 0])]
+    chan_combs.idx2 = np.c_[np.take(ii, combs[:, 1]), np.take(jj, combs[:, 1])]
     # Distances are measured between grid locations (i1,j1) to (i2,j2)
     # Define a (s1,s2) scaling to multiply these distances
     if np.iterable(scale):
         s_ = np.array( scale[::-1] )
     else:
         s_ = np.array( [scale, scale] )
-    for n, c in enumerate(combs):
-        c0, c1 = c
-        chan_combs.p1[n] = c0
-        chan_combs.p2[n] = c1
-        chan_combs.idx1[n] = ii[c0], jj[c0]
-        chan_combs.idx2[n] = ii[c1], jj[c1]
 
     d = np.abs( chan_combs.idx1 - chan_combs.idx2 ) * s_
     dist = ( d**2 ).sum(1) ** 0.5
