@@ -1,8 +1,8 @@
 import numpy as np
 from traits.api import Tuple
 
-from data_scroll import *
-from scatter_scroller import *
+from ecoglib.vis.data_scroll import *
+from ecoglib.vis.scatter_scroller import *
 
 # XXX: these are some horrible hacks.. need to think of away around
 # Traits rigidity
