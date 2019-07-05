@@ -26,7 +26,7 @@ try:
 except ImportError:
     use_mayavi = False
 
-print "USING MAYVI?", use_mayavi
+
 pyf_version = StrictVersion(pyface.__version__)
 pyf_new_api = pyf_version >= StrictVersion('6.1.0')
 

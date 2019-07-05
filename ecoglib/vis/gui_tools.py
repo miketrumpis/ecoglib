@@ -5,12 +5,14 @@ from traits.api import *
 from traitsui.api import *
 
 from matplotlib.figure import Figure
-from matplotlib.patches import FancyBboxPatch
+from matplotlib.patches import FancyBboxPatch, BoxStyle
 import matplotlib.cm as cm
+
+from ecoglib.channel_map import CoordinateChannelMap
+from ecoglib.util import mkdir_p
 
 import ecoglib.vis.traitsui_bridge as tb
 import ecoglib.vis.plot_modules as pm
-from ecoglib.util import mkdir_p
 
 __all__ = ['SavesFigure', 'ArrayMap', 'EvokedPlot', 'current_screen']
 
@@ -271,45 +273,71 @@ class ArrayMap(HasTraits):
 
     def __init__(
             self, chan_map,
-            labels=None, vec=None, clim=None, ax=None, map_units=None,
-            **traits_n_kws
+            labels=None, vec=None, ax=None, map_units=None, cbar=True,
+            **plot_kwargs
     ):
         # the simplest instantiation is with a vector to plot
         self.labels = labels
-        self._clim = clim
-        if (ax is None):
-            if vec is None:
-                vec = np.ones(len(chan_map))
-            cmap = traits_n_kws.pop('cmap', cm.Blues)
-            origin = traits_n_kws.pop('origin', 'upper')
-            fsize = np.array(chan_map.geometry[::-1], 'd') / 3.0
-            self.fig = Figure(figsize=tuple(fsize))
-            self.ax = self.fig.add_subplot(111)
-            self._map = self.ax.imshow(
-                chan_map.embed(vec), cmap=cmap, origin=origin,
-                clim=self._clim
-            )
-            self.ax.axis('image')
-            self.cbar = self.fig.colorbar(
-                self._map, ax=self.ax, use_gridspec=True
-            )
+        self._clim = plot_kwargs.pop('clim', None)
+        chan_image = chan_map.image(vec, cbar=cbar, ax=ax, clim=self._clim, **plot_kwargs)
+        if cbar:
+            self.fig, self.cbar = chan_image
+        else:
+            self.fig = chan_image
+            self.cbar = None
+        self.ax = self.fig.axes[0]
+        self.ax.axis('image')
+        if self.cbar:
             if labels is not None:
                 self.cbar.set_ticks(np.arange(0, len(labels)))
                 self.cbar.set_ticklabels(labels)
-            elif map_units is not None:
+            if map_units is not None:
                 self.cbar.set_label(map_units)
-        elif ax:
-            self.ax = ax
-            self.fig = ax.figure
 
-        super(ArrayMap, self).__init__(**traits_n_kws)
+        super(ArrayMap, self).__init__()
 
+        self._coord_map = isinstance(chan_map, CoordinateChannelMap)
+        # both these kinds of maps update in the same way :D
+        if self._coord_map:
+            self._map = self.ax.collections[-1]
+        else:
+            self._map = self.ax.images[-1]
         self.chan_map = chan_map
         self._box = None
 
+        # if (ax is None):
+        #     if vec is None:
+        #         vec = np.ones(len(chan_map))
+        #     cmap = traits_n_kws.pop('cmap', cm.Blues)
+        #     origin = traits_n_kws.pop('origin', 'upper')
+        #     fsize = np.array(chan_map.geometry[::-1], 'd') / 3.0
+        #     self.fig = Figure(figsize=tuple(fsize))
+        #     self.ax = self.fig.add_subplot(111)
+        #     self._map = self.ax.imshow(
+        #         chan_map.embed(vec), cmap=cmap, origin=origin,
+        #         clim=self._clim
+        #     )
+        #     self.ax.axis('image')
+        #     self.cbar = self.fig.colorbar(
+        #         self._map, ax=self.ax, use_gridspec=True
+        #     )
+        #     if labels is not None:
+        #         self.cbar.set_ticks(np.arange(0, len(labels)))
+        #         self.cbar.set_ticklabels(labels)
+        #     elif map_units is not None:
+        #         self.cbar.set_label(map_units)
+        # elif ax:
+        #     self.ax = ax
+        #     self.fig = ax.figure
+
+
     def click_listen(self, ev):
         try:
-            i, j = map(lambda x: int(round(x)), (ev.ydata, ev.xdata))
+            i, j = ev.ydata, ev.xdata
+            if i is None or j is None:
+                raise TypeError
+            if not self._coord_map:
+                i, j = map(round, (i, j))
         except TypeError:
             if ev.inaxes is None:
                 self.selected_site = -1
@@ -328,8 +356,10 @@ class ArrayMap(HasTraits):
             i, j = self.chan_map.rlookup(self.selected_site)
             if self._box:
                 self._box.remove()
+            box_size = self.chan_map.min_pitch if self._coord_map else 1
+            style = BoxStyle('Round', pad=0.3 * box_size, rounding_size=None)
             self._box = FancyBboxPatch(
-                (j - 0.5, i - 0.5), 1, 1, boxstyle='round',
+                (j - box_size / 2.0, i - box_size / 2.0), box_size, box_size, boxstyle=style,
                 fc='none', ec='k', transform=self.ax.transData,
                 clip_on=False
             )
@@ -344,17 +374,21 @@ class ArrayMap(HasTraits):
 
     def update_map(self, scores, c_label=None, **extra):
         "Update map image given new set of scalars from the sensor vector"
-        origin = extra.get('origin', 'upper')
         if 'clim' not in extra:
             extra['clim'] = self._clim
-        if scores.shape != self.chan_map.geometry:
-            scores = self.chan_map.embed(scores)
+        if not self._coord_map:
+            if scores.shape != self.chan_map.geometry:
+                scores = self.chan_map.embed(scores)
+        elif len(scores) != len(self.chan_map):
+            raise ValueError("Can't plot vector length {} to a coordinate map.".format(len(scores)))
         self._map.set_array(scores)
         self._map.update(extra)
-        if c_label is not None:
-            self.cbar.set_label(c_label)
+        if self.cbar:
+            if c_label is not None:
+                self.cbar.set_label(c_label)
         try:
-            self.cbar.draw_all()
+            if self.cbar:
+                self.cbar.draw_all()
             self.fig.canvas.draw()
         except:
             # no canvas? no problem

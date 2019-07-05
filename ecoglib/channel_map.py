@@ -56,7 +56,7 @@ class ChannelMap(list):
 
     @property
     def site_combinations(self):
-        if self._combs is None:
+        if self._combs is None and len(self) > 1:
             self._combs = channel_combinations(self, scale=self.pitch)
         return self._combs
     
@@ -83,6 +83,11 @@ class ChannelMap(list):
         return flat_to_mat(self.geometry, self, col_major=self.col_major)
 
     def lookup(self, i, j):
+        if np.iterable(i):
+            i = np.array(i, dtype='i')
+            j = np.array(j, dtype='i')
+        else:
+            i, j = map(int, (i, j))
         from .util import mat_to_flat
         flat_idx = mat_to_flat(self.geometry, i, j, col_major=self.col_major)
         if np.iterable(flat_idx):
@@ -293,16 +298,18 @@ class CoordinateChannelMap(ChannelMap):
         self[:] = coordinates
         yy, xx = zip(*self)
         self.boundary = (min(yy), max(yy), min(xx), max(xx))
-        self._combs = None
         self.pitch = pitch
+        if len(self) > 1:
+            self._combs = channel_combinations(self, scale=pitch)
+            self.min_pitch = self._combs.dist.min()
+        else:
+            self.min_pitch = pitch
         # this is nonsense, but to satisfy parent class
         self.col_major = col_major
         if isinstance(geometry, (str, unicode)) and geometry.lower() == 'auto':
             y_gap = max(yy) - min(yy)
             x_gap = max(xx) - min(xx)
-            self._combs = channel_combinations(self, scale=self.pitch)
-            min_pitch = self._combs.dist.min()
-            self.geometry = int(np.round(y_gap / min_pitch)), int(np.round(x_gap / min_pitch))
+            self.geometry = int(np.round(y_gap / self.min_pitch)), int(np.round(x_gap / self.min_pitch))
         else:
             self.geometry = geometry
 
@@ -342,9 +349,9 @@ class CoordinateChannelMap(ChannelMap):
         return super(CoordinateChannelMap, self).subset(sub, as_mask=as_mask)
 
     def image(
-            self, arr=None, cbar=True, ax=None, interpolate='linear',
+            self, arr=None, cbar=True, ax=None, interpolate=None,
             grid_pts=None, norm=None, clim=None, cmap='viridis',
-            scatter_kw={}, contour_kw={}
+            scatter_kw={}, contour_kw={}, **passthru
             ):
         y, x = self.to_mat()
         if ax is None:
@@ -377,7 +384,16 @@ class CoordinateChannelMap(ChannelMap):
 
         scatter_kw.setdefault('edgecolors', 'k')
         scatter_kw.setdefault('linewidths', 1.0)
-        sct = ax.scatter(x, y, c=arr, norm=norm, cmap=cmap, **scatter_kw)
+        # set default point size to be 90% of the minimum pitch (and square it to get correct area size)
+        # (DOES NOT WORK WELL IF AXES GETS RESIZED AT DRAW TIME)
+        # pts_per_pitch = ax.transData.transform((0, self.min_pitch))[1] - ax.transData.transform((0, 0))[1]
+        # scatter_kw.setdefault('s', (0.9 * pts_per_pitch) ** 2)
+        scatter_kw.setdefault('s', 100)
+        if 'c' in scatter_kw:
+            # someone is pretty sure what the colors should be, rather than simply mapping the given array
+            sct = ax.scatter(x, y, **scatter_kw)
+        else:
+            sct = ax.scatter(x, y, c=arr, norm=norm, cmap=cmap, **scatter_kw)
         if cbar:
             if not interpolate:
                 cb = f.colorbar(sct, ax=ax, use_gridspec=True)
