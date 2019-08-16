@@ -6,8 +6,8 @@ import nitime.algorithms as alg
 import nitime.utils as nt_utils
 
 from numpy.lib.stride_tricks import as_strided
-from sandbox.split_methods import multi_taper_psd
-import ecoglib.filt.blocks as blocks
+from ecogdata.parallel.split_methods import multi_taper_psd
+import ecogdata.filt.blocks as blocks
 
 def mtm_spectrogram_basic(
         x, n, pl=0.25, detrend='', **mtm_kwargs

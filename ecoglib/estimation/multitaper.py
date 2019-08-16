@@ -10,8 +10,8 @@ import nitime.utils as nt_utils
 from numpy.lib.stride_tricks import as_strided
 from sandbox.split_methods import multi_taper_psd
 from sandbox.array_split import shared_ndarray, split_at
-import ecoglib.filt.blocks as blocks
-from ecoglib.numutil import nextpow2
+import ecogdata.filt.blocks as blocks
+from ecogdata.numutil import nextpow2
 
 from .jackknife import Jackknife
 

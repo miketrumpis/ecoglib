@@ -10,7 +10,7 @@ from matplotlib.colors import Normalize
 from matplotlib import cm
 
 from . import plot_tools as pt
-from ecoglib.numutil import nanpercentile
+from ecogdata.numutil import nanpercentile
 
 # XXX: an incomplete decorator for the listen/set pattern of traits callbacks
 ## def set_or_listen(attr):

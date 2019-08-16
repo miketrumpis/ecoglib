@@ -6,7 +6,7 @@ from scipy.special import comb
 from sklearn.model_selection import KFold
 from itertools import combinations, tee
 from contextlib import closing
-import ecoglib.mproc as mp
+import ecogdata.parallel.mproc as mp
 from sandbox.array_split import SharedmemManager
 
 __all__ = ['random_combinations', 'Jackknife']

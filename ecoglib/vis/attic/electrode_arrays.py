@@ -3,7 +3,7 @@ import matplotlib.patches as patches
 from matplotlib.lines import Line2D
 import matplotlib.pyplot as pp
 import numpy as np
-from ecoglib.util import Bunch, mat_to_flat, flat_to_mat
+from ecogdata.util import Bunch, mat_to_flat, flat_to_mat
 
 
 def make_rectangles(

@@ -23,14 +23,6 @@ cknn_graph = Extension(
     extra_compile_args=['-O3']
     )
 
-slepian_projection = Extension(
-    'ecoglib.filt.time._slepian_projection',
-    ['ecoglib/filt/time/_slepian_projection.pyx'], 
-    include_dirs = dirs, 
-    libraries=(['m'] if os.name != 'nt' else []),
-    extra_compile_args=['-O3']
-    )
-
 bispectrum = Extension(
     'ecoglib.estimation._bispectrum',
     ['ecoglib/estimation/_bispectrum.pyx'], 
@@ -62,7 +54,6 @@ if __name__=='__main__':
         version = '0.1',
         packages = find_packages(exclude=['demos', 'notes_n_demos', 'build']),
         ext_modules = [cknn_graph,
-                       slepian_projection,
                        bispectrum,
                        semivariance],
         cmdclass = {'build_ext': build_ext},

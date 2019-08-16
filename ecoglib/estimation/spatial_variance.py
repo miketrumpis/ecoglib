@@ -1,5 +1,5 @@
 import numpy as np
-from ecoglib.numutil import fenced_out
+from ecogdata.numutil import fenced_out
 
 __all__ = ['semivariogram']
 

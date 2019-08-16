@@ -14,9 +14,9 @@ import pyface
 
 from . import plot_modules as pm
 from . import traitsui_bridge as tb
-import ecoglib.util as ut
 
-import ecogana.devices.units as units_tools
+import ecogdata.util as ut
+import ecogdata.devices.units as units_tools
 
 try:
     # Mayavi/TVTK

@@ -8,8 +8,8 @@ from matplotlib.figure import Figure
 from matplotlib.patches import FancyBboxPatch, BoxStyle
 import matplotlib.cm as cm
 
-from ecoglib.channel_map import CoordinateChannelMap
-from ecoglib.util import mkdir_p
+from ecogdata.channel_map import CoordinateChannelMap
+from ecogdata.util import mkdir_p
 
 import ecoglib.vis.traitsui_bridge as tb
 import ecoglib.vis.plot_modules as pm
