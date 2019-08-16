@@ -46,7 +46,7 @@ The set of file formats to generate can be specified with the
 `plot_formats` configuration variable.
 """
 
-import sys, os, shutil, imp, warnings, cStringIO, re
+import sys, os, shutil, imp, warnings, io, re
 try:
     from hashlib import md5
 except ImportError:
@@ -104,23 +104,23 @@ else:
         """
 
         if not os.path.exists(target):
-            raise OSError, 'Target does not exist: '+target
+            raise OSError('Target does not exist: '+target)
 
         if not os.path.isdir(base):
-            raise OSError, 'Base is not a directory or does not exist: '+base
+            raise OSError('Base is not a directory or does not exist: '+base)
 
         base_list = (os.path.abspath(base)).split(os.sep)
         target_list = (os.path.abspath(target)).split(os.sep)
 
         # On the windows platform the target may be on a completely
         # different drive from the base.
-        if os.name in ['nt','dos','os2'] and base_list[0] <> target_list[0]:
-            raise OSError, 'Target is on a different drive to base. Target: '+target_list[0].upper()+', base: '+base_list[0].upper()
+        if os.name in ['nt','dos','os2'] and base_list[0] != target_list[0]:
+            raise OSError('Target is on a different drive to base. Target: '+target_list[0].upper()+', base: '+base_list[0].upper())
 
         # Starting from the filepath root, work out how much of the
         # filepath is shared by base and target.
         for i in range(min(len(base_list), len(target_list))):
-            if base_list[i] <> target_list[i]: break
+            if base_list[i] != target_list[i]: break
         else:
             # If we broke out of the loop, i is pointing to the first
             # differing path elements.  If we didn't break out of the
@@ -188,7 +188,7 @@ def run_code(plot_path, function_name, plot_code):
         path, fname = os.path.split(plot_path)
         sys.path.insert(0, os.path.abspath(path))
         stdout = sys.stdout
-        sys.stdout = cStringIO.StringIO()
+        sys.stdout = io.StringIO()
         os.chdir(path)
         fd = None
         try:
@@ -351,12 +351,12 @@ def _plot_directive(plot_path, basedir, function_name, plot_code, caption,
     if plot_code is None:
         shutil.copyfile(plot_path, os.path.join(destdir, fname))
 
-    if options.has_key('include-source'):
+    if 'include-source' in options:
         if plot_code is None:
             lines.extend(
                 ['.. include:: %s' % os.path.join(setup.app.builder.srcdir, plot_path),
                  '    :literal:'])
-            if options.has_key('encoding'):
+            if 'encoding' in options:
                 lines.append('    :encoding: %s' % options['encoding'])
                 del options['encoding']
         else:
@@ -370,7 +370,7 @@ def _plot_directive(plot_path, basedir, function_name, plot_code, caption,
 
     if num_figs > 0:
         options = ['%s:%s: %s' % (template_content_indent, key, val)
-                   for key, val in options.items()]
+                   for key, val in list(options.items())]
         options = "\n".join(options)
 
         for i in range(num_figs):
@@ -442,7 +442,7 @@ def mark_plot_labels(app, document):
     the "htmlonly" (or "latexonly") node to the actual figure node
     itself.
     """
-    for name, explicit in document.nametypes.iteritems():
+    for name, explicit in document.nametypes.items():
         if not explicit:
             continue
         labelid = document.nameids[name]

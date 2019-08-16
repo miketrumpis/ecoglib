@@ -60,8 +60,8 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Mike T\'s microECoG notes'
-copyright = u'2013, Mike'
+project = 'Mike T\'s microECoG notes'
+copyright = '2013, Mike'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -203,8 +203,8 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'MikeTsmicroECoGnotes.tex', u'Mike T\'s microECoG notes Documentation',
-   u'Mike', 'manual'),
+  ('index', 'MikeTsmicroECoGnotes.tex', 'Mike T\'s microECoG notes Documentation',
+   'Mike', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -233,8 +233,8 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'miketsmicroecognotes', u'Mike T\'s microECoG notes Documentation',
-     [u'Mike'], 1)
+    ('index', 'miketsmicroecognotes', 'Mike T\'s microECoG notes Documentation',
+     ['Mike'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -247,8 +247,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'MikeTsmicroECoGnotes', u'Mike T\'s microECoG notes Documentation',
-   u'Mike', 'MikeTsmicroECoGnotes', 'One line description of project.',
+  ('index', 'MikeTsmicroECoGnotes', 'Mike T\'s microECoG notes Documentation',
+   'Mike', 'MikeTsmicroECoGnotes', 'One line description of project.',
    'Miscellaneous'),
 ]
 
@@ -265,10 +265,10 @@ texinfo_documents = [
 # -- Options for Epub output ---------------------------------------------------
 
 # Bibliographic Dublin Core info.
-epub_title = u'Mike T\'s microECoG notes'
-epub_author = u'Mike'
-epub_publisher = u'Mike'
-epub_copyright = u'2013, Mike'
+epub_title = 'Mike T\'s microECoG notes'
+epub_author = 'Mike'
+epub_publisher = 'Mike'
+epub_copyright = '2013, Mike'
 
 # The language of the text. It defaults to the language option
 # or en if the language is not set.

@@ -19,7 +19,7 @@ def peak_to_peak(x, m, p=4, xwin=(), msiter=4, points=False):
 
     if not xwin:
         xwin = (0, dx.shape[axis])
-    xwin = map(int, xwin)
+    xwin = list(map(int, xwin))
 
     pk_dx = np.argmax(dx[:, xwin[0]:xwin[1]], axis=-1) + xwin[0]
     # these are our starting points for peak finding
@@ -27,7 +27,7 @@ def peak_to_peak(x, m, p=4, xwin=(), msiter=4, points=False):
     pos_pks = np.zeros(x.shape[0], 'i')
     neg_pks = np.zeros(x.shape[0], 'i')
     bw = m//2
-    for n in xrange(x.shape[0]):
+    for n in range(x.shape[0]):
         trace = x[n].copy()
         # must be all positive
         #trace = trace - trace.min()
@@ -75,7 +75,7 @@ def peak_to_peak(x, m, p=4, xwin=(), msiter=4, points=False):
     p2p = x[ (cx, pos_pks) ] - x[ (cx, neg_pks) ]
 
     if points:
-        return map(lambda x: x.reshape(oshape[:-1]), (p2p, neg_pks, pos_pks))
+        return [x.reshape(oshape[:-1]) for x in (p2p, neg_pks, pos_pks)]
     else:
         return p2p.reshape(oshape[:-1])
 
@@ -97,7 +97,7 @@ def peak_to_peak2(x, m, p=4, xwin=(), msiter=4, points=False):
 
     if not xwin:
         xwin = (0, dx.shape[axis])
-    xwin = map(int, xwin)
+    xwin = list(map(int, xwin))
 
     pk_dx = np.argmax(dx[:, xwin[0]:xwin[1]], axis=-1) + xwin[0]
     # these are our starting points for peak finding
@@ -105,7 +105,7 @@ def peak_to_peak2(x, m, p=4, xwin=(), msiter=4, points=False):
     pos_pks = np.zeros(x.shape[0], 'i')
     neg_pks = np.zeros(x.shape[0], 'i')
     bw = m//2
-    for n in xrange(x.shape[0]):
+    for n in range(x.shape[0]):
         trace = x[n].copy()
         # must be all positive
         #trace = trace - trace.min()
@@ -146,7 +146,7 @@ def peak_to_peak2(x, m, p=4, xwin=(), msiter=4, points=False):
     p2p = x[ (cx, pos_pks) ] - x[ (cx, neg_pks) ]
 
     if points:
-        return map(lambda x: x.reshape(oshape[:-1]), (p2p, neg_pks, pos_pks))
+        return [x.reshape(oshape[:-1]) for x in (p2p, neg_pks, pos_pks)]
     else:
         return p2p.reshape(oshape[:-1])
 
@@ -167,7 +167,7 @@ def peak_to_peak3(x, m, p=4, xwin=(), msiter=4, points=False):
 
     if not xwin:
         xwin = (0, dx.shape[axis])
-    xwin = map(int, xwin)
+    xwin = list(map(int, xwin))
 
     pk_dx = np.argmax(dx[:, xwin[0]:xwin[1]], axis=-1) + xwin[0]
     # these are our starting points for peak finding
@@ -175,7 +175,7 @@ def peak_to_peak3(x, m, p=4, xwin=(), msiter=4, points=False):
     pos_pks = np.zeros(x.shape[0], 'i')
     neg_pks = np.zeros(x.shape[0], 'i')
     bw = m//2
-    for n in xrange(x.shape[0]):
+    for n in range(x.shape[0]):
         trace = x[n].copy()
         # must be all positive
         #trace = trace - trace.min()
@@ -191,7 +191,7 @@ def peak_to_peak3(x, m, p=4, xwin=(), msiter=4, points=False):
     p2p = x[ (cx, pos_pks) ] - x[ (cx, neg_pks) ]
 
     if points:
-        return map(lambda x: x.reshape(oshape[:-1]), (p2p, neg_pks, pos_pks))
+        return [x.reshape(oshape[:-1]) for x in (p2p, neg_pks, pos_pks)]
     else:
         return p2p.reshape(oshape[:-1])
 

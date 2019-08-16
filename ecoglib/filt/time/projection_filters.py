@@ -316,7 +316,7 @@ try:
                 y_re = np.zeros_like(x)
                 # make dummy array to satisfy Cython signature
                 y_im = np.empty( (x.shape[0], 1), 'd' )
-            for i in xrange(x.shape[0]):
+            for i in range(x.shape[0]):
                 bandpass_moving_projection(
                     x[i].astype('d'), dpss, wf, wt, y_re[i], y_im[i],
                     f0, baseband=baseband
@@ -325,7 +325,7 @@ try:
                 y = y_re
         else:
             y = np.zeros(x.shape, 'd')
-            for i in xrange(x.shape[0]):
+            for i in range(x.shape[0]):
                 lowpass_moving_projection(x[i].astype('d'), dpss, wf, wt, y[i])
         if save_dpss:
             return y, (dpss, eigs)

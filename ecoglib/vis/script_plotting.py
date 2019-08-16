@@ -33,9 +33,9 @@ def find_sub_source(sl,l):
     # 
     results=[]
     sll=len(sl)
-    sl = map(lambda s: s.strip(), sl)
+    sl = [s.strip() for s in sl]
     for ind in (i for i,e in enumerate(l) if e.strip()==sl[0]):
-        l_strip = map(lambda s: s.strip(), l[ind:ind+sll])
+        l_strip = [s.strip() for s in l[ind:ind+sll]]
         if l_strip==sl:
             #results.append((ind,ind+sll-1))
             return ind, ind+sll
@@ -66,7 +66,7 @@ class ScriptPlotter(object):
         self.fig_cache = list()
         self.pages_cache = list()
         self.fig_text = list()
-        self.formats = map(lambda x: x.strip('.'), formats)
+        self.formats = [x.strip('.') for x in formats]
         self.dpi = dpi
         self.plotting = plotting
         self.saving = saving
@@ -99,7 +99,7 @@ class ScriptPlotter(object):
             for (f, name, kwargs) in self.fig_cache:
                 dpi = self.dpi or f.dpi
                 f_file = os.path.join(e_path, name)+'.'+ext
-                print 'saving', f_file
+                print('saving', f_file)
                 f.savefig(f_file, dpi=dpi, **kwargs)
         if len(self.pages_cache):
             e_path = os.path.join(self.fig_path, 'pdf')
@@ -162,7 +162,7 @@ class ScriptPlotter(object):
             if inside_fixup:
                 # we hit a magic string, check if it's ours
                 if line.strip() == fig_hash.strip():
-                    print 'already fixed'
+                    print('already fixed')
                     return
                 # if not, put back that last line (if not already done)
                 if save_line:
@@ -223,9 +223,7 @@ class ScriptPlotter(object):
         calling = inspect.getouterframes(inspect.currentframe())[1]
         fi = inspect.getframeinfo(calling[0], 5)
         line = fi.lineno
-        code_context = filter(
-            lambda s: s.strip() not in ('"""', "'''"), fi.code_context
-            )
+        code_context = [s for s in fi.code_context if s.strip() not in ('"""', "'''")]
         # XXX: this assumes 4-space indentation like hidden-code-block
         #context = '    '+'    '.join(code_context)
         fname = fi.filename

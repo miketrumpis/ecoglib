@@ -8,7 +8,7 @@ def stochastic_limits(x, n_samps=100, conf=98.0):
     absolute values in the array x.
     """
     n = len(x)
-    r_pts = random.sample(xrange(n), n_samps)
+    r_pts = random.sample(range(n), n_samps)
     r_samps = np.take(x, r_pts)
     # unbiased estimator??
     e_abs = np.abs(r_samps).mean()

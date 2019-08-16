@@ -6,7 +6,7 @@ from scipy.optimize import brent, minimize_scalar
 def auto_tune_lambda(Kg, Kt, scl=1.0):
     var_x = Kg.diagonal()
     scl = np.median( Kt.diagonal() ) / np.median(var_x)
-    print np.median( Kt.diagonal() ), np.median(var_x)
+    print(np.median( Kt.diagonal() ), np.median(var_x))
     if (var_x[0] == var_x).all():
         inliers = np.ones( len(var_x), '?' )
     else:
@@ -129,9 +129,9 @@ def conditional_mean_filter(chan_map, pitch=None, x_samp=None, lam='auto',
         lam = 0
 
     if not preconditioner and \
-      isinstance(lam, (unicode, str)) and lam.lower() == 'auto':
+      isinstance(lam, str) and lam.lower() == 'auto':
         Kt_temp = Kt
-        print sill, nugget
+        print(sill, nugget)
         lam = auto_tune_lambda(Kg, Kt_temp)
     W = np.linalg.solve(Kg + lam*np.eye(n_chan), Kt)
     return Kg, Kt, W.T, lam #, (dbin, Kt_lin)

@@ -1,4 +1,4 @@
-from __future__ import division
+
 import numpy as np
 import scipy.signal as signal
 import scipy.interpolate as interpolate
@@ -78,7 +78,7 @@ def mtm_coherogram(x, n, pl=0.25, axis=0, **mtm_kwargs):
 
     for b, win in enumerate(blk_x.fwd()):
         # win is (n, n_chan)
-        print 'block %03d of %03d'%(b, blk_x.nblock)
+        print('block %03d of %03d'%(b, blk_x.nblock))
         avg_coh[b] = avg_coherence(
             win.T, dpss, eigvals, NFFT=NFFT, low_bias=False
             )
@@ -99,8 +99,8 @@ def avg_coherence(x, dpss, eigs, NFFT=None, low_bias=True):
     sdf_est = alg.mtm_cross_spectrum(spec2, spec2, w2, sides='onesided')
     nf = sdf_est.shape[-1]
     coh = np.zeros(nf)
-    for i in xrange(M):
-        for j in xrange(i):
+    for i in range(M):
+        for j in range(i):
             csd = alg.mtm_cross_spectrum(
                 spectra[i], spectra[j], (weights[i], weights[j]),
                 sides='twosided'
@@ -207,13 +207,13 @@ def mtm_spectrogram(
         p = np.ceil(m / user_delta)
         if (m//p) * p < m:
             m = p * (m//p)
-            print 'resetting pl from %0.2f'%pl,
+            print('resetting pl from %0.2f'%pl, end=' ')
             pl = 1 - float(m)/n
-            print ' to %0.2f'%pl
+            print(' to %0.2f'%pl)
         delta = m//p
         #delta -= delta % 2
 
-    print user_delta, delta, m
+    print(user_delta, delta, m)
 
     # check contiguous    
     if not x.flags.c_contiguous:
@@ -242,7 +242,7 @@ def mtm_spectrogram(
     psd_len = int( nblock * pts_per_block - (nblock-1)*overlap )
     psd_pl = float(overlap) / pts_per_block
     psd_matrix = np.zeros( x.shape[:-1] + (nfreq, psd_len), 'd' )
-    print pts_per_block, overlap, psd_len
+    print(pts_per_block, overlap, psd_len)
     # need to make sure psd overlap is
     blk_psd = blocks.BlockedSignal(
         psd_matrix, pts_per_block, overlap=psd_pl, 
@@ -254,17 +254,17 @@ def mtm_spectrogram(
         n_avg, pts_per_block, overlap=psd_pl, partial_block = False
         )
 
-    print blk_n.nblock, blk_x.nblock
+    print(blk_n.nblock, blk_x.nblock)
 
     dpss, eigs = alg.dpss_windows(n, NW, 2*NW)
     if lb:
         lb = 0.99 if float(lb)==1.0 else lb
-        print 'low_bias:', lb
+        print('low_bias:', lb)
         keepers = eigs > lb
         dpss = dpss[keepers]
         eigs = eigs[keepers]
 
-    print 'n_tapers:', len(dpss)
+    print('n_tapers:', len(dpss))
     dpss_sub = dpss[..., int(delta//2)::int(delta)]
     weight = delta * dpss_sub.T.dot( dpss_sub.dot(np.ones(pts_per_block)) )
     #weight **= 2
@@ -274,9 +274,9 @@ def mtm_spectrogram(
     window = np.hamming(pts_per_block)
     weight *= window
     weight = window
-    print 'weight max:', weight.max()
+    print('weight max:', weight.max())
     
-    for b in xrange(blk_n.nblock):
+    for b in range(blk_n.nblock):
         # it's possible to exceed the data blocks, since we're not
         # using fractional blocks in the signal (??)
         if b >= nblock:
@@ -329,12 +329,12 @@ def mtm_spectrogram(
 
 def bw2nw(bw, n, fs):
     # nw = tw = t(bw)/2 = (n/fs)(bw)/2
-    bw, n, fs = map(float, (bw, n, fs))
+    bw, n, fs = list(map(float, (bw, n, fs)))
     return (n/fs) * (bw/2)
 
 def nw2bw(nw, n, fs):
     # bw = 2w = 2(tw)/t = 2(nw)/t = 2(nw) / (n/fs) = 2(nw)(fs/n)
-    nw, n, fs = map(float, (nw, n, fs))
+    nw, n, fs = list(map(float, (nw, n, fs)))
     return 2 * nw * fs / n
 
 def mtm_complex_demodulate(
@@ -395,7 +395,7 @@ def mtm_complex_demodulate(
         if xk.ndim == 2:
             xk.shape = (1,) + xk.shape
         weight = np.empty( (xk.shape[0], nfft // 2+1), 'd' )
-        for m in xrange(xk.shape[0]):
+        for m in range(xk.shape[0]):
             w, _ = nt_utils.adaptive_weights(xk[m], eigs, sides='onesided')
             weight[m] = np.sum(w**2, axis=0)
             xk[m, :, :fmax] = xk[m, :, :fmax] * w[:, :fmax]
@@ -443,7 +443,7 @@ def _jn(fn, sample, *fnarg, **fnkw):
     xtest = fn(sample[1:], *fnarg, **fnkw)
     pseudovals = np.zeros( (M,) + xtest.shape, dtype=xtest.dtype )
     pseudovals[0] = xtest
-    for m in xrange(1,M):
+    for m in range(1,M):
         pseudovals[m] = fn(
             np.row_stack( (sample[:m], sample[m+1:]) ), *fnarg, **fnkw
             )

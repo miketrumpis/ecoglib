@@ -110,6 +110,6 @@ if __name__=='__main__':
             if skip_example(script):
                 continue
             figure_basename = pjoin('fig', os.path.splitext(script)[0])
-            execfile(script)
+            exec(compile(open(script, "rb").read(), script, 'exec'))
             plt.close('all')
     

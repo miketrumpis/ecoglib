@@ -337,7 +337,7 @@ class ArrayMap(HasTraits):
             if i is None or j is None:
                 raise TypeError
             if not self._coord_map:
-                i, j = map(round, (i, j))
+                i, j = list(map(round, (i, j)))
         except TypeError:
             if ev.inaxes is None:
                 self.selected_site = -1

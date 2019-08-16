@@ -6,6 +6,7 @@ import warnings
 import gc
 from decorator import decorator
 import numpy as np
+from functools import reduce
 
 class ParaState(object):
 
@@ -63,7 +64,7 @@ is a single character.  The following type codes are defined:
 dtype_maps_to = dict([ ('?', 'b') ])
 
 dtype_ctype = dict( (('F', 'f'), ('D', 'd'), ('G', 'g')) )
-ctype_dtype = dict( ( (v, k) for k, v in dtype_ctype.items() ) )
+ctype_dtype = dict( ( (v, k) for k, v in list(dtype_ctype.items()) ) )
 
 def shared_ndarray(shape, typecode='d'):
     if not parallel_controller.state:
@@ -203,7 +204,7 @@ def split_at(
                 job_dims[n] = m - 1
                 n -= 1
             # filter out any proc with zero size
-            job_dims = filter(None, job_dims)
+            job_dims = [_f for _f in job_dims if _f]
             n = 0
             job_slices = list()
             # now form the data slicing to map out to the jobs
@@ -230,7 +231,7 @@ def estimate_chunks(arr_size, nproc):
     return nproc
 
 def splice_results(map_list, splice_at):
-    if filter(lambda x: x is None, map_list):
+    if [x for x in map_list if x is None]:
         return
     if isinstance(map_list[0], np.ndarray):
         res = np.concatenate(map_list, axis=0)
@@ -308,10 +309,10 @@ def _global_method_wrap(aslice):
     
     ## info = mp.get_logger().info
     
-    spliced_in = zip( 
+    spliced_in = list(zip( 
         split_arg_+shared_args_, 
         [arr_[aslice] for arr_ in arrs] + list(shared_args_mem_)
-        )
+        ))
     spliced_in = sorted(spliced_in, key=lambda x: x[0])
     # assemble argument order correctly
     args = list()

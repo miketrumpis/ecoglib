@@ -1,4 +1,4 @@
-from __future__ import division
+
 ## if __name__=='__main__':
 ##     print 'shutting down splitting'
 ##     import sandbox.array_split
@@ -61,48 +61,48 @@ if __name__ == '__main__':
     sh = arsp.split_at(splice_at=(0,1))(h)
     
 
-    print 'inplace:'
+    print('inplace:')
     f(x)
-    print x
+    print(x)
     sf(sx)
-    print '----------------------------------------------------------------'
-    print sx
+    print('----------------------------------------------------------------')
+    print(sx)
     assert np.all(x==sx)
 
-    print 'simple split:'
+    print('simple split:')
     y1 = g(x)
-    print y1
-    print '----------------------------------------------------------------'
+    print(y1)
+    print('----------------------------------------------------------------')
     y2 = sg(x)
-    print y2
+    print(y2)
     assert np.all(y1==y2)
 
-    print 'returning two arrays'
+    print('returning two arrays')
     y1, b1 = h(x)
-    print y1
-    print b1
-    print '----------------------------------------------------------------'
+    print(y1)
+    print(b1)
+    print('----------------------------------------------------------------')
     y2, b2 = sh(x)
-    print y2
-    print b2
+    print(y2)
+    print(b2)
     assert np.all(y2==y1)
     assert np.all(b1==b2)
     
-    print 'sharing one argument'
+    print('sharing one argument')
     sk = arsp.split_at(shared_args=(1,))(k)
     y = np.arange(x.shape[-1])
     z1 = k(x, y)
     z2 = sk(x, y)
-    print z1
-    print '----------------------------------------------------------------'
-    print z2
+    print(z1)
+    print('----------------------------------------------------------------')
+    print(z2)
     assert np.all(z1==z2)
 
-    print 'nested functions'
+    print('nested functions')
     sm = arsp.split_at()(m)
     y1 = m(x)
     y2 = sm(x)
-    print y1
-    print '----------------------------------------------------------------'
-    print y2
+    print(y1)
+    print('----------------------------------------------------------------')
+    print(y2)
     assert np.all(y1*2 == y2)

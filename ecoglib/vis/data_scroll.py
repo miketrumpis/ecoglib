@@ -12,8 +12,8 @@ from traitsui.api import Item, View, VGroup, HGroup, \
 from pyface.timer.api import Timer
 import pyface
 
-import plot_modules as pm
-import traitsui_bridge as tb
+from . import plot_modules as pm
+from . import traitsui_bridge as tb
 import ecoglib.util as ut
 
 import ecogana.devices.units as units_tools
@@ -183,7 +183,7 @@ class DataScroller(HasTraits):
                 self._has_video = True
             except NotImplementedError:
                 self._has_video = False
-                print 'no video due to implementation problem'
+                print('no video due to implementation problem')
         else:
             # if still no shape info, then no video
             self._has_video = False
@@ -634,7 +634,7 @@ class ChannelScroller(DataScroller):
                 # <but impossible to know!!>
                 ii, jj = self.chans.to_mat()
                 #jj, ii = zip(*sorted(zip(jj, ii)))
-                ii, jj = zip(*sorted(zip(ii, jj)))
+                ii, jj = list(zip(*sorted(zip(ii, jj))))
                 c_num = self.chans.lookup(ii, jj)
 
                 plot.ax.set_yticklabels(
@@ -643,7 +643,7 @@ class ChannelScroller(DataScroller):
                 )
             else:
                 plot.ax.set_yticklabels(
-                    ['%s'%n for n in xrange(n_lines)], fontsize=8
+                    ['%s'%n for n in range(n_lines)], fontsize=8
                 )
         if self.units:
             units = self.units

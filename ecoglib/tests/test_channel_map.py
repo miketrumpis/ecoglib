@@ -6,7 +6,7 @@ import numpy as np
 from ecoglib.util import ChannelMap, map_intersection
 
 def get_chan_map(geometry, scrambled=False, col_major=False, pitch=1.0):
-    idx = range( geometry[0] * geometry[1] )
+    idx = list(range( geometry[0] * geometry[1]))
     if scrambled:
         idx = np.random.permutation(idx)
     return ChannelMap(idx, geometry, col_major=col_major, pitch=pitch)
@@ -23,7 +23,7 @@ def test_slicing():
     cm = get_chan_map( (5, 5), pitch=0.5 )
     # should be 2nd row
     cm_sliced = cm[5:10]
-    assert_true(list(cm_sliced) == range(5, 10))
+    assert_true(list(cm_sliced) == list(range(5, 10)))
     assert_true(cm_sliced.pitch == cm.pitch)
     assert_true(cm_sliced.rlookup(0) == (1, 0))    
     assert_true(cm_sliced.rlookup(3) == (1, 3))
@@ -43,8 +43,8 @@ def test_intersection_subset():
     assert_true( len(cm_sub) == len(cm2) )
     assert_true( cm_sub.pitch == cm.pitch )
 
-    cm2_sites = zip( *cm2.to_mat() )
-    sub_sites = zip( *cm_sub.to_mat() )
+    cm2_sites = list(zip( *cm2.to_mat() ))
+    sub_sites = list(zip( *cm_sub.to_mat() ))
     assert_true( set(cm2_sites) == set(sub_sites) )
     
 def test_1D_subset():
@@ -73,8 +73,8 @@ def test_1D_subset():
 
     mask = np.zeros( cm.geometry, '?' )
     mask[:] = True
-    hot_sites = zip(*mask.nonzero())
+    hot_sites = list(zip(*mask.nonzero()))
     cm_sub = cm.subset(mask)
 
-    cm_sub_sites = zip(*cm_sub.to_mat())
+    cm_sub_sites = list(zip(*cm_sub.to_mat()))
     assert_true( set( cm_sub_sites ) == set( hot_sites ) )

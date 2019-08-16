@@ -19,7 +19,7 @@ def random_combinations(iterable, r, n):
     pool = tuple(iterable)
     L = len(pool)
     while len(pulls) < n:
-        indices = sorted(random.sample(xrange(L), r))
+        indices = sorted(random.sample(range(L), r))
         pulls.add( tuple(pool[i] for i in indices) )
     return pulls
 
@@ -74,7 +74,7 @@ class Jackknife(object):
         self._array = array
         self._axis = axis
         N = array.shape[axis]
-        self.__choose = (xrange(N), N-n_out)
+        self.__choose = (range(N), N-n_out)
         self._resampler = None
         self._max_samps = max_samps
         self._n_jobs = n_jobs

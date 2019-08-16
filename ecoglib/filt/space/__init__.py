@@ -1,1 +1,1 @@
-from pix_corr import *
+from .pix_corr import *

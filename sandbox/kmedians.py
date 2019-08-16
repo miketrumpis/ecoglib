@@ -1,4 +1,4 @@
-from __future__ import division
+
 import numpy as np
 import sklearn.cluster.k_means_ as km
 
@@ -50,7 +50,7 @@ def kmedians(X, k, init='k-means++', n_init=2, tol=1e-4, max_iter=100):
     sq_dist = np.sum(X_scratch, axis=1)
     group_sz = np.zeros(k)
 
-    for n in xrange(n_init):
+    for n in range(n_init):
         # this appears to lead to too-close initializations for higher k
         if init=='random':
             r_pts = np.random.randint(0, m, 3*k)
@@ -64,9 +64,9 @@ def kmedians(X, k, init='k-means++', n_init=2, tol=1e-4, max_iter=100):
         # 2) update locations by finding median of provisional clusters
         # repeat steps until the "inertia" value converges
         old_locs = np.ones_like(locs) * 1e10
-        for i in xrange(max_iter):
+        for i in range(max_iter):
             # find labels
-            for r in xrange(k):
+            for r in range(k):
                 np.subtract(X, locs[r], X_scratch)
                 np.abs(X_scratch, X_scratch)
                 X_dist[:,r] = np.sum(X_scratch, axis=1)
@@ -74,7 +74,7 @@ def kmedians(X, k, init='k-means++', n_init=2, tol=1e-4, max_iter=100):
             assignments = np.argmin(X_dist, axis=1)
 
             # update medians
-            for r in xrange(k):
+            for r in range(k):
                 # indicator set
                 Cr = (assignments == r)
                 nr = np.sum(Cr)
@@ -91,7 +91,7 @@ def kmedians(X, k, init='k-means++', n_init=2, tol=1e-4, max_iter=100):
                 break
             old_locs = locs.copy()
 
-        for r in xrange(k):
+        for r in range(k):
             Cr = (assignments == r)
             nr = np.sum(Cr)
             group_sz[r] = nr
@@ -190,7 +190,7 @@ if __name__=='__main__':
     pp.scatter(d[:,0], d[:,1], c=g2)
     pp.title('kmedians')
 
-    print 'kmeans))) loc err: %1.4f'%c1_loc_err, 'cls err: %1.2f'%cls_err1
-    print 'kmedos))) loc err: %1.4f'%c2_loc_err, 'cls err: %1.2f'%cls_err2
+    print('kmeans))) loc err: %1.4f'%c1_loc_err, 'cls err: %1.2f'%cls_err1)
+    print('kmedos))) loc err: %1.4f'%c2_loc_err, 'cls err: %1.2f'%cls_err2)
 
     pp.show()

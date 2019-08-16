@@ -14,7 +14,7 @@ def unsupervised_clusters(x, Kmax, nsurr=20, p=2, svd=False):
     ## wk = [ k_means(x, k, n_init=10)[-1]
     ##        for k in xrange(1,Kmax+1) ]
     wk = [ pooled_dispersion(x, k, p=p, n_init=20)
-           for k in xrange(1, Kmax+1) ]
+           for k in range(1, Kmax+1) ]
     wk = np.array(wk)
     ## bbox_hi = x.max(axis=0)
     ## bbox_lo = x.min(axis=0)
@@ -25,8 +25,8 @@ def unsupervised_clusters(x, Kmax, nsurr=20, p=2, svd=False):
         bbox_hi, bbox_lo = bounding_box(x)
 
     rand_wk = np.zeros( (nsurr, Kmax) )
-    for n in xrange(nsurr):
-        print n
+    for n in range(nsurr):
+        print(n)
         rbox = np.random.rand(*x.shape)
         rbox *= (bbox_hi - bbox_lo)
         rbox += bbox_lo
@@ -38,7 +38,7 @@ def unsupervised_clusters(x, Kmax, nsurr=20, p=2, svd=False):
         ##       )
         rand_wk[n] = np.array(
             [ pooled_dispersion(rbox, k, p=p, n_init=1)
-              for k in xrange(1, Kmax+1) ]
+              for k in range(1, Kmax+1) ]
               )
     #e_wk = np.mean(rand_wk, axis=0)
     return wk, rand_wk

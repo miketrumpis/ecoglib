@@ -15,7 +15,7 @@ def adapt_bins(bsize, dists, return_map=False):
         diffs = np.abs( dists - bins[:, None] )
         bin_assignment = diffs.argmin(0)
         new_bins = [ dists[ bin_assignment==b ].mean()
-                     for b in xrange(len(bins)) ]
+                     for b in range(len(bins)) ]
         new_bins = np.array(new_bins)
         new_bins = new_bins[ np.isfinite(new_bins) ]
         if len(new_bins) == len(bins):
@@ -72,7 +72,7 @@ def binned_variance_aggregate(xb, y_tab, mid_type='mean', scale_type='sem'):
 
     y_mid = np.array([mid_fn(y) for y in y_tab if len(y) > 1])
     y_scale = np.array([scale_fn(y) for y in y_tab if len(y) > 1])
-    xb = np.array([xb[i] for i in xrange(len(xb)) if len(y_tab[i]) > 1])
+    xb = np.array([xb[i] for i in range(len(xb)) if len(y_tab[i]) > 1])
     return xb, y_mid, y_scale
 
 
@@ -137,7 +137,7 @@ def semivariogram(
         Nd = np.zeros(len(x), 'i')
         sv = np.empty(len(x))
     serr = np.empty(len(x))
-    for n in xrange(len(x)):
+    for n in range(len(x)):
         if xbin is None:
             pair_mask = combs.dist == x[n]
         else:
@@ -269,7 +269,7 @@ def fast_semivariogram(
         return x, sv
 
     xb, yb = binned_variance(x, sv, binsize=xbin)
-    Nd = np.array(map(len, yb))
+    Nd = np.array(list(map(len, yb)))
     xb, semivar, serr = binned_variance_aggregate(xb, yb)
     if counts and se:
         return xb, semivar, Nd, serr

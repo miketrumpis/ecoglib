@@ -37,7 +37,7 @@ class ChannelMap(list):
         """
 
         from .util import mat_to_flat
-        i, j = zip(*ij)
+        i, j = list(zip(*ij))
         map = mat_to_flat(shape, i, j, col_major=col_major)
         return ChannelMap(map, shape, col_major=col_major, pitch=pitch)
 
@@ -49,7 +49,7 @@ class ChannelMap(list):
         """
 
         i, j = mask.nonzero()
-        ij = zip(i, j)
+        ij = list(zip(i, j))
         geo = mask.shape
         return ChannelMap.from_index(ij, geo, col_major=col_major, pitch=pitch)
 
@@ -87,7 +87,7 @@ class ChannelMap(list):
             i = np.array(i, dtype='i')
             j = np.array(j, dtype='i')
         else:
-            i, j = map(int, (i, j))
+            i, j = list(map(int, (i, j)))
         from .util import mat_to_flat
         flat_idx = mat_to_flat(self.geometry, i, j, col_major=self.col_major)
         if np.iterable(flat_idx):
@@ -166,7 +166,7 @@ class ChannelMap(list):
             )
         import sys
         # Keep the pre-computed combinations IFF the entire map is copied
-        if i==0 and j==sys.maxint and self._combs is not None:
+        if i==0 and j==sys.maxsize and self._combs is not None:
             new_map._combs = self._combs.copy()
         return new_map
 
@@ -262,7 +262,7 @@ class ChannelMap(list):
         if arr.shape != self.geometry:
             arr = self.embed(arr, fill=fill)
 
-        nans = zip(*np.isnan(arr).nonzero())
+        nans = list(zip(*np.isnan(arr).nonzero()))
         im = ax.imshow(arr, **kwargs)
         ext = kwargs.pop('extent', ax.get_xlim() + ax.get_ylim())
         dx = abs(float(ext[1] - ext[0])) / arr.shape[1]
@@ -296,7 +296,7 @@ class CoordinateChannelMap(ChannelMap):
         """
         list.__init__(self)
         self[:] = coordinates
-        yy, xx = zip(*self)
+        yy, xx = list(zip(*self))
         self.boundary = (min(yy), max(yy), min(xx), max(xx))
         self.pitch = pitch
         if len(self) > 1:
@@ -306,7 +306,7 @@ class CoordinateChannelMap(ChannelMap):
             self.min_pitch = pitch
         # this is nonsense, but to satisfy parent class
         self.col_major = col_major
-        if isinstance(geometry, (str, unicode)) and geometry.lower() == 'auto':
+        if isinstance(geometry, str) and geometry.lower() == 'auto':
             y_gap = max(yy) - min(yy)
             x_gap = max(xx) - min(xx)
             self.geometry = int(np.round(y_gap / self.min_pitch)), int(np.round(x_gap / self.min_pitch))
@@ -314,7 +314,7 @@ class CoordinateChannelMap(ChannelMap):
             self.geometry = geometry
 
     def to_mat(self):
-        return map(np.array, zip(*self))
+        return list(map(np.array, list(zip(*self))))
 
     def lookup(self, y, x):
         coords = np.array( self )

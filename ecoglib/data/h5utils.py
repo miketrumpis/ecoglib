@@ -12,8 +12,8 @@ from ecoglib.util import Bunch
 from sandbox.array_split import shared_ndarray
 
 
-_h5_seq_types = types.StringTypes + (types.ListType, types.IntType, types.FloatType, types.ComplexType,
-                                     types.BooleanType)
+_h5_seq_types = (str,) + (list, int, float, complex,
+                                     bool)
 
 
 class HDF5Bunch(Bunch):
@@ -26,7 +26,7 @@ class HDF5Bunch(Bunch):
     def close(self):
         # Need to recurse into sub-bunches (?)
         # The file handle should be shared with sub-bunches
-        sb = filter( lambda x: isinstance(x, HDF5Bunch), self.values() )
+        sb = [x for x in list(self.values()) if isinstance(x, HDF5Bunch)]
         for b in sb:
             b.close()
         if self.__file.isopen:
@@ -85,7 +85,7 @@ def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
         f.create_group(p, node, createparents=True)
 
     sub_bunches = list()
-    items = b.iteritems()
+    items = iter(b.items())
     pickle_bunch = Bunch()
 
     # 1) create arrays for suitable types
@@ -105,7 +105,7 @@ def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
         elif type(val) in _h5_seq_types:
             try:
                 f.create_array(path, key, val)
-            except TypeError, ValueError:
+            except (TypeError, ValueError) as e:
                 pickle_bunch[key] = val
 
         elif isinstance(val, Bunch):
@@ -153,7 +153,7 @@ def load_bunch(f, path='/', shared_arrays=(), load=True, scan=False):
     
     """
 
-    shared_arrays = map(lambda a: '/'.join([path, a]), shared_arrays)
+    shared_arrays = ['/'.join([path, a]) for a in shared_arrays]
     return traverse_table(
         f, path=path, shared_paths=shared_arrays, load=load, scan=scan
         )
@@ -224,7 +224,7 @@ def traverse_table(f, path='/', load=True, scan=False, shared_paths=()):
                     gbunch[n.name] = obj
             else:
                 # ignore the empty pickle
-                if n.name == 'b_pickle' and n.size_in_memory > 32L:
+                if n.name == 'b_pickle' and n.size_in_memory > 32:
                     gbunch[n.name] = 'unloaded pickle'
         elif isinstance(n, tables.Group):
             gname = n._v_name

@@ -53,7 +53,7 @@ def subspace_scatters(x, labels=None, fig=None, **kwargs):
         oneplot = False
         plots = list()
     
-    for p, ij in enumerate(itertools.combinations(range(n), 2)):
+    for p, ij in enumerate(itertools.combinations(list(range(n)), 2)):
         if oneplot:
             pp.subplot(P2,P1,p+1)
         else:

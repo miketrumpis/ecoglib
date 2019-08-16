@@ -7,6 +7,7 @@ import numpy as np
 import inspect
 import importlib
 from weakref import WeakKeyDictionary
+from functools import reduce
 
 # ye olde Bunch object
 class Bunch(dict):
@@ -15,7 +16,7 @@ class Bunch(dict):
         self.__dict__ = self
 
     def __repr__(self):
-        k_rep = self.keys()
+        k_rep = list(self.keys())
         if not len(k_rep):
             return 'an empty Bunch'
         v_rep = [str(type(self[k])) for k in k_rep]
@@ -57,11 +58,11 @@ def flat_to_mat(mn, idx, col_major=True):
     return (i, j) if col_major else (j, i)
 
 def mat_to_flat(mn, i, j, col_major=True):
-    i, j = map(np.asarray, (i, j))
+    i, j = list(map(np.asarray, (i, j)))
     if (i < 0).any() or (i >= mn[0]).any() \
       or (j < 0).any() or (j >= mn[1]).any():
         raise ValueError('The matrix index does not fit the geometry: '+str(mn))
-    (i, j) = map(np.asarray, (i, j))
+    (i, j) = list(map(np.asarray, (i, j)))
     # covert matrix indexing to a flat (linear) indexing
     (fast, slow) = (i, j) if col_major else (j, i)
     block = mn[0] if col_major else mn[1]
@@ -121,7 +122,7 @@ def equalize_groups(x, group_sizes, axis=0, fill=np.nan, reshape=True):
     y.fill(fill)
     y_slice = [slice(None)] * len(new_shape)
     x_slice = [slice(None)] * len(x.shape)
-    for g in xrange(n_groups):
+    for g in range(n_groups):
         y_slice[axis] = g
         y_slice[axis+1] = slice(0, group_sizes[g])
         x_slice[axis] = slice(steps[g], steps[g+1])
@@ -137,10 +138,10 @@ def search_results(path, filter=''):
     filter = filter + '*.h5'
     existing = sorted(glob(os.path.join(path, filter)))
     if existing:
-        print 'Precomputed results exist:'
+        print('Precomputed results exist:')
         for n, path in enumerate(existing):
-            print '\t(%d)\t%s'%(n,path)
-        mode = raw_input(
+            print('\t(%d)\t%s'%(n,path))
+        mode = input(
             'Enter a choice to load existing work,'\
             'or (c) to compute new results: '
             )
@@ -210,8 +211,8 @@ class RelocatedImport(object):
         self.data = WeakKeyDictionary()
 
     def __get__(self, instance, owner):
-        print str(self.thing) + ' should now be imported from ' \
-          + self.new_module
+        print(str(self.thing) + ' should now be imported from ' \
+          + self.new_module)
         pkg = importlib.import_module(self.new_module)
         try:
             obj = getattr(pkg, self.thing)

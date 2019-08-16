@@ -1,4 +1,4 @@
-from __future__ import division
+
 import numpy as np
 import scipy.signal as signal
 import scipy.ndimage as ndimage
@@ -70,7 +70,7 @@ def find_spikes(d, spikewidth, Fs, spikewindow=None, fudge=0.8):
     # don't want to lowpass below 2.5x spike width resolution--heuristically
     win_sz = int(np.floor(2.5 / spikewidth))
     win_sz += (win_sz+1) % 2
-    print win_sz
+    print(win_sz)
 
     idl = np.convolve( dl, np.ones(win_sz)/win_sz, mode='same' )
 
@@ -81,7 +81,7 @@ def find_spikes(d, spikewidth, Fs, spikewindow=None, fudge=0.8):
     ix = np.where(np.diff(ndx) > 0)[0][1]
 
     tau = bv[ix] * fudge
-    print tau
+    print(tau)
     survivors = (idl > tau).astype('i')
     ds = np.diff(survivors)
     spk_start = np.where(ds > 0)[0] + 1
@@ -169,13 +169,13 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     try:
         window_size = np.abs(np.int(window_size))
         order = np.abs(np.int(order))
-    except ValueError, msg:
+    except ValueError as msg:
         raise ValueError("window_size and order have to be of type int")
     if window_size % 2 != 1 or window_size < 1:
         raise TypeError("window_size size must be a positive odd number")
     if window_size < order + 2:
         raise TypeError("window_size is too small for the polynomials order")
-    order_range = range(order+1)
+    order_range = list(range(order+1))
     half_window = (window_size -1) // 2
     # precompute coefficients
     b = np.mat(
@@ -218,7 +218,7 @@ def simple_spikes(d, thresh, t_refractory, t_min):
 
     spikes = list()
     last_spike = -t_refractory
-    print len(rising_edge)
+    print(len(rising_edge))
     for start, stop in zip(rising_edge, falling_edge):
         if stop - start < t_min:
             continue

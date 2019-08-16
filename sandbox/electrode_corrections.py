@@ -20,7 +20,7 @@ def correct_for_channels(d, fname, **kwargs):
         pass
 
     return pixel_corrections(
-        d, (bad_row, bad_col), zip(bad_single_row, bad_single_col),
+        d, (bad_row, bad_col), list(zip(bad_single_row, bad_single_col)),
         **kwargs
         )
 

@@ -1,7 +1,7 @@
 """
 One-stop shopping for digital filtering of arrays
 """
-from __future__ import division
+
 import numpy as np
 from .design import butter_bp, cheby1_bp, cheby2_bp, notch
 from ecoglib.util import get_default_args, input_as_2d
@@ -112,9 +112,9 @@ def notch_all(
         # repeat lines until nmax
         nf = lines
         nmax = min( nmax, Fs/2.0 )
-        lines = [ nf*i for i in xrange(1, int(nmax//nf) + 1) ]
+        lines = [ nf*i for i in range(1, int(nmax//nf) + 1) ]
     else:
-        lines = filter(lambda x: x < Fs/2, lines)
+        lines = [x for x in lines if x < Fs/2]
 
     notch_defs = get_default_args(notch)
     notch_defs['nwid'] = nwid
@@ -285,7 +285,7 @@ def ar_whiten_blocks(blocks, p=50):
     """AR(p) Autoregressive whitening of timeseries blocks.
     """
     bw = np.empty_like(blocks)
-    for n in xrange(len(blocks)):
+    for n in range(len(blocks)):
         b, _ = AR_est_YW(blocks[n], p)
         bw[n] = signal.lfilter(np.r_[1, -b], [1], blocks[n])
     return bw

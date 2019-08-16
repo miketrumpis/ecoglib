@@ -76,7 +76,7 @@ def test_sample_consistency():
     jn = Jackknife(r, n_out=d, max_samps=5, ordered_samples=True)
     s1 = np.array( jn.all_samples() )
     s2 = np.array( jn.all_samples() )
-    print map(np.shape, (s1, s2))
+    print(list(map(np.shape, (s1, s2))))
     assert_true( (s1 == s2).all() )
     
 

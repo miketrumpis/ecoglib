@@ -52,13 +52,13 @@ def ellip_bp(atten, ripple, lo=0, hi=0, hp_width=0, lp_width=0, Fs=2.0):
         if lo - hp_width <= 0:
             # set hp_width to halfway between 0 and lo
             hp_width = 0.5 * lo
-            print 'bad HP stopband, adjusting to {0:.1f}'.format(hp_width)
+            print('bad HP stopband, adjusting to {0:.1f}'.format(hp_width))
     if lp_width == 0 and hi > 0:
         lp_width = 0.1 * (hi - lo)
         if hi + lp_width >= Fs/2:
             # make lp_width to halfway between hi and Nyquist
             lp_width = 0.5 * (Fs/2 - hi)
-            print 'bad LP stopband, adjusting to {0:.1f}'.format(lp_width)
+            print('bad LP stopband, adjusting to {0:.1f}'.format(lp_width))
     if lo > 0 and hi > 0:
         # bandpass design
         wp = np.array([lo, hi]) * 2 / Fs

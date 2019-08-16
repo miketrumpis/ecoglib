@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.sparse as sparse
 
-from kernels import gauss_affinity
+from .kernels import gauss_affinity
 
 def eps_graph(dists, nbs, eps, sigma_sq=1.0):
     """

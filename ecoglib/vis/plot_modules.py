@@ -144,11 +144,11 @@ class BlitPlot(HasTraits):
         """
         canvas = self.fig.canvas
         if canvas is None:
-            print 'Canvas not present, no connections made'
+            print('Canvas not present, no connections made')
             return
         if self._mpl_connections:
-            print 'Connections already present,'\
-              'may want to consider disconnecting them first'
+            print('Connections already present,'\
+              'may want to consider disconnecting them first')
         #standard mpl connection pattern
         connections = (('resize_event', self._resize_handler),) + \
           extra_connections
@@ -159,7 +159,7 @@ class BlitPlot(HasTraits):
     def disconnect_live_interaction(self):
         canvas = self.fig.canvas
         if canvas is None:
-            print 'Canvas not present'
+            print('Canvas not present')
         else:
             for id in self._mpl_connections:
                 canvas.mpl_disconnect(id)

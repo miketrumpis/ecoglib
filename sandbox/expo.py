@@ -1,4 +1,4 @@
-from __future__ import division
+
 
 import numpy as np
 import matplotlib as mpl
@@ -6,6 +6,7 @@ import matplotlib as mpl
 #import cmdline.strip_expo_xml as expo
 
 import itertools
+from functools import reduce
 try:
   from lxml import etree
 except ImportError:
@@ -13,7 +14,7 @@ except ImportError:
     # Python 2.5
     import xml.etree.cElementTree as etree
   except ImportError:
-      print "What's wrong with your distro??"
+      print("What's wrong with your distro??")
       sys.exit(1)
 
 def check_closure(xmlfile):
@@ -35,7 +36,7 @@ def itertag_wrap(xml_ish, tag):
         return context
 
     context = etree.iterparse(xml_ish)
-    fcontext = itertools.ifilter(lambda x: x[0].tag==tag, context)
+    fcontext = filter(lambda x: x[0].tag==tag, context)
     return fcontext
 
 class StimEvent(object):
@@ -61,7 +62,7 @@ class StimEvent(object):
         ## with itertag_wrap(xml, cls.tag) as pass_iter:
         all_names = list(cls.attr_keys)
         for child in cls.children:
-            all_names.extend(child.data_lookup.keys())
+            all_names.extend(list(child.data_lookup.keys()))
 
         # fill with empty sequences
         named_seqs = dict(( (name, list()) for name in all_names ))
@@ -111,9 +112,7 @@ class ChildInfo(object):
         rid_code = self.rid.split('.')
         rid = rid_code.pop(0)
         rep = int(rid_code.pop()) if rid_code else 0
-        ev = filter(
-            lambda x: x.attrib['RID']==rid, pass_node.getchildren()
-            )
+        ev = [x for x in pass_node.getchildren() if x.attrib['RID']==rid]
         if len(ev) <= rep-1:
             raise RuntimeError(
                 'This pass has an unexpected multiplicity of children '\
@@ -127,7 +126,7 @@ class ChildInfo(object):
         ev = ev[rep]
         all_data = ev.attrib['Data'].split(',')
         data = ()
-        for name, pos in self.data_lookup.items():
+        for name, pos in list(self.data_lookup.items()):
             # XXX: always converting to float here -- watch
             # out if string values are important
             data = data + ( (name, float(all_data[pos])), )
@@ -174,7 +173,7 @@ class StimulatedExperiment(object):
     def set_enum_tables(self, table_names):
         if isinstance(table_names, str):
             table_names = (table_names,)
-        good_tabs = filter(lambda x: x in self.event_names, table_names)
+        good_tabs = [x for x in table_names if x in self.event_names]
         if len(good_tabs) < len(table_names):
             raise ValueError('some table names not found in this exp')
         self.enum_tables = table_names
@@ -213,8 +212,8 @@ class StimulatedExperiment(object):
             for n, val in enumerate(uvals):
                 conditions[ tab==val ] += n
 
-        n_vals = map(len, all_uvals)
-        for n in xrange(len(all_uvals)):
+        n_vals = list(map(len, all_uvals))
+        for n in range(len(all_uvals)):
             # first tile the current table of values to
             # match the preceeding "most-significant" values,
             # then repeat the tiled set to match to following
@@ -232,7 +231,7 @@ class StimulatedExperiment(object):
         #all_uvals[-1] = utab
         # 1-offset or 0-offset?
         conditions += 1
-        return conditions, Bunch(**dict(zip(self.enum_tables, all_uvals)))
+        return conditions, Bunch(**dict(list(zip(self.enum_tables, all_uvals))))
 
     def rolled_conditions_shape(self):
         _, ctab = self.enumerate_conditions()
@@ -254,7 +253,7 @@ class StimulatedExperiment(object):
             mask = np.row_stack(mask)
             if c_slice:
                 sl = slices[:]
-                for i in xrange(len(combo)):
+                for i in range(len(combo)):
                     sl[ t_idx[i] ] = t_vals[i].searchsorted(combo[i])
                 yield mask.all(axis=0), sl
             else:
@@ -267,8 +266,8 @@ class StimulatedExperiment(object):
 
     def _fill_tables(self, **tables):
         self.__dict__.update(tables)
-        self.event_names = tables.keys()
-        for k, v in tables.items():
+        self.event_names = list(tables.keys())
+        for k, v in list(tables.items()):
             setattr(self, 'u'+k, np.unique(v))
     
     def __getitem__(self, slicing):
@@ -435,7 +434,7 @@ class ExpoExperiment(StimulatedExperiment):
             ticks['tick_'+attrib] = val
         data = self.event_type.walk_events(xml_file)
         data.update(ticks)
-        keys = data.keys()
+        keys = list(data.keys())
         if ignore_skip or not self.skip_blocks:
             keep_idx = slice(None)
         else:
@@ -560,7 +559,7 @@ def join_experiments(exps, offsets):
     if len(offsets) < len(exps) - 1:
         raise ValueError('Not enough offset points given to join experiments')
     new_exp = exps[0].extend(exps[1], offsets[0])
-    for n in xrange(2, len(exps)):
+    for n in range(2, len(exps)):
         new_exp = new_exp.extend(exps[n], offsets[n-1])
     return new_exp
 

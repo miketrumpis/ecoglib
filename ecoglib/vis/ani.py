@@ -120,11 +120,11 @@ def write_anim(
     writer.extra_args = extra_args
     fname = fname.split('.mp4')[0]
     with writer.saving(fig, fname+'.mp4', dpi):
-        print 'Writing {0} frames'.format(n_frame)
+        print('Writing {0} frames'.format(n_frame))
         if progress:
             itr = trange(n_frame)
         else:
-            itr = xrange(n_frame)
+            itr = range(n_frame)
         for n in itr:
             func(n)
             writer.grab_frame()

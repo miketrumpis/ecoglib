@@ -191,7 +191,7 @@ def admm_one(Y, lamz, lamr, rho, X=None, YYt=None, YtY=None, max_it = 1e3):
         Akm1[:] = A
         Ekm1[:] = E
         it += 1
-        print it, errs
+        print(it, errs)
 
     return C, E
 

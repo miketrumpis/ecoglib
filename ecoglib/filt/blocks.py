@@ -1,4 +1,4 @@
-from __future__ import division
+
 import numpy as np
 
 from numpy.lib.stride_tricks import as_strided
@@ -72,7 +72,7 @@ class BlockedSignal(object):
         # this object will be repeatedly modified in the following loop(s)
         blk_slice = [slice(None)] * self._x_blk.ndim
         axis = self._axis
-        for blk in xrange(self.nblock):
+        for blk in range(self.nblock):
             blk_slice[self._axis] = blk
             if blk == self.nblock-1:
                 # VERY important! don't go out of bounds in memory!
@@ -88,7 +88,7 @@ class BlockedSignal(object):
         bsize = self._x_blk.shape[self._axis+1]
         # this object will be repeatedly modified in the following loop(s)
         blk_slice = [slice(None)] * self._x_blk.ndim
-        for blk in xrange(self.nblock-1, -1, -1):
+        for blk in range(self.nblock-1, -1, -1):
             blk_slice[self._axis] = blk
             if blk == self.nblock-1:
                 # VERY important! don't go out of bounds in memory!
@@ -153,7 +153,7 @@ def block_apply(fn, bsize, args, block_arg=0, b_axis=-1, **kwargs):
 
     def _hotswap_block(blk):
         n_arg = len(args)
-        a = [args[n] for n in xrange(n_arg) if n != block_arg]
+        a = [args[n] for n in range(n_arg) if n != block_arg]
         a.insert(block_arg, blk)
         return a
     

@@ -13,7 +13,7 @@ def plot_snz_modulations(spectra, fc=None):
         pcomp = lambda x,y: x/y
         pfun = pp.semilogy
     
-    for c in xrange(ncond):
+    for c in range(ncond):
         
         f = pp.figure()
         f.add_subplot(211)

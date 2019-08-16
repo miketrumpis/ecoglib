@@ -40,16 +40,16 @@ if normalize:
 import pyflann
 fln = pyflann.FLANN()
 
-print 'finding nearest neighbors... ',
+print('finding nearest neighbors... ', end=' ')
 sys.stdout.flush()
 t1 = time()
 # dists are squared--annoying
 # XXX: must find out the relative error in approximate kNN distance
 # versus actual kNN distance
 nbs, dists = fln.nn(d, d, num_neighbors=knn+1, checks=2000)
-print time()-t1, 'sec'
+print(time()-t1, 'sec')
 
-print 'constructing adjacency matrix... ',
+print('constructing adjacency matrix... ', end=' ')
 sys.stdout.flush()
 t1 = time()
 if connectivity:
@@ -68,9 +68,9 @@ else:
             nbs[:,1:], np.sqrt(dists[:,1:]),
             scale=scale, auto_scale=knn_scale, mutual=mutual
             )
-print time() - t1, 'sec'
+print(time() - t1, 'sec')
 
-print 'normalizing graph and finding spectrum... ',
+print('normalizing graph and finding spectrum... ', end=' ')
 sys.stdout.flush()
 t1 = time()
 W.sort_indices()
@@ -82,7 +82,7 @@ M = nrm.bimarkov(K)
 w, V = sp_la.eigsh(M, k=20, which='LM')
 # these eigs are related to markov(K) by a normalization
 V = Di*V[:,::-1]
-print time() - t1, 'sec'
+print(time() - t1, 'sec')
 
 ## centroids, labels, r = k_means(V[:,1:], 6)
 centroids, labels, r = k_means(V[:,1:10], 5)

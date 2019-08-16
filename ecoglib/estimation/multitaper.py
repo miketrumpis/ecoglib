@@ -1,6 +1,6 @@
 """Spectral estimation methods for nonstationary/nonlinear timeseries"""
 
-from __future__ import division
+
 import numpy as np
 import scipy.signal as signal
 import scipy.interpolate as interpolate
@@ -151,13 +151,13 @@ def mtm_spectrogram(
         p = np.ceil(m / user_delta)
         if (m//p) * p < m:
             m = p * (m//p)
-            print 'resetting pl from %0.2f'%pl,
+            print('resetting pl from %0.2f'%pl, end=' ')
             pl = 1 - float(m)/n
-            print ' to %0.2f'%pl
+            print(' to %0.2f'%pl)
         delta = m//p
         #delta -= delta % 2
 
-    print user_delta, delta, m
+    print(user_delta, delta, m)
 
     # check contiguous    
     if not x.flags.c_contiguous:
@@ -186,7 +186,7 @@ def mtm_spectrogram(
     psd_len = int( nblock * pts_per_block - (nblock-1)*overlap )
     psd_pl = float(overlap) / pts_per_block
     psd_matrix = np.zeros( x.shape[:-1] + (nfreq, psd_len), 'd' )
-    print pts_per_block, overlap, psd_len
+    print(pts_per_block, overlap, psd_len)
     # need to make sure psd overlap is
     blk_psd = blocks.BlockedSignal(
         psd_matrix, pts_per_block, overlap=psd_pl, 
@@ -198,10 +198,10 @@ def mtm_spectrogram(
         n_avg, pts_per_block, overlap=psd_pl, partial_block = False
         )
 
-    print blk_n.nblock, blk_x.nblock
+    print(blk_n.nblock, blk_x.nblock)
 
     dpss, eigs = _prepare_dpss(n, NW, low_bias=lb)
-    print 'n_tapers:', len(dpss)
+    print('n_tapers:', len(dpss))
     dpss_sub = dpss[..., int(delta//2)::int(delta)]
     weight = delta * dpss_sub.T.dot( dpss_sub.dot(np.ones(pts_per_block)) )
     #weight **= 2
@@ -211,9 +211,9 @@ def mtm_spectrogram(
     window = np.hamming(pts_per_block)
     weight *= window
     weight = window
-    print 'weight max:', weight.max()
+    print('weight max:', weight.max())
     
-    for b in xrange(blk_n.nblock):
+    for b in range(blk_n.nblock):
         # it's possible to exceed the data blocks, since we're not
         # using fractional blocks in the signal (??)
         if b >= nblock:
@@ -267,13 +267,13 @@ def mtm_spectrogram(
 def bw2nw(bw, n, fs):
     """Full BW to NW, given sequence length n"""
     # nw = tw = t(bw)/2 = (n/fs)(bw)/2
-    bw, n, fs = map(float, (bw, n, fs))
+    bw, n, fs = list(map(float, (bw, n, fs)))
     return (n/fs) * (bw/2)
 
 def nw2bw(nw, n, fs):
     """NW to full BW, given sequence length n"""
     # bw = 2w = 2(tw)/t = 2(nw)/t = 2(nw) / (n/fs) = 2(nw)(fs/n)
-    nw, n, fs = map(float, (nw, n, fs))
+    nw, n, fs = list(map(float, (nw, n, fs)))
     return 2 * nw * fs / n
 
 def mtm_complex_demodulate(
@@ -332,7 +332,7 @@ def mtm_complex_demodulate(
         if xk.ndim == 2:
             xk.shape = (1,) + xk.shape
         weight = np.empty( (xk.shape[0], nfft // 2+1), 'd' )
-        for m in xrange(xk.shape[0]):
+        for m in range(xk.shape[0]):
             w, _ = nt_utils.adaptive_weights(xk[m], eigs, sides='onesided')
             weight[m] = np.sum(w**2, axis=0)
             xk[m, :, :fmax] = xk[m, :, :fmax] * w[:, :fmax]
@@ -447,7 +447,7 @@ def bispectrum(
                 if return_sparse:
                     return sm
                 dm = np.empty( (len(X), nf, nf), dtype=X.dtype )
-                for k in xrange(len(X)):
+                for k in range(len(X)):
                     dm[k] = sm[k].todense()
                     if return_symmetric:
                         dm[k].flat[::nf+1] /= 2.0
@@ -475,7 +475,7 @@ def bispectrum(
         #@split_at(split_arg=(0,1))
         def _apply_third_product(x, tf, nf, tr_i, tr_j):
             b_tr = np.zeros( (nf, nf), dtype=x.dtype )
-            for k in xrange(x.shape[0]):
+            for k in range(x.shape[0]):
                 b_tr[ (tr_i, tr_j) ] = np.take(tf[k], tr_i + tr_j)
                 x[k] *= b_tr.conj()
             return x

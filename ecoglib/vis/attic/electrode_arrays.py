@@ -18,8 +18,8 @@ def make_rectangles(
     verts = np.zeros( (nverts, 2) )
     codes = np.ones( nverts, 'i' ) * Path.LINETO
 
-    xy_size = map(float, xy_size)
-    xh, yh = map(lambda x: x/2, xy_size)
+    xy_size = list(map(float, xy_size))
+    xh, yh = [x/2 for x in xy_size]
     locs = np.asarray(locs)
 
     # bottom left (x,y)
@@ -127,10 +127,7 @@ def draw_array(
     ##     lambda x: (22/100. * x * spacing)*zoom,
     ##     geo
     ##     )
-    figsize = map(
-        lambda x: (0.5 * x * spacing)*zoom,
-        geo
-        )
+    figsize = [(0.5 * x * spacing)*zoom for x in geo]
 
     figsize = (geo[0] * spacing * zoom + 0.5, 
                geo[1] * spacing * zoom)
@@ -143,8 +140,8 @@ def draw_array(
     elif isinstance(e_patches, (list, tuple)):
         for ep in e_patches:
             ax.add_patch(ep)
-    xl = map(lambda x: x*spacing, (-0.5, geo[1]-0.5))
-    yl = map(lambda x: x*spacing, (-0.5, geo[0]-0.5))
+    xl = [x*spacing for x in (-0.5, geo[1]-0.5)]
+    yl = [x*spacing for x in (-0.5, geo[0]-0.5)]
     ax.set_xlim(xl)
     ax.set_ylim(yl)
     ax.axis('off')
@@ -169,7 +166,7 @@ def draw_array(
     # Now go and add the channel names
     chan_map = chan_map.as_row_major()
     if not len(chan_set):
-        chan_set = range(len(chan_map))
+        chan_set = list(range(len(chan_map)))
 
     yy, xx = chan_map.to_mat()
     for y, x, chan_name in zip(yy, xx, chan_set):

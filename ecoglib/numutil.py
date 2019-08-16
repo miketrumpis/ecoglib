@@ -1,5 +1,5 @@
 # brief numerical utility functions
-from __future__ import division
+
 import numpy as np
 from scipy.optimize import leastsq, fmin_tnc
 import scipy.stats.distributions as dists
@@ -34,10 +34,10 @@ def nanpercentile(*args, **kwargs):
     import distutils.version as vs
     if vs.LooseVersion(np.__version__) < vs.LooseVersion('1.11.0'):
         if axis is not None:
-            print axis
+            print(axis)
             while axis < 0:
                 axis += args[0].ndim
-            print axis
+            print(axis)
             return np.rollaxis(res, axis)
     return res
 
@@ -125,11 +125,11 @@ def fenced_out(samps, quantiles=(25,75), thresh=3.0, axis=None, low=True):
         # roll axis of interest to the end
         samps = np.rollaxis(samps, axis, samps.ndim)
 
-    quantiles = map(float, quantiles)
+    quantiles = list(map(float, quantiles))
     q_lo, q_hi = nanpercentile(samps, quantiles, axis=-1)
     extended_range = thresh * (q_hi - q_lo)
     if (extended_range == 0).any():
-        print 'Equal percentiles: estimating outlier range from median value'
+        print('Equal percentiles: estimating outlier range from median value')
         m = (extended_range > 0).astype('d')
         md_range = thresh * q_hi
         extended_range = extended_range * m + md_range * (1 - m)
@@ -234,7 +234,7 @@ def mean_shift(f, bw):
             my = my + midy
             extended = 1
         if iter > 40:
-            print 'did not converge'
+            print('did not converge')
             mx = mx - midx
             my = my - midy
             return
@@ -249,7 +249,7 @@ def gauss1d(x, p, jacobian=False):
     x = x.ravel()
     # process as if all parameters are vectors and we're returning
     # a matrix of values
-    x0, xw, alpha, bias = map(lambda x: np.atleast_2d(x).T, p)
+    x0, xw, alpha, bias = [np.atleast_2d(x).T for x in p]
     if jacobian:
         raise NotImplementedError
 
@@ -261,7 +261,7 @@ def gauss1d(x, p, jacobian=False):
 def bump1d(x, p):
     # bump fn is a + b * exp{ - ( 1 - (x/xw)**2 )^-1 }
     x = x.ravel()
-    xw, b, a = map(lambda x: np.atleast_2d(x).T, p)
+    xw, b, a = [np.atleast_2d(x).T for x in p]
 
     x_arg = 1 - (x/xw)**2
     fx = np.zeros( (xw.shape[0], len(x)) )
@@ -516,13 +516,13 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1, axis=-1):
     try:
         window_size = np.abs(np.int(window_size))
         order = np.abs(np.int(order))
-    except ValueError, msg:
+    except ValueError as msg:
         raise ValueError("window_size and order have to be of type int")
     if window_size % 2 != 1 or window_size < 1:
         raise TypeError("window_size size must be a positive odd number")
     if window_size < order + 2:
         raise TypeError("window_size is too small for the polynomials order")
-    order_range = range(order+1)
+    order_range = list(range(order+1))
     half_window = (window_size -1) // 2
     # precompute coefficients
     ## b = np.mat(
@@ -598,8 +598,8 @@ def mahal_distance(population, test_points, tol=1-1e-2):
 def _autovectorize(fn, exclude_after=-1):
     def vfn(*args, **kwargs):
         kwargs.pop('axis', None)
-        va = map(np.atleast_2d, args)
-        used = range(len(va))
+        va = list(map(np.atleast_2d, args))
+        used = list(range(len(va)))
         res = [ fn(*a_, **kwargs) for a_ in zip(*va) ]
         return np.array(res).squeeze()
     return vfn
@@ -668,15 +668,15 @@ def bootstrap_stat(*arrays, **kwargs):
 
         test_output = func(*test_input, **kwargs)
         if isinstance(test_output, tuple):
-            outputs = range(len(test_output))
+            outputs = list(range(len(test_output)))
         else:
             outputs = (0,)
     else:
         outputs = splice_args
-        print outputs
+        print(outputs)
 
     p_func = split_at(
-        split_arg=range(len(b_arrays)), 
+        split_arg=list(range(len(b_arrays))), 
         splice_at=outputs
         )(func)
 

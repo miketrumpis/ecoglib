@@ -25,7 +25,7 @@ ds2 = dscroll.DataScroller(arr, arr[0], rowcol=(ncol, nrow))
 ds2.configure_traits()
 
 # should see that there has been no copy
-print ds.arr_img_dsource.scalar_data.flags
+print(ds.arr_img_dsource.scalar_data.flags)
 
 # Now simulate case where data has come from MATLAB (column-major layout).
 # The c-contiguous view of this data is shaped (npts, ncol, nrow),
@@ -35,5 +35,5 @@ arr = np.sin(2*np.pi*(0.05*np.arange(npts)[:,None] + phs_map.T.ravel()))
 ds3 = dscroll.DataScroller(arr, arr[:,0], rowcol=(nrow,ncol))
 ds3.configure_traits()
 # again there should not have been a copy
-print ds2.arr_img_dsource.scalar_data.flags
+print(ds2.arr_img_dsource.scalar_data.flags)
 

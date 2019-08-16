@@ -68,7 +68,7 @@ def bdetrend(x, bsize=0, **kwargs):
         bp = np.asarray(bp)
         bp_blocks = (bp/bsize).astype('i')
         new_bp = bp - bsize*bp_blocks
-        bp_table.update( zip(bp_blocks, new_bp) )
+        bp_table.update( list(zip(bp_blocks, new_bp)) )
 
     for n, xc in enumerate(x_blk.fwd()):
         blk_bp = bp_table.get(n, 0)
@@ -119,7 +119,7 @@ def overlap_add(x, w, progress=False):
     if progress:
         itr = trange(nb1)
     else:
-        itr = xrange(nb1)
+        itr = range(nb1)
     for n in itr:
         
         b = blocks.block(n)
@@ -145,7 +145,7 @@ def overlap_add(x, w, progress=False):
     #print b.shape, bf.shape, n
 
     if nb2 > nb1:
-        print 'more output blocks than input blocks??'
+        print('more output blocks than input blocks??')
     
     return xf
         

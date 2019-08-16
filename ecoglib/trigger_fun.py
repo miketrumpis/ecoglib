@@ -25,7 +25,7 @@ def _auto_level(ttl, verbose=False):
             mn = ttl.mean()
             sz = len(ttl)
             pct = 100 * float(sz) / n
-            print 'new level: {0:.2f}; subset size: {1} ({2:.1f} %)'.format(mn, sz, pct)
+            print('new level: {0:.2f}; subset size: {1} ({2:.1f} %)'.format(mn, sz, pct))
         if len(ttl):
             mn = ttl.mean()
             # it's possible there are > 1000 values all clipped
@@ -80,9 +80,9 @@ def process_trigger(trig_chan, thresh=0.5, uniform=True, clean=False):
                                         isi_guess = min_credible_isi)
         sdiff = np.setdiff1d(pos_edge, pos_edge_)
         if len(sdiff):
-            print 'Warning.. spurious triggers auto-detected.'
+            print('Warning.. spurious triggers auto-detected.')
             rej = pos_edge.searchsorted(sdiff)-1
-            print 'Rejected ISIs were', isi_raw[rej]
+            print('Rejected ISIs were', isi_raw[rej])
         pos_edge = pos_edge_
     if clean:
         pos_edge = clean_dirty_trigger(pos_edge)
@@ -112,7 +112,7 @@ def clean_dirty_trigger(pos_edges, isi_guess=None):
     # lose any edges that are < half of the isi_guess
     edge_mask = np.ones(len(pos_edges), '?')
 
-    for i in xrange(len(pos_edges)):
+    for i in range(len(pos_edges)):
         if not edge_mask[i]:
             continue
 
@@ -228,7 +228,7 @@ def ep_trigger_avg(
         
         avg[:,c-1,:] = np.sum(epochs, axis=1) / n_avg[:,c-1][:,None]
 
-    x.shape = filter(lambda x: x > 1, x.shape)
+    x.shape = [x for x in x.shape if x > 1]
     if envelope:
         np.sqrt(avg, avg)
     return avg, n_avg
@@ -365,7 +365,7 @@ def psd_trigger_avg(
         
     tapers, eigs = ntalg.dpss_windows(pre+post, (ntaper+1)/2., ntaper)
     
-    mx_epochs = max([max(map(len, p)) for p in plan.maps])
+    mx_epochs = max([max(list(map(len, p))) for p in plan.maps])
     #epochs = array_split.shared_ndarray((nchan, mx_epochs, 
 
     for c, cond_spec in enumerate(plan.walk_conditions()):
@@ -400,7 +400,7 @@ def psd_trigger_avg(
             #  e.g. if baseline is an interval, then extract the
             #  correct intervals and to psd here)
             pass
-        print 'proc cond', c
+        print('proc cond', c)
     
     spectra.fx = np.linspace(0, Fs/2, nfft/2+1)
     spectra.units = units

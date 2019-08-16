@@ -1,4 +1,4 @@
-from __future__ import division
+
 import numpy as np
 from scikits.bootstrap import ci as boots_ci
 
@@ -58,7 +58,7 @@ def test_for_rf(
     n_pt = pre+post
 
     # xxx: this seems funky
-    n_trial = max( [max(map(len, c_maps)) for c_maps in exp_plan.maps] )
+    n_trial = max( [max(list(map(len, c_maps))) for c_maps in exp_plan.maps] )
 
     n_test = len(exp_plan.active)
     # these arrays are samples of the integrated field response
@@ -77,16 +77,16 @@ def test_for_rf(
         prestim_baseline = True
         samps = np.zeros( (2*n_var, n_cond, n_trial, n_pt) )
         Fs = ml_data.Fs
-        bpre, bpost = map(lambda x: int(round(x*Fs)), exp_plan.b_itvl)
+        bpre, bpost = [int(round(x*Fs)) for x in exp_plan.b_itvl]
         bpre = -bpre
     else:
         prestim_baseline = False
         samps = np.zeros( (n_var, n_cond, n_trial, n_pt) )
    
-    for n in xrange(n_sites):
+    for n in range(n_sites):
         # gather samps
         for c, cond in enumerate(exp_plan.walk_conditions()):
-            for v_idx in xrange(n_var):
+            for v_idx in range(n_var):
                 v_samps = tfun.extract_epochs(
                     d_arr[n], trigs, selected=cond.maps[v_idx], 
                     pre=pre, post=post
@@ -137,7 +137,7 @@ def test_for_rf(
     res = Bunch()
     #ratio_fn = lambda x,y: np.mean(x/y, axis=0)
     ratio_fn = lambda x,y: np.mean(x, axis=0)/np.mean(y, axis=0)
-    for t in xrange(n_test):
+    for t in range(n_test):
         active = field_var[t]
         baseline = baseline_var[t]
         ci = boots_ci( 
