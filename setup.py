@@ -1,11 +1,10 @@
+import os
 from setuptools import setup, Extension, find_packages
 from numpy.distutils.command import build_src
-import Cython
 import Cython.Compiler.Main
 build_src.Pyrex = Cython
 build_src.have_pyrex = True
 from Cython.Distutils import build_ext
-import Cython
 import numpy
 
 try:
@@ -28,7 +27,7 @@ slepian_projection = Extension(
     'ecoglib.filt.time._slepian_projection',
     ['ecoglib/filt/time/_slepian_projection.pyx'], 
     include_dirs = dirs, 
-    libraries=['m'],
+    libraries=(['m'] if os.name != 'nt' else []),
     extra_compile_args=['-O3']
     )
 
