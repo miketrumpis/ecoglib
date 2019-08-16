@@ -8,8 +8,8 @@ import nitime.algorithms as alg
 import nitime.utils as nt_utils
 
 from numpy.lib.stride_tricks import as_strided
-from sandbox.split_methods import multi_taper_psd
-from sandbox.array_split import shared_ndarray, split_at
+from ecogdata.parallel.split_methods import multi_taper_psd
+from ecogdata.parallel.array_split import shared_ndarray, split_at
 import ecogdata.filt.blocks as blocks
 from ecogdata.numutil import nextpow2
 

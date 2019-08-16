@@ -7,7 +7,7 @@ from sklearn.model_selection import KFold
 from itertools import combinations, tee
 from contextlib import closing
 import ecogdata.parallel.mproc as mp
-from sandbox.array_split import SharedmemManager
+from ecogdata.parallel.array_split import SharedmemManager
 
 __all__ = ['random_combinations', 'Jackknife']
 
@@ -40,8 +40,9 @@ def _jackknife_sampler(index):
     * e_kwargs
     
     """
-        
-    array = shm_array.get_ndarray()
+
+    with shm_array.get_ndarray() as array:
+        pass
     samps = np.take(array, index, axis=axis)
     if estimator is not None:
         e_kwargs['axis'] = axis
