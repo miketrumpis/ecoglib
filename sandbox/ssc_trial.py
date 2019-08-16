@@ -1,24 +1,12 @@
 import numpy as np
-import matplotlib.pyplot as pp
-import scipy.io as sio
-import scipy.sparse as sparse
-import scipy.sparse.linalg as sp_la
 import scipy.signal as signal
-import scipy.ndimage as ndimage
-from time import time
-import sys
-from sklearn.cluster import k_means
 
-from ecoglib.vis import data_scroll, scatter_scroller, combo_scroller, single
-from ecoglib.graph import cknn_graph
-from ecoglib.graph import normalize as nrm
 from ecoglib.filt.time import blocked_filter
 
 from ecoglib.ssc import admm
 
 import sandbox.electrode_corrections as electrode_corrections
 import sandbox.load_arr as load_arr
-import sandbox.kmedians as kmedians
 
 # Parameters
 knn = 10; knn_scale = 8; scale = 0.8
