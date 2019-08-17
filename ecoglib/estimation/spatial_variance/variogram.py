@@ -1,79 +1,9 @@
 import numpy as np
 from ecogdata.numutil import fenced_out
 
-__all__ = ['semivariogram']
 
-def adapt_bins(bsize, dists, return_map=False):
-
-    bins = [dists.min()]
-    while bins[-1] + bsize < dists.max():
-        bins.append( bins[-1] + bsize )
-    bins = np.array(bins)
-    converged = False
-    n = 0
-    while not converged:
-        diffs = np.abs( dists - bins[:, None] )
-        bin_assignment = diffs.argmin(0)
-        new_bins = [ dists[ bin_assignment==b ].mean()
-                     for b in range(len(bins)) ]
-        new_bins = np.array(new_bins)
-        new_bins = new_bins[ np.isfinite(new_bins) ]
-        if len(new_bins) == len(bins):
-            dx = np.linalg.norm( bins - new_bins )
-            converged = dx < 1e-5
-        bins = new_bins
-        if n > 20:
-            break
-        n += 1
-    # sometimes the maximum distance to a bin can be greater than the
-    # bin size -- seems to only happen on last distance group (probably
-    # because of very low weighting). 
-    ## diffs = np.abs( dists - bins[:, None] )
-    ## print diffs.min(0).max()
-    ## mx_diff = diffs.min(0).argmax()
-    ## print dists[mx_diff]
-    if return_map:
-        diffs = np.abs( dists - bins[:, None] )
-        bin_assignment = diffs.argmin(0)
-        return bins, bins[bin_assignment]
-    return bins
-
-
-def binned_variance(x, y, binsize=None):
-    if binsize is None:
-        xu = np.unique(x)
-    else:
-        xu, x = adapt_bins(binsize, x, return_map=True)
-    return xu, [ y[x==u] for u in xu ]
-
-
-def _get_scale_method(scale_type):
-    def iqr(sample):
-        return np.nanpercentile(sample, [25, 75])
-    def sd(sample):
-        return np.std(sample)
-    def sem(sample):
-        return sd(sample) / np.sqrt(len(sample))
-    # XXX: bootstrap TODO
-
-    methods = {'iqr': iqr, 'sd': sd, 'std': sd, 'sem': sem}
-    if scale_type.lower() not in methods:
-        raise ValueError('scale function {} not implemented'.format(scale_type))
-    return methods[scale_type.lower()]
-
-
-def binned_variance_aggregate(xb, y_tab, mid_type='mean', scale_type='sem'):
-    mid_fn = {'mean': np.mean,
-              'median': np.median}
-    if mid_type.lower() not in mid_fn:
-        raise ValueError('middle function {} not implemented'.format(mid_type))
-    mid_fn = mid_fn.get(mid_type.lower())
-    scale_fn = _get_scale_method(scale_type)
-
-    y_mid = np.array([mid_fn(y) for y in y_tab if len(y) > 1])
-    y_scale = np.array([scale_fn(y) for y in y_tab if len(y) > 1])
-    xb = np.array([xb[i] for i in range(len(xb)) if len(y_tab[i]) > 1])
-    return xb, y_mid, y_scale
+__all__ = ['semivariogram', 'fast_semivariogram', 'ergodic_semivariogram', 'semivariogram', 'adapt_bins',
+           'binned_variance', 'binned_variance_aggregate', 'resample_bins', 'subsample_bins', 'concat_bins']
 
 
 def semivariogram(
@@ -279,6 +209,7 @@ def fast_semivariogram(
         return xb, semivar, Nd
     return xb, semivar
 
+
 def ergodic_semivariogram(data, normed=False, mask_outliers=True, zero_field=True, covar=False):
     #data = data - data.mean(1)[:,None]
     if zero_field:
@@ -309,3 +240,142 @@ def ergodic_semivariogram(data, normed=False, mask_outliers=True, zero_field=Tru
     if covar:
         return cxx
     return 0.5 * (var[:,None] + var) - cxx
+
+
+# Not sure if this belongs here -- this functionality overlaps pretty well with the output preparation of
+# fast_semivariogram
+def cxx_to_pairs(cxx, chan_map, **kwargs):
+    if cxx.ndim < 3:
+        cxx = cxx[np.newaxis, :, :]
+    chan_combs = chan_map.site_combinations
+    pairs = zip(chan_combs.p1, chan_combs.p2)
+    ix = [x for x,y in sorted(enumerate(pairs), key = lambda x: x[1])]
+    idx1 = chan_combs.idx1[ix]; idx2 = chan_combs.idx2[ix]
+    dist = chan_combs.dist[ix]
+    tri_x = np.triu_indices( cxx.shape[1], k=1 )
+    cxx_pairs = np.array([ c_[ tri_x ] for c_ in cxx ])
+    return dist, cxx_pairs.squeeze()
+
+
+def adapt_bins(bsize, dists, return_map=False):
+
+    bins = [dists.min()]
+    while bins[-1] + bsize < dists.max():
+        bins.append( bins[-1] + bsize )
+    bins = np.array(bins)
+    converged = False
+    n = 0
+    while not converged:
+        diffs = np.abs( dists - bins[:, None] )
+        bin_assignment = diffs.argmin(0)
+        new_bins = [ dists[ bin_assignment==b ].mean()
+                     for b in range(len(bins)) ]
+        new_bins = np.array(new_bins)
+        new_bins = new_bins[ np.isfinite(new_bins) ]
+        if len(new_bins) == len(bins):
+            dx = np.linalg.norm( bins - new_bins )
+            converged = dx < 1e-5
+        bins = new_bins
+        if n > 20:
+            break
+        n += 1
+    # sometimes the maximum distance to a bin can be greater than the
+    # bin size -- seems to only happen on last distance group (probably
+    # because of very low weighting).
+    # diffs = np.abs( dists - bins[:, None] )
+    # print diffs.min(0).max()
+    # mx_diff = diffs.min(0).argmax()
+    # print dists[mx_diff]
+    if return_map:
+        diffs = np.abs( dists - bins[:, None] )
+        bin_assignment = diffs.argmin(0)
+        return bins, bins[bin_assignment]
+    return bins
+
+
+def binned_variance(x, y, binsize=None):
+    if binsize is None:
+        xu = np.unique(x)
+    else:
+        xu, x = adapt_bins(binsize, x, return_map=True)
+    return xu, [y[x == u] for u in xu]
+
+
+def subsample_bins(xb, yb, min_bin=-1, max_bin=-1):
+    """
+    Sub-sample bins to equalize the group sizes. The minimum group
+    size can be specified by min_bin, or will be set by the minimum
+    of the provided group sizes. Bins with sizes smaller than the
+    minimum will be dropped.
+    """
+
+    group_sizes = map(len, yb)
+    if min_bin < 0:
+        min_bin = min(group_sizes)
+
+    if any([g < min_bin for g in group_sizes]):
+        nb = len(group_sizes)
+        xb = [xb[i] for i in range(nb) if group_sizes[i] >= min_bin]
+        yb = [yb[i] for i in range(nb) if group_sizes[i] >= min_bin]
+
+    if max_bin > 0:
+        min_bin = max_bin
+
+    yb_r = [np.random.choice(y_, min_bin, replace=False) for y_ in yb]
+    return xb, yb_r
+
+
+def resample_bins(xb, yb, min_bin=10, beta=0.5):
+    """
+    Do a bootstrap resample within the len(xb) bins in the list yb.
+    Only resample if there are at least min_bin elements in a bin,
+    otherwise reject the entire bin with probability (1-beta).
+    """
+
+    xb = np.asarray(xb)
+    bin_size = np.array(map(len, yb))
+    b_mask = bin_size >= min_bin
+    yb_r = [y_[np.random.randint(0, len(y_), len(y_))]
+            for y_, b in zip(yb, b_mask) if b]
+    yb_sm = [y_ for y_, b in zip(yb, b_mask) if not b]
+    xb_r = xb[b_mask]
+    keep_small = np.random.rand(len(xb) - b_mask.sum()) < beta
+    xb_r = np.r_[xb_r, xb[~b_mask][keep_small]]
+    yb_r.extend([y_ for y_, k in zip(yb_sm, keep_small) if k])
+    return xb_r, yb_r
+
+
+def concat_bins(xb, yb):
+    sizes = map(len, yb)
+    x = np.concatenate([[x_] * g for x_, g in zip(xb, sizes)])
+    y = np.concatenate(yb)
+    return x, y
+
+
+def _get_scale_method(scale_type):
+    def iqr(sample):
+        return np.nanpercentile(sample, [25, 75])
+    def sd(sample):
+        return np.std(sample)
+    def sem(sample):
+        return sd(sample) / np.sqrt(len(sample))
+    # XXX: bootstrap TODO
+
+    methods = {'iqr': iqr, 'sd': sd, 'std': sd, 'sem': sem}
+    if scale_type.lower() not in methods:
+        raise ValueError('scale function {} not implemented'.format(scale_type))
+    return methods[scale_type.lower()]
+
+
+def binned_variance_aggregate(xb, y_tab, mid_type='mean', scale_type='sem'):
+    mid_fn = {'mean': np.mean,
+              'median': np.median}
+    if mid_type.lower() not in mid_fn:
+        raise ValueError('middle function {} not implemented'.format(mid_type))
+    mid_fn = mid_fn.get(mid_type.lower())
+    scale_fn = _get_scale_method(scale_type)
+
+    y_mid = np.array([mid_fn(y) for y in y_tab if len(y) > 1])
+    y_scale = np.array([scale_fn(y) for y in y_tab if len(y) > 1])
+    xb = np.array([xb[i] for i in range(len(xb)) if len(y_tab[i]) > 1])
+    return xb, y_mid, y_scale
