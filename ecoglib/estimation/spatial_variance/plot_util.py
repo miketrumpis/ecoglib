@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib.collections import LineCollection
 from networkx import Graph, draw
 
-from ecogdata.vis.colormaps import diverging_cm
+from ecoglib.vis.colormaps import diverging_cm
 from .variogram import binned_variance
 from .kernels import matern_correlation, matern_spectrum
 
