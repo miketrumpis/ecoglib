@@ -12,6 +12,7 @@ from .variogram import cxx_to_pairs, concat_bins, binned_variance
 __all__ = ['matern_correlation', 'matern_spectrum', 'matern_covariance_matrix', 'matern_semivariogram',
            'simulate_matern_process', 'effective_range', 'exponential_fit']
 
+
 # handcock & wallis def (also Rasmussen & Williams 2006 ch4)
 def matern_correlation(x, theta=1.0, nu=0.5, d=1.0, **kwargs):
     """
@@ -118,10 +119,7 @@ def matern_covariance_matrix(chan_map, channel_variance=(), **matern_params):
     return Kg
 
 
-def simulate_matern_process(
-        extent, dx, theta=1.0, nu=0.5, nugget=0, sill=1,
-        kappa=0, nr=1, mu=(), cxx=False
-):
+def simulate_matern_process(extent, dx, theta=1.0, nu=0.5, nugget=0, sill=1, kappa=0, nr=1, mu=(), cxx=False):
     """
     (Dense) simulation of spatial fields using Matern covariance.
     The terminology of sill is slightly adapted from typical usage.
@@ -202,33 +200,55 @@ def matern_semivariogram(x, theta=1.0, nu=1.0, nugget=0, sill=None, y=(), free=(
 
     Parameters
     ----------
-    x
-    theta
-    nu
-    nugget
-    sill
-    y
-    free
-    wls_mode
-    fit_mean
-    binsize
-    dist_limit
-    bin_limit
-    bounds
-    weights
-    fraction_nugget
-    kwargs
+    x: ndarray
+        Spatial lags for computing or fitting a Matérn variogram kernel.
+    theta: float
+        Range parameter
+    nu: float
+        Smoothness parameter
+    nugget: float
+        Size of noise (nugget). Same "units" as sill.
+    sill: float
+        Total process variance. The "partial" sill would be sill - nugget.
+    y: ndarray
+        If given, then this method estimates the kernel parameters listed in the "free" variable.
+    free: sequence
+        Free parameters to optimize, subset of ('theta', 'nu', 'nugget', 'sill'). Any parameter not in "free" is fixed.
+    wls_mode: str
+        Weighted least squares mode, default 'irls' for iteratively reweighted least squares per Stein. Use 'var' for
+        traditional weights based on the variance per binned spatial lag. Use 'none' to disable weighted LS.
+    fit_mean: bool
+        If (x, y) is a variogram cloud, fit_mean=True computes squared error for bin means rather than all cloud points.
+    binsize: float or None
+        If (x, y) is a variogram cloud, bin at this approximate x spacing. If binsize=None, then binning takes place
+        at natural grid spacings.
+    dist_limit: float or None
+        If given, restrict optimization to the variogram for x in [min(x), dist_limit * max(x)].
+    bin_limit: int or None
+        If given, discard bins with less than bin_limit entries.
+    bounds: dict
+        Lower and upper bounds (lb, ub) for any free parameter, e.g. dict(theta=(0.2, 10)). If a bound is one-sided,
+        use None for the opposite bound.
+    weights: ndarray
+        Weights to be used for weighted LS. Typically number of points per bin for wls_mode='irls'.
+    fraction_nugget: bool
+        Optimize nugget to be a fraction of the sill, rather than a free number. This can be more convenient for
+        defining constraints.
+    kwargs: junk
 
     Returns
     -------
+    params: dict
+        The estimated values of the free parameters.
 
     """
+
     if 'ci' in kwargs.keys():
         print
         'Conf intervals not supported anymore'
     if 'wls' in kwargs.keys():
         print
-        "Use wls='none' to turn off weighted least squares"
+        "Use wls_mode='none' to turn off weighted least squares"
 
     # change default sill value depending on whether this is
     # a fitting or an evaluation
