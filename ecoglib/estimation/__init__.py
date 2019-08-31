@@ -1,5 +1,5 @@
 """A package for assorted estimators"""
 
 from .multitaper import *
-from .jackknife import *
+from .resampling import *
 from .spatial_variance import *

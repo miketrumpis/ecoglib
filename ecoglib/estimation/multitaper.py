@@ -13,7 +13,7 @@ from ecogdata.parallel.array_split import shared_ndarray, split_at
 import ecogdata.filt.blocks as blocks
 from ecogdata.numutil import nextpow2
 
-from .jackknife import Jackknife
+from .resampling import Jackknife
 
 __all__ = ['mtm_spectrogram_basic',
            'mtm_spectrogram',

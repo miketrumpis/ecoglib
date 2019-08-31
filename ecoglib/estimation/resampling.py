@@ -3,16 +3,17 @@ import sys
 import random
 import numpy as np
 from scipy.special import comb
-from sklearn.model_selection import KFold
-from itertools import combinations, tee
+from itertools import combinations
 from contextlib import closing
 import ecogdata.parallel.mproc as mp
 from ecogdata.parallel.array_split import SharedmemManager
 
-__all__ = ['random_combinations', 'Jackknife']
+
+__all__ = ['random_combinations', 'Jackknife', 'Bootstrap']
+
 
 def random_combinations(iterable, r, n):
-    "Pull n random selections from itertools.combinations(iterable, r)"
+    """Pull n random selections from itertools.combinations(iterable, r)"""
     if n > comb(len(iterable), r):
         raise ValueError('Not enough combinations for {0} samples'.format(n))
     pulls = set()
@@ -20,14 +21,17 @@ def random_combinations(iterable, r, n):
     L = len(pool)
     while len(pulls) < n:
         indices = sorted(random.sample(range(L), r))
-        pulls.add( tuple(pool[i] for i in indices) )
+        pulls.add(tuple(pool[i] for i in indices))
     return pulls
 
+
 def _init_pool(pool_args):
+    """stick a dictionary of variable names / values into the global namespace of the process worker"""
     for kw in pool_args.keys():
         globals()[kw] = pool_args[kw]
 
-def _jackknife_sampler(index):
+
+def _resampler(index):
     """Light array sampler using shared memory.
 
     The multiprocess Pool is initialized so that these variables are in
@@ -42,15 +46,108 @@ def _jackknife_sampler(index):
     """
 
     with shm_array.get_ndarray() as array:
-        pass
-    samps = np.take(array, index, axis=axis)
+        samps = np.take(array, index, axis=axis)
     if estimator is not None:
         e_kwargs['axis'] = axis
         return estimator(samps, *e_args, **e_kwargs)
     return samps
 
-    
-class Jackknife(object):
+
+class Bootstrap:
+    """
+    Bootstrap resampler
+    """
+
+    def __init__(self, array, num_samples, axis=-1, sample_size=None, n_jobs=None, ordered_samples=False):
+        """
+        Make a bootstrap resampler for an array.
+
+        Parameters
+        ----------
+        array: ndarray
+            Multidimensional sample data
+        num_samples: int
+            Number of bootstrap samples to create
+        axis: int
+            Axis of the array to resample
+        sample_size: int
+            If given, then pull so many samples with replacement from the array. Normally equal to the original
+            sample size.
+        n_jobs: int
+            Number of parallel jobs to make bootstrap samples. None uses cpu_count().
+        ordered_samples: bool
+            ???
+
+        """
+
+        self._array = array
+        self._axis = axis
+        self._num_samples = num_samples
+        if sample_size is None:
+            self._sample_size = array.shape[axis]
+        else:
+            self._sample_size = sample_size
+        self._resampler = None
+        if sys.platform == 'win32':
+            self._n_jobs = 1
+        else:
+            self._n_jobs = n_jobs
+        self._ordered_samples = ordered_samples
+
+    def _init_sampler(self):
+        max_n = self._array.shape[self._axis]
+        samp_size = self._sample_size
+        def anon_sampler():
+            for i in range(self._num_samples):
+                yield np.random.randint(0, max_n, samp_size)
+        self._resampler = anon_sampler()
+
+    def __len__(self):
+        return self._num_samples
+
+    def sample(self, estimator=None, e_args=(), **e_kwargs):
+        """Generate bootstrap samples, or estimates from the samples. The estimator must be a
+        callable that accepts the "axis" keyword.
+        """
+
+        self._init_sampler()
+        parallel = self._n_jobs is None or self._n_jobs > 1
+        if not parallel:
+            for samp_idx in self._resampler:
+                samps = np.take(self._array, samp_idx, axis=self._axis)
+                if estimator is not None:
+                    e_kwargs['axis'] = self._axis
+                    yield estimator(samps, *e_args, **e_kwargs)
+                else:
+                    yield samps
+            return
+        pool_args = dict(shm_array=SharedmemManager(self._array, use_lock=True),
+                         axis=self._axis, estimator=estimator,
+                         e_args=e_args, e_kwargs=e_kwargs)
+        with closing(mp.Pool(processes=self._n_jobs,
+                             initializer=_init_pool,
+                             initargs=(pool_args,))) as p:
+            if self._ordered_samples:
+                for samp in p.imap(_resampler, self._resampler):
+                    yield samp
+            else:
+                for samp in p.imap_unordered(_resampler, self._resampler):
+                    yield samp
+
+    def all_samples(self, estimator=None, e_args=(), **e_kwargs):
+        """Return all samples from the generator"""
+        samps = list(self.sample(estimator=estimator, e_args=e_args, **e_kwargs))
+        return np.array(samps)
+
+    def estimate(self, estimator, se=False, e_args=(), **e_kwargs):
+        vals = self.all_samples(estimator=estimator, e_args=e_args, **e_kwargs)
+        if se:
+            se = np.std(vals, axis=0) / np.sqrt(len(vals))
+            return np.mean(vals, axis=0), se
+        return np.mean(vals, axis=0)
+
+
+class Jackknife(Bootstrap):
     """
     Jackknife generator with leave-L-out resampling.
 
@@ -67,19 +164,16 @@ class Jackknife(object):
 
     """
 
-    def __init__(
-            self, array, n_out=1, axis=-1, max_samps=-1,
-            n_jobs=None, ordered_samples=False
-            ):
-
-        self._array = array
-        self._axis = axis
+    def __init__(self, array, n_out=1, axis=-1, max_samps=-1, n_jobs=None, ordered_samples=False):
         N = array.shape[axis]
-        self.__choose = (range(N), N-n_out)
-        self._resampler = None
+        if max_samps > 0:
+            num_samples = max_samps
+        else:
+            r = N - n_out
+            num_samples = comb(N, r)
+        super(Jackknife, self).__init__(array, num_samples, axis=axis, n_jobs=n_jobs, ordered_samples=ordered_samples)
+        self.__choose = (range(N), N - n_out)
         self._max_samps = max_samps
-        self._n_jobs = n_jobs
-        self._ordered_samples = ordered_samples
 
     def _init_sampler(self):
         if self._max_samps < 0:
@@ -88,51 +182,6 @@ class Jackknife(object):
             iterable, r = self.__choose
             self._resampler = random_combinations(iterable, r, self._max_samps)
         # else random sampler is already set
-
-    def __len__(self):
-        if self._max_samps > 0:
-            return self._max_samps
-        r = self.__choose[1]
-        return comb(self._array.shape[self._axis], r)
-        
-    def sample(
-            self, estimator=None, e_args=(), **e_kwargs
-            ):
-        """
-        Make min(N-choose-L, max_samps) jack-knife samples.
-        Optionally return jack-knife samples of an estimator. The
-        estimator must be a callable that accepts the "axis" keyword.
-        """
-
-        self._init_sampler()
-        if sys.platform == 'win32':
-            for comb in self._resampler:
-                samps = np.take(self._array, comb, axis=self._axis)
-                if estimator is not None:
-                    e_kwargs['axis'] = self._axis
-                    yield estimator(samps, *e_args, **e_kwargs)
-                else:
-                    yield samps
-            return
-        pool_args = dict(shm_array=SharedmemManager(self._array, use_lock=True),
-                         axis=self._axis, estimator=estimator,
-                         e_args=e_args, e_kwargs=e_kwargs)
-        with closing(mp.Pool(processes=self._n_jobs,
-                             initializer=_init_pool,
-                             initargs=(pool_args,))) as p:
-            if self._ordered_samples:
-                for samp in p.imap(_jackknife_sampler, self._resampler):
-                    yield samp
-            else:
-                for samp in p.imap_unordered(
-                        _jackknife_sampler, self._resampler
-                        ):
-                    yield samp
-
-    def all_samples(self, estimator=None, e_args=(), **e_kwargs):
-        """Return all samples from the generator"""
-        samps = list(self.sample(estimator=estimator, e_args=e_args, **e_kwargs))
-        return np.array(samps)
 
     def pseudovals(self, estimator, jn_samples=(), e_args=(), **e_kwargs):
         """Return the bias-correcting pseudovalues of the estimator"""
@@ -187,4 +236,4 @@ class Jackknife(object):
             )
         N1 = float(self._array.shape[self._axis])
         return np.var(pv, axis=0) / N1
-        
+
