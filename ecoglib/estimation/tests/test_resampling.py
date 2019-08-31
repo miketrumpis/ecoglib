@@ -4,7 +4,7 @@ from scipy.special import comb
 from numpy.testing import assert_almost_equal
 import numpy as np
 
-from ecoglib.estimation.jackknife import Jackknife, Bootstrap
+from ecoglib.estimation.resampling import Jackknife, Bootstrap
 
 
 def test_boot_sample_size():

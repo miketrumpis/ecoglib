@@ -42,7 +42,7 @@ def _resampler(index):
     * estimator
     * e_args
     * e_kwargs
-    
+
     """
 
     with shm_array.get_ndarray() as array:
@@ -97,6 +97,7 @@ class Bootstrap:
     def _init_sampler(self):
         max_n = self._array.shape[self._axis]
         samp_size = self._sample_size
+
         def anon_sampler():
             for i in range(self._num_samples):
                 yield np.random.randint(0, max_n, samp_size)
@@ -186,27 +187,23 @@ class Jackknife(Bootstrap):
     def pseudovals(self, estimator, jn_samples=(), e_args=(), **e_kwargs):
         """Return the bias-correcting pseudovalues of the estimator"""
         if not len(jn_samples):
-            jn_samples = self.all_samples(
-                estimator=estimator, e_args=e_args, **e_kwargs
-                )
+            jn_samples = self.all_samples(estimator=estimator, e_args=e_args, **e_kwargs)
         e_kwargs['axis'] = self._axis
         theta = estimator(self._array, *e_args, **e_kwargs)
         N1 = float(self._array.shape[self._axis])
         d = N1 - self.__choose[1]
         return N1 / d * theta - (N1 - d) * jn_samples / d
-        
+
     def estimate(
             self, estimator, correct_bias=True, se=False,
             e_args=(), **e_kwargs
-            ):
+    ):
         if correct_bias:
             vals = self.pseudovals(estimator, e_args=e_args, **e_kwargs)
         else:
-            vals = self.all_samples(
-                estimator=estimator, e_args=e_args, **e_kwargs
-                )
+            vals = self.all_samples(estimator=estimator, e_args=e_args, **e_kwargs)
         if se:
-            se = np.std(vals, axis=0) / np.sqrt( len(vals) )
+            se = np.std(vals, axis=0) / np.sqrt(len(vals))
             return np.mean(vals, axis=0), se
         return np.mean(vals, axis=0)
 
@@ -217,9 +214,7 @@ class Jackknife(Bootstrap):
 
         e_kwargs['axis'] = self._axis
         theta = estimator(self._array, *e_args, **e_kwargs)
-        pv = self.pseudovals(
-            estimator, jn_samples=jn_samples, e_args=e_args, **e_kwargs
-            )
+        pv = self.pseudovals(estimator, jn_samples=jn_samples, e_args=e_args, **e_kwargs)
         # mean of PV = theta - bias
         # bias = theta - avg{PV}
         return theta - np.mean(pv, axis=0)
@@ -231,9 +226,6 @@ class Jackknife(Bootstrap):
         NOTE! The normalization is probably wrong for delete-d JN
         """
 
-        pv = self.pseudovals(
-            estimator, jn_samples=jn_samples, e_args=e_args, **e_kwargs
-            )
+        pv = self.pseudovals(estimator, jn_samples=jn_samples, e_args=e_args, **e_kwargs)
         N1 = float(self._array.shape[self._axis])
         return np.var(pv, axis=0) / N1
-
