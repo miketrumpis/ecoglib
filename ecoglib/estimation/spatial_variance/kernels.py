@@ -142,18 +142,7 @@ def simulate_matern_process(extent, dx, theta=1.0, nu=0.5, nugget=0, sill=1, kap
         nchan = len(extent)
         cx = np.zeros((nchan, nchan), 'd')
         upper = np.triu_indices(len(cx), k=1)
-        ## mx = matern_correlation(h, theta, nu)
-        ## # this seems wrong??
-        ## #mx = (sill - nugget) * mx + nugget
-        ## mx = (sill - nugget) * mx + kappa
-        ## #mx = (sill - nugget - kappa) * mx + kappa
-        ## cx[upper] = mx
-        ## cx = cx + cx.T
-        ## cx.flat[::len(cx)+1] = sill + kappa
-        cx = matern_covariance_matrix(
-            extent, theta=theta, nu=nu,
-            sill=sill, nugget=nugget, kappa=kappa
-        )
+        cx = matern_covariance_matrix(extent, theta=theta, nu=nu, sill=sill, nugget=nugget, kappa=kappa)
         x = np.linspace(0, ncol - 1, ncol) - ncol / 2.0
         y = np.linspace(0, nrow - 1, nrow) - nrow / 2.0
         x = (x * dx, y * dx)
@@ -165,9 +154,6 @@ def simulate_matern_process(extent, dx, theta=1.0, nu=0.5, nugget=0, sill=1, kap
         rx = np.abs(x[0] - x)
         # print rx
         mask = rx < 1e-3
-        ## mx = matern_semivariogram(rx, theta, nu, nugget, sill)
-        ## mx[mask] = 0
-        ## cx = (sill - nugget) * (1 - mx) + (1 - sill)
         cm = matern_correlation(rx, theta=theta, nu=nu)
         cx = (sill - nugget) * cm + kappa
         cx[mask] = sill + kappa
@@ -414,9 +400,7 @@ def matern_semivariogram(x, theta=1.0, nu=1.0, nugget=0, sill=None, y=(), free=(
     fixed = dict(theta=theta, nu=nu, nugget=nugget, sill=sill)
     p0 = [fixed.pop(f) for f in free]
 
-    r = minimize(
-        loss, p0, constraints=cons, method='SLSQP', bounds=solver_bounds
-    )
+    r = minimize(loss, p0, constraints=cons, method='SLSQP', bounds=solver_bounds)
     params = dict(zip(free, r.x))
     if 'nugget' in params and fraction_nugget:
         sill = params.get('sill', sill)
@@ -446,23 +430,15 @@ def effective_range(p, mx):
 
     # theta = p[0]
     # x0 = 2*theta
-    fx = lambda x: (matern_semivariogram(x, **p) - mx)**2
+    def fx(x):
+        return (matern_semivariogram(x, **p) - mx) ** 2
     return minimize_scalar(fx).x
 
 
 # keep this around just in case
 
-def exponential_fit(
-        cxx, chan_map, pitch=1.0, bin_lim=10, Tv=np.log, lsq='linear',
-        nugget=False, sill=False, cov=False
-        ):
+def exponential_fit(cxx, chan_map, bin_lim=10, Tv=np.log, lsq='linear', nugget=False, sill=False, cov=False):
     if isinstance(chan_map, ChannelMap):
-        ## combs = channel_combinations(chan_map)
-        ## pairs = zip(chan_combs.p1, chan_combs.p2)
-        ## ix = [x for x,y in sorted(enumerate(pairs), key = lambda x: x[1])]
-        ## idx1 = chan_combs.idx1[ix]; idx2 = chan_combs.idx2[ix]
-        ## dist = chan_combs.dist[ix] * pitch
-        ## cxx_pairs = cxx[ np.triu_indices(len(cxx), k=1) ]
         dist, cxx_pairs = cxx_to_pairs(cxx, chan_map)
     else:
         cxx_pairs = cxx
@@ -471,9 +447,9 @@ def exponential_fit(
     xb, yb = binned_variance(dist, cxx_pairs)
     #T = np.log
     if Tv is None:
-        Tv = lambda x: x
+        def Tv(x): return x
     yv = np.array([np.var(Tv(y_)) if len(y_) > bin_lim else -1 for y_ in yb])
-    yv[ yv < 0 ] = np.max(yv)
+    yv[yv < 0] = np.max(yv)
     # need to put weights and data in the same order
     yv, _ = concat_bins(yv, yb)
     x, y = concat_bins(xb, yb)
@@ -490,16 +466,16 @@ def exponential_fit(
             sill = float(sill)
         else:
             sill = 1.0
-        yt = (y - 1 + sill) / ( sill - nugget )
+        yt = (y - 1 + sill) / (sill - nugget)
         d_obj = dict(dist=x, cxx=yt)
         wls = smf.wls(
             'I(-np.log(np.abs(cxx))) ~ 0 + dist', d_obj, weights=1/yv
-            ).fit()
+        ).fit()
         lam = 1.0/float(wls.params.dist)
         return (lam, wls) if cov else lam
     else:
-        ## def _expdecay(x_, lam_):
-        ##     return np.exp(-x_ / lam_)
+        # def _expdecay(x_, lam_):
+        # return np.exp(-x_ / lam_)
         def _expdecay(x_, lam_, nug_=0, sill_=1):
             nug_ = nug_ if est_nugget else fixed_nugget
             sill_ = sill_ if est_sill else fixed_sill
@@ -533,8 +509,6 @@ def exponential_fit(
         p, pcov = curve_fit(
             _expdecay, x, y, p0=p0, sigma=np.sqrt(yv),
             absolute_sigma=True
-            )
+        )
         lam = p[0]
         return (p, pcov) if cov else p
-
-

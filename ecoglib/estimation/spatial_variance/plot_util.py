@@ -44,7 +44,7 @@ def covar_to_lines(x, y, cen_fn=np.mean, len_fn=np.std, binsize=None, **lc_kwarg
     y_c = np.array([cen_fn(_y) for _y in yb])
     y_l = np.array([len_fn(_y) for _y in yb])
 
-    bin_lines = [[(xi, yi-li), (xi, yi+li)] for xi, yi, li in zip(xb, y_c, y_l)]
+    bin_lines = [[(xi, yi - li), (xi, yi + li)] for xi, yi, li in zip(xb, y_c, y_l)]
     return (xb, y_c), LineCollection(bin_lines, **lc_kwargs)
 
 
@@ -87,8 +87,7 @@ def matern_demo(
     # sns.set_palette('muted')
     xx = np.linspace(0, 2, 200) if spectrum else np.linspace(0.001, 5, 200)
     sns_st = {u'font.sans-serif': [u'Helvetica', u'Arial']}
-    with sns.plotting_context(context), sns.axes_style('dark', rc=sns_st), \
-         sns.color_palette('muted'):
+    with sns.plotting_context(context), sns.axes_style('dark', rc=sns_st), sns.color_palette('muted'):
         if paired:
             f, ax = pp.subplots()
             axs = [ax]
@@ -102,7 +101,7 @@ def matern_demo(
                     y = matern_spectrum(xx, theta=theta, nu=nu)
                     ax.plot(
                         xx, y / y[0],
-                        label=label, ls=ls.next()
+                        label=label, ls=next(ls)
                     )
                 else:
                     if reparam:
@@ -114,7 +113,7 @@ def matern_demo(
                         y = 1 - y
                     ax.plot(
                         xx, y,
-                        label=label, ls=ls.next()
+                        label=label, ls=next(ls)
                     )
             ax.legend(loc='upper right')
             axs = [ax]
@@ -125,7 +124,7 @@ def matern_demo(
                     y = matern_spectrum(xx, theta=1.0, nu=nu)
                     axs[0].plot(
                         xx, y / y[0],
-                        label=label, ls=ls.next()
+                        label=label, ls=next(ls)
                     )
                 else:
                     theta = 2.0
@@ -138,7 +137,7 @@ def matern_demo(
                         y = 1 - y
                     axs[0].plot(
                         xx, y,
-                        label=label, ls=ls.next()
+                        label=label, ls=next(ls)
                     )
             ls = itertools.cycle(('-', '--', '-.', ':'))
             for theta in thetas:
@@ -147,7 +146,7 @@ def matern_demo(
                     y = matern_spectrum(xx, theta=theta, nu=1.0)
                     axs[1].plot(
                         xx, y / y[0],
-                        label=label, ls=ls.next()
+                        label=label, ls=next(ls)
                     )
                 else:
                     if reparam:
@@ -160,7 +159,7 @@ def matern_demo(
                     axs[1].plot(
                         xx, y,
                         label=label,
-                        ls=ls.next()
+                        ls=next(ls)
                     )
 
         for ax in axs:
@@ -177,9 +176,8 @@ def matern_demo(
     return f
 
 
-def plot_electrode_graph(
-        graph, chan_map, scale='auto', edge_colors=('black', 'red'), ax=None, stagger_x=False, stagger_y=False
-):
+def plot_electrode_graph(graph, chan_map, scale='auto', edge_colors=('black', 'red'), ax=None, stagger_x=False,
+                         stagger_y=False ):
     import matplotlib.pyplot as pp
     if not ax:
         figsize = np.array(chan_map.geometry)
@@ -218,4 +216,3 @@ def plot_electrode_graph(
     cbar = pp.colorbar(ax.collections[0], ax=ax, use_gridspec=True)
     cbar.set_label('graph avg rank')
     return f
-

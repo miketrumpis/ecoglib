@@ -6,10 +6,7 @@ __all__ = ['semivariogram', 'fast_semivariogram', 'ergodic_semivariogram', 'semi
            'binned_variance', 'binned_variance_aggregate', 'resample_bins', 'subsample_bins', 'concat_bins']
 
 
-def semivariogram(
-        F, combs, xbin=None, robust=True,
-        trimmed=True, cloud=False, counts=False, se=False, slowcloud=False
-        ):
+def semivariogram(F, combs, xbin=None, robust=True, trimmed=True, cloud=False, counts=False, se=False):
     """
     Classical semivariogram estimator with option for Cressie's robust
     estimator. Can also return a semivariogram "cloud".
@@ -51,7 +48,7 @@ def semivariogram(
         bin counts (only if counts==True)
     se : ndarray
         standard error (only if se==True)
-    
+
     """
     # F is an n_site field of values
     # combs is a channel combination bunch
@@ -112,6 +109,7 @@ def semivariogram(
         return x, sv, Nd
     return x, sv
 
+
 try:
     from ._semivariance import triu_diffs
     def _pairwise_semivariance(F, robust=False, trimmed=False):
@@ -127,21 +125,18 @@ try:
         else:
             Nd = np.ones(diffs.shape[0], 'i') * P
         if robust:
-            avg_var = np.power( np.abs(diffs), 0.5 ).mean(1) ** 4
+            avg_var = np.power(np.abs(diffs), 0.5).mean(1) ** 4
             sv = avg_var / 2 / (0.457 + 0.494 / Nd)
         else:
-            sv = 0.5 * np.mean( diffs**2, axis=1 )
+            sv = 0.5 * np.mean(diffs**2, axis=1)
 
         return sv, Nd
 except ImportError:
     def _pairwise_semivariance(*args, **kwargs):
         raise NotImplementedError('Cythonized "triu_diffs" method required.')
-    
 
-def fast_semivariogram(
-        F, combs, xbin=None, trimmed=True,
-        cloud=False, counts=False, se=False, **kwargs
-        ):
+
+def fast_semivariogram(F, combs, xbin=None, trimmed=True, cloud=False, counts=False, se=False, **kwargs):
     """
     Semivariogram estimator with stationarity assumptions, enabling
     faster "flipped" covariance computation.
@@ -180,11 +175,10 @@ def fast_semivariogram(
         bin counts (only if counts==True)
     se : ndarray
         standard error (only if se==True)
-    
+
     """
     # F is an n_site field of values
     # combs is a channel combination bunch
-
 
     sv_matrix = ergodic_semivariogram(F, normed=False,
                                       mask_outliers=trimmed, **kwargs)
@@ -226,7 +220,7 @@ def ergodic_semivariogram(data, normed=False, mask_outliers=True, zero_field=Tru
         dm = np.zeros_like(data)
         np.putmask(dm, m, data)
         data = dm
-        
+
     if normed:
         data = data / np.std(data, axis=1, keepdims=1)
     cxx = np.einsum('ik,jk->ij', data, data)
@@ -239,7 +233,7 @@ def ergodic_semivariogram(data, normed=False, mask_outliers=True, zero_field=Tru
     var = cxx.diagonal()
     if covar:
         return cxx
-    return 0.5 * (var[:,None] + var) - cxx
+    return 0.5 * (var[:, None] + var) - cxx
 
 
 # Not sure if this belongs here -- this functionality overlaps pretty well with the output preparation of
@@ -249,11 +243,12 @@ def cxx_to_pairs(cxx, chan_map, **kwargs):
         cxx = cxx[np.newaxis, :, :]
     chan_combs = chan_map.site_combinations
     pairs = zip(chan_combs.p1, chan_combs.p2)
-    ix = [x for x,y in sorted(enumerate(pairs), key = lambda x: x[1])]
-    idx1 = chan_combs.idx1[ix]; idx2 = chan_combs.idx2[ix]
+    ix = [x for x, y in sorted(enumerate(pairs), key=lambda x: x[1])]
+    idx1 = chan_combs.idx1[ix]
+    idx2 = chan_combs.idx2[ix]
     dist = chan_combs.dist[ix]
-    tri_x = np.triu_indices( cxx.shape[1], k=1 )
-    cxx_pairs = np.array([ c_[ tri_x ] for c_ in cxx ])
+    tri_x = np.triu_indices(cxx.shape[1], k=1)
+    cxx_pairs = np.array([c_[tri_x] for c_ in cxx])
     return dist, cxx_pairs.squeeze()
 
 
@@ -261,19 +256,19 @@ def adapt_bins(bsize, dists, return_map=False):
 
     bins = [dists.min()]
     while bins[-1] + bsize < dists.max():
-        bins.append( bins[-1] + bsize )
+        bins.append(bins[-1] + bsize)
     bins = np.array(bins)
     converged = False
     n = 0
     while not converged:
-        diffs = np.abs( dists - bins[:, None] )
+        diffs = np.abs(dists - bins[:, None])
         bin_assignment = diffs.argmin(0)
-        new_bins = [ dists[ bin_assignment==b ].mean()
-                     for b in range(len(bins)) ]
+        new_bins = [dists[bin_assignment == b].mean()
+                    for b in range(len(bins))]
         new_bins = np.array(new_bins)
-        new_bins = new_bins[ np.isfinite(new_bins) ]
+        new_bins = new_bins[np.isfinite(new_bins)]
         if len(new_bins) == len(bins):
-            dx = np.linalg.norm( bins - new_bins )
+            dx = np.linalg.norm(bins - new_bins)
             converged = dx < 1e-5
         bins = new_bins
         if n > 20:
@@ -287,7 +282,7 @@ def adapt_bins(bsize, dists, return_map=False):
     # mx_diff = diffs.min(0).argmax()
     # print dists[mx_diff]
     if return_map:
-        diffs = np.abs( dists - bins[:, None] )
+        diffs = np.abs(dists - bins[:, None])
         bin_assignment = diffs.argmin(0)
         return bins, bins[bin_assignment]
     return bins
@@ -355,8 +350,10 @@ def concat_bins(xb, yb):
 def _get_scale_method(scale_type):
     def iqr(sample):
         return np.nanpercentile(sample, [25, 75])
+
     def sd(sample):
         return np.std(sample)
+
     def sem(sample):
         return sd(sample) / np.sqrt(len(sample))
     # XXX: bootstrap TODO
