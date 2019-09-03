@@ -3,7 +3,8 @@ from ecogdata.numutil import fenced_out
 
 
 __all__ = ['semivariogram', 'fast_semivariogram', 'ergodic_semivariogram', 'semivariogram', 'adapt_bins',
-           'binned_variance', 'binned_variance_aggregate', 'resample_bins', 'subsample_bins', 'concat_bins']
+           'cxx_to_pairs', 'binned_variance', 'binned_variance_aggregate', 'resample_bins', 'subsample_bins',
+           'concat_bins']
 
 
 def semivariogram(F, combs, xbin=None, robust=True, trimmed=True, cloud=False, counts=False, se=False):
