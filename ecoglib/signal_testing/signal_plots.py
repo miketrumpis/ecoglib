@@ -14,6 +14,12 @@ from .signal_tools import bad_channel_mask, band_power, block_psds, logged_estim
 import seaborn as sns
 sns.reset_orig()
 
+
+__all__ = ['plot_psds', 'plot_electrode_graph', 'plot_avg_psds', 'plot_centered_rxx', 'plot_channel_mask',
+           'plot_mean_psd', 'plot_mux_columns', 'plot_rms_array', 'plot_site_corr', 'plot_site_corr_new',
+           'spatial_variance']
+
+
 psd_colors = ["#348ABD", "#A60628"]
 
 

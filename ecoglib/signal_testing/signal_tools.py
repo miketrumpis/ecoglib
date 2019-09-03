@@ -11,6 +11,10 @@ from ecogdata.expconfig import load_params
 from ecoglib.estimation.spatial_variance import ergodic_semivariogram
 
 
+__all__ = ['band_power', 'bad_channel_mask', 'block_psds', 'logged_estimators', 'safe_corrcoef', 'safe_avg_power',
+           'spatial_autocovariance']
+
+
 def band_power(f, pf, fc=None, root_hz=True):
     """
     Sum of band power in a power spectral density estimate.
