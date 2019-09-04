@@ -4,7 +4,7 @@ import numpy as np
 from ecogdata.parallel.split_methods import multi_taper_psd
 from ecogdata.filt.blocks import BlockedSignal
 from ecogdata.filt.time import ar_whiten_blocks
-from ecogdata.numutil import fenced_out, nextpow2
+from ecogdata.util import fenced_out, nextpow2
 from ecogdata.parallel.mproc import multiprocessing as mp
 from ecogdata.expconfig import load_params
 
@@ -54,7 +54,7 @@ def bad_channel_mask(pwr_est, iqr=4.0, **kwargs):
     pwr_est: ndarray
         Power (squared or RMS) estimates for each channel. Will be log-transformed if all values > 0.
     iqr: float
-        Multiple of the interquartile range defining the inlier/outlier fence in ecogdata.numutil.fenced_out
+        Multiple of the interquartile range defining the inlier/outlier fence in ecogdata.util.fenced_out
     kwargs: dict
         Other arguments for fenced_out method.
 

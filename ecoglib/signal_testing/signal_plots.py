@@ -1,7 +1,7 @@
 import numpy as np
 
 from ecogdata.util import get_default_args
-from ecogdata.numutil import fenced_out
+from ecogdata.util import fenced_out
 from ecogdata.devices.units import nice_unit_text
 
 from ecoglib.vis.plot_util import filled_interval, light_boxplot

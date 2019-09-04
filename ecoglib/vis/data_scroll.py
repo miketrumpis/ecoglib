@@ -15,7 +15,7 @@ import pyface
 from . import plot_modules as pm
 from . import traitsui_bridge as tb
 
-import ecogdata.util as ut
+from ecogdata.channel_map import ChannelMap
 import ecogdata.devices.units as units_tools
 
 try:
@@ -629,7 +629,7 @@ class ChannelScroller(DataScroller):
         #from matplotlib.ticker import LinearLocator
         #plot.ax.yaxis.set_major_locator(LinearLocator(numticks=n_lines))
         if n_lines < Locator.MAXTICKS:
-            if isinstance(self.chans, ut.ChannelMap):
+            if isinstance(self.chans, ChannelMap):
                 # these indices are potentially transposed due to VTk hack
                 # <but impossible to know!!>
                 ii, jj = self.chans.to_mat()

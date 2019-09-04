@@ -4,7 +4,7 @@ from matplotlib.collections import LineCollection, PatchCollection
 from matplotlib.patches import Polygon
 
 from ecogdata.channel_map import ChannelMap
-from ecogdata.numutil import ndim_prctile
+from ecogdata.util import ndim_prctile
 
 from ecogdata.devices import units
 
