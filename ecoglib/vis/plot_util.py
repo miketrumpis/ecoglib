@@ -14,8 +14,7 @@ from matplotlib.ticker import MaxNLocator
 import numpy as np
 from copy import copy
 
-from ecogdata.numutil import bootstrap_stat
-
+from ecoglib.estimation.resampling import Bootstrap
 from .tile_images import quick_tiles, calibration_axes  # need to de-pyplot
 from .colormaps import rgba_field  # need to de-pyplot
 
@@ -143,6 +142,7 @@ def subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True,
         gridspec_kw = {}
 
     fig = Figure(**fig_kw)
+    fig.canvas = None
     gs = GridSpec(nrows, ncols, **gridspec_kw)
 
     # Create empty object array to hold all axes.  It's easiest to make it 1-d
@@ -386,10 +386,9 @@ def _median_ci(samps, boots=1000, ci=95.0):
     Returns (med_ci_lo, median, med_ci_hi) and then 25th and 7th pctiles.
     """
 
-    q1 = bootstrap_stat(samps, func=np.percentile, args=[25], n_boot=boots)
-    md = bootstrap_stat(samps, func=np.percentile, args=[50], n_boot=boots)
-    q3 = bootstrap_stat(samps, func=np.percentile, args=[75], n_boot=boots)
-
+    resampler = Bootstrap(samps, boots)
+    quantiles = resampler.all_samples(estimator=np.percentile, e_args=([25, 50, 75],))
+    q1, md, q3 = quantiles.T
     margin = 100.0 - ci
     md_lo, md, md_hi = np.percentile(
         md, [margin / 2.0, 50, 100 - margin / 2.0], axis=0

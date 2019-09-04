@@ -147,6 +147,11 @@ class Bootstrap:
             return np.mean(vals, axis=0), se
         return np.mean(vals, axis=0)
 
+    @classmethod
+    def bootstrap_estimate(cls, sample, num_resample, estimator, axis=-1, e_args=(), **e_kwargs):
+        bootstrapper = Bootstrap(sample, num_resample, axis=axis)
+        return bootstrapper.estimate(estimator, e_args=e_args, **e_kwargs)
+
 
 class Jackknife(Bootstrap):
     """
@@ -194,10 +199,7 @@ class Jackknife(Bootstrap):
         d = N1 - self.__choose[1]
         return N1 / d * theta - (N1 - d) * jn_samples / d
 
-    def estimate(
-            self, estimator, correct_bias=True, se=False,
-            e_args=(), **e_kwargs
-    ):
+    def estimate(self, estimator, correct_bias=True, se=False, e_args=(), **e_kwargs):
         if correct_bias:
             vals = self.pseudovals(estimator, e_args=e_args, **e_kwargs)
         else:
@@ -229,3 +231,8 @@ class Jackknife(Bootstrap):
         pv = self.pseudovals(estimator, jn_samples=jn_samples, e_args=e_args, **e_kwargs)
         N1 = float(self._array.shape[self._axis])
         return np.var(pv, axis=0) / N1
+
+    @classmethod
+    def jackknife_estimate(cls, sample, estimator, axis=-1, e_args=(), **e_kwargs):
+        sampler = Jackknife(sample, axis=axis)
+        return sampler.estimate(estimator, e_args=e_args, **e_kwargs)
