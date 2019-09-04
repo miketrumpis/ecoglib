@@ -271,11 +271,8 @@ class ArrayMap(HasTraits):
     """
     selected_site = Int(-1)
 
-    def __init__(
-            self, chan_map,
-            labels=None, vec=None, ax=None, map_units=None, cbar=True,
-            **plot_kwargs
-    ):
+    def __init__(self, chan_map, labels=None, vec=None, ax=None, map_units=None, cbar=True,
+                 mark_site=True, **plot_kwargs):
         # the simplest instantiation is with a vector to plot
         self.labels = labels
         self._clim = plot_kwargs.pop('clim', None)
@@ -304,6 +301,7 @@ class ArrayMap(HasTraits):
             self._map = self.ax.images[-1]
         self.chan_map = chan_map
         self._box = None
+        self._mark_site = mark_site
 
         # if (ax is None):
         #     if vec is None:
@@ -349,6 +347,8 @@ class ArrayMap(HasTraits):
 
     @on_trait_change('selected_site')
     def _move_box(self):
+        if not self._mark_site:
+            return
         try:
             # negative index codes for outside array
             if self.selected_site < 0:

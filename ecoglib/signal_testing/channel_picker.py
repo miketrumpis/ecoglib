@@ -178,7 +178,7 @@ else:
                 self._dbman = None
 
         def _init_mask_plot(self):
-            self.array_fig = ArrayMap(self.chan_map)
+            self.array_fig = ArrayMap(self.chan_map, mark_site=False)
             cb = self.array_fig.cbar
 
             # self.array_fig = Figure(figsize=(3,3))
@@ -275,8 +275,7 @@ else:
             self.rms_plot.connect_live_interaction(sense_button=1, transient=False)
             self._set_picker_event()
             self.__alive = True
-            # TODO: make array figure live
-            # self.array_fig.fig.canvas.mpl_connect('button_press_event', self.array_fig.click_listen)
+            self.array_fig.fig.canvas.mpl_connect('button_press_event', self.array_fig.click_listen)
 
         def _key_event(self, ev):
             if ev.name == 'key_press_event' and ev.key.lower() == 'shift':
@@ -349,12 +348,12 @@ else:
                 self.chan_mask[chan] = m
                 self._mask_changed()
 
-        # TODO: make map clickable to toggle mask
-        # @on_trait_change('array_map.selected_site')
-        # def _toggle_site_from_array_map(self):
-        #     if self.array_map.selected_site >= 0:
-        #         site = self.array_map.selected_site
-        #         self.chan_mask[site] = not self.chan_mask[site]
+        @on_trait_change('array_fig.selected_site')
+        def _toggle_site_from_array_fig(self):
+            if self.array_fig.selected_site >= 0:
+                site = self.array_fig.selected_site
+                self.chan_mask[site] = not self.chan_mask[site]
+            self._mask_changed()
 
         def _clear_array_fired(self):
             self._existing_rms_mask = ~np.isnan(self._rms_values)
