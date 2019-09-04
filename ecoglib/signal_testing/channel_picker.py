@@ -194,6 +194,7 @@ else:
             # if any channels were all zero, then rms returns NaN
             self._existing_rms_mask = ~np.isnan(self._rms_values)
             self.chan_mask = self._existing_rms_mask.copy()
+            self.box_fig.canvas = None
             self.rms_plot = InteractiveBoxplot(
                 self._rms_values, axes=self.box_ax, names=['RMS Voltage'], horiz=True,
                 box_ls='solid'
@@ -260,14 +261,7 @@ else:
             return patches
 
         def _post_canvas_hook(self):
-            import os
-            if os.environ['QT_API'].lower() == 'pyqt5':
-                from PyQt5 import QtCore
-            elif os.environ['QT_API'].lower() in ('pyside', 'pyqt', 'pyqt4'):
-                try:
-                    from PySide import QtCore
-                except ImportError:
-                    from PyQt4 import QtCore
+            import qtpy.QtCore as QtCore
             # connect time-marker manipulation with right mouse button
             con = (('key_press_event', self._key_event),
                    ('key_release_event', self._key_event),

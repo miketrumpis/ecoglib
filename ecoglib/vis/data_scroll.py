@@ -857,7 +857,7 @@ class ChannelScroller(DataScroller):
     
 if __name__ == "__main__":
     import sys
-    from pyface.qt import QtGui
+    from qtpy import QtGui
     nrow = 10; ncol = 15; n_pts = 1000
     d = np.random.randn(nrow*ncol, n_pts)
     d_mx = d.max(axis=0)

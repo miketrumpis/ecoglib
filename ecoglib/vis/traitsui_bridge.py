@@ -1,32 +1,23 @@
 """This module creates a bridge between the plot modules and a traits GUI
 """
 
-import os
 import matplotlib
 use = matplotlib.get_backend()
 
 # Only really tested for QT4Agg backend
 if use.lower() == 'qt4agg':
-    from matplotlib.backends.backend_qt4agg import \
-     FigureCanvasQTAgg as FigureCanvas
-    from matplotlib.backends.backend_qt4agg import \
-     NavigationToolbar2QT as NavigationToolbar
+    from matplotlib.backends.backend_qt4agg import FigureCanvas
+    from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 elif use.lower() == 'qt5agg':
-    from matplotlib.backends.backend_qt5agg import \
-     FigureCanvasQTAgg as FigureCanvas
-    from matplotlib.backends.backend_qt5agg import \
-     NavigationToolbar2QT as NavigationToolbar
+    from matplotlib.backends.backend_qt5agg import FigureCanvas
+    from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 elif use.lower() == 'wxagg':
-    from matplotlib.backends.backend_wxagg \
-      import FigureCanvasWxAgg as FigureCanvas
-    from matplotlib.backends.backend_wx import \
-     NavigationToolbar2Wx as NavigationToolbar
+    from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
+    from matplotlib.backends.backend_wx import NavigationToolbar2Wx as NavigationToolbar
 else: #elif use.lower() == 'agg':
     # make this the fallback case
-    from matplotlib.backends.backend_agg \
-      import FigureCanvasAgg as FigureCanvas
-    from matplotlib.backend_bases \
-      import NavigationToolbar2 as NavigationToolbar
+    from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+    from matplotlib.backend_bases import NavigationToolbar2 as NavigationToolbar
          
 from matplotlib.figure import Figure
 
@@ -54,7 +45,7 @@ def assign_canvas(editor):
         mpl_fig = editor.object
     else:
         mpl_fig = editor.object.fig
-    if hasattr(mpl_fig, 'canvas') and mpl_fig.canvas is not None:
+    if hasattr(mpl_fig, 'canvas') and isinstance(mpl_fig.canvas, FigureCanvas):
         # strip this canvas, and close the originating figure?
         #num = mpl_fig.number
         #Gcf.destroy(num)
@@ -63,17 +54,13 @@ def assign_canvas(editor):
     return mpl_canvas
 
 def _embedded_qt_figure(parent, editor, toolbar=True):
-    if os.environ['QT_API'].lower() == 'pyqt5':
-        from PyQt5.QtWidgets import QVBoxLayout, QWidget
-    elif os.environ['QT_API'].lower() in ('pyside', 'pyqt', 'pyqt4'):
-        try:
-            from PySide.QtGui import QVBoxLayout, QWidget
-        except ImportError:
-            from PyQt4.QtGui import QVBoxLayout, QWidget
+    try:
+        from qtpy.QtWidgets import QVBoxLayout, QWidget
+    except ImportError:
+        from qtpy.QtGui import QVBoxLayout, QWidget
 
     panel = QWidget(parent.parentWidget())
     canvas = assign_canvas(editor)
-
     vbox = QVBoxLayout(panel)
     vbox.addWidget(canvas)
     if toolbar:
@@ -130,12 +117,15 @@ class _MPLFigureEditor(Editor):
             mpl_fig = self.value
         else:
             mpl_fig = self.value.fig
-        if hasattr(mpl_fig, 'canvas') and mpl_fig.canvas is not None:
+        # if canvas is good, return it. If it's a dummy canvas, then re-set it
+        if hasattr(mpl_fig, 'canvas') and isinstance(mpl_fig.canvas, FigureCanvas):
             return mpl_fig.canvas
-        mpl_canvas = FigureCanvas(mpl_fig)
+        else:
+            mpl_canvas = FigureCanvas(mpl_fig)
+            return mpl_canvas
         # for Qt?
         # mpl_canvas.setParent(parent)
-        return mpl_canvas
+
 
 class MPLFigureEditor(BasicEditorFactory):
 
