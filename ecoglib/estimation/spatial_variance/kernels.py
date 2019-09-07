@@ -40,8 +40,7 @@ def matern_correlation(x, theta=1.0, nu=0.5, d=1.0, **kwargs):
     """
     theta, nu, d = map(float, (theta, nu, d))
     if 'nugget' in kwargs or 'sill' in kwargs:
-        print
-        'The matern_correlation() method no longer scales past [0, 1]'
+        print('The matern_correlation() method no longer scales past [0, 1]')
     if theta < 1e-6 or nu < 1e-2:
         # argument error, return null vector
         return np.zeros_like(x)
@@ -230,11 +229,9 @@ def matern_semivariogram(x, theta=1.0, nu=1.0, nugget=0, sill=None, y=(), free=(
     """
 
     if 'ci' in kwargs.keys():
-        print
-        'Conf intervals not supported anymore'
+        print('Conf intervals not supported anymore')
     if 'wls' in kwargs.keys():
-        print
-        "Use wls_mode='none' to turn off weighted least squares"
+        print("Use wls_mode='none' to turn off weighted least squares")
 
     # change default sill value depending on whether this is
     # a fitting or an evaluation
@@ -289,11 +286,11 @@ def matern_semivariogram(x, theta=1.0, nu=1.0, nugget=0, sill=None, y=(), free=(
             Nh = Nh[keep]
     else:
         # else get the observed bin counts (even if ones)
-        Nh = np.array(map(len, ybinned), dtype='d')
+        Nh = np.array(list(map(len, ybinned), dtype='d'))
     # If weights are *not* supplied in inverse-variance weighted mode,
     # then define weights
     if wls_mode.lower() == 'var' and not len(weights):
-        weights = np.array(map(np.var, ybinned))
+        weights = np.array(list(map(np.var, ybinned)))
         # this corrects for single-entry bins
         weights[weights == 0] = max(1, weights.max())
     elif wls_mode.lower() == 'none':
@@ -311,7 +308,7 @@ def matern_semivariogram(x, theta=1.0, nu=1.0, nugget=0, sill=None, y=(), free=(
         Nh = Nh[keep]
 
     if fit_mean:
-        x_, y_ = xbinned, np.array(map(np.mean, ybinned))
+        x_, y_ = xbinned, np.array(list(map(np.mean, ybinned)))
     else:
         # x_, y_ = concat_bins(xbinned, ybinned)
         _, y_ = concat_bins(xbinned, ybinned)
@@ -505,7 +502,6 @@ def exponential_fit(cxx, chan_map, bin_lim=10, Tv=np.log, lsq='linear', nugget=F
         else:
             est_sill = False
             fixed_sill = 1.0
-            print
         p, pcov = curve_fit(
             _expdecay, x, y, p0=p0, sigma=np.sqrt(yv),
             absolute_sigma=True
