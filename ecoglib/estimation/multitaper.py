@@ -166,7 +166,7 @@ def mtm_spectrogram(
         x, n, overlap=pl, partial_block = False
         )
 
-    nblock = blk_x.nblock
+    nblock = len(blk_x)
 
     # going to compute the family of complex demodulates for each block
     if not nfft:
@@ -198,8 +198,6 @@ def mtm_spectrogram(
         n_avg, pts_per_block, overlap=psd_pl, partial_block = False
         )
 
-    print(blk_n.nblock, blk_x.nblock)
-
     dpss, eigs = _prepare_dpss(n, NW, low_bias=lb)
     print('n_tapers:', len(dpss))
     dpss_sub = dpss[..., int(delta//2)::int(delta)]
@@ -213,7 +211,7 @@ def mtm_spectrogram(
     weight = window
     print('weight max:', weight.max())
     
-    for b in range(blk_n.nblock):
+    for b in range(len(blk_n)):
         # it's possible to exceed the data blocks, since we're not
         # using fractional blocks in the signal (??)
         if b >= nblock:

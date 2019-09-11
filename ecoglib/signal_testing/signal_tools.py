@@ -2,7 +2,7 @@ from functools import partial
 import numpy as np
 
 from ecogdata.parallel.split_methods import multi_taper_psd
-from ecogdata.filt.blocks import BlockedSignal
+from ecogdata.filt.blocks import BlockedSignal, BlockSignalBase
 from ecogdata.filt.time import ar_whiten_blocks
 from ecogdata.util import fenced_out, nextpow2
 from ecogdata.parallel.mproc import multiprocessing as mp
@@ -208,11 +208,15 @@ def safe_avg_power(data, bsize=2000, iqr_thresh=3.0, mean=True, mask_per_chan=Fa
         Robust average of (or all) RMS blocks.
 
     """
-    if data.ndim < 3:
-        b_data = BlockedSignal(data, bsize, axis=-1)
-        iterator = b_data.fwd()
-        nblock = b_data.nblock
+    if isinstance(data, BlockSignalBase):
+        iterator = data
+        nblock = len(data)
+        nchan = data.array_shape[0]
+    elif data.ndim < 3:
+        bdata = BlockedSignal(data, bsize, partial_block=False)
         nchan = data.shape[0]
+        nblock = len(bdata)
+        iterator = bdata.fwd()
     else:
         nblock, nchan = data.shape[:2]
         iterator = (b for b in data)
@@ -259,10 +263,14 @@ def safe_corrcoef(data, bsize=2000, iqr_thresh=3.0, mean=True, normed=True, semi
         Covariance/correlation/semivariance matrix.
 
     """
-    if data.ndim < 3:
+    if isinstance(data, BlockSignalBase):
+        iterator = data
+        nblock = len(data)
+        nchan = data.array_shape[0]
+    elif data.ndim < 3:
         bdata = BlockedSignal(data, bsize, partial_block=False)
         nchan = data.shape[0]
-        nblock = bdata.nblock
+        nblock = len(bdata)
         iterator = bdata.fwd()
     else:
         nblock, nchan = data.shape[:2]
