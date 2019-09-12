@@ -5,7 +5,7 @@ from traitsui.api import Item, View, UItem, HGroup, VGroup, HSplit, VSplit
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 from ecogdata.devices.maskdb import MaskDB
-from ecogdata.datasource import MappedSource
+from ecogdata.datasource import MappedSource, ElectrodeDataSource
 from ecoglib.vis.plot_modules import BlitPlot, PagedTimeSeriesPlot, AxesScrubber
 from ecoglib.vis.gui_tools import ArrayMap
 from ecoglib.vis.data_scroll import ChannelScroller
@@ -153,13 +153,17 @@ else:
             # make chans appear to be empty -- this skips some weird re-indexing
             self.chan_map = dataset.chan_map
             # TODO: data access in the ChannelScroller type is deeply tied to the ndarray.. needs future decoupling
-            if isinstance(dataset.data, MappedSource):
-                # For now just grab a bit of data
-                mx_pts = 10e6
-                t = int(mx_pts // dataset.data.shape[0])
-                array_data = dataset.data[:, :t]
+            if isinstance(dataset.data, ElectrodeDataSource):
+                if isinstance(dataset.data, MappedSource):
+                    # For now just grab a bit of data
+                    mx_pts = 10e6
+                    t = int(mx_pts // dataset.data.shape[0])
+                    array_data = dataset.data[:, :t]
+                else:
+                    array_data = dataset.data.data_buffer
             else:
-                array_data = dataset.data.data_buffer
+                # hope for the best!
+                array_data = dataset.data
             ChannelScroller.__init__(
                 self, array_data, page_len,
                 Fs=dataset.Fs, units=dataset.units, **traits_n_kw
