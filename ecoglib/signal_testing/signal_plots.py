@@ -246,28 +246,30 @@ def plot_mean_psd(f, gf, df, fc, title, ylims=(), root_hz=True, units='V', iqr_t
     return fig
 
 
-def plot_avg_psds(data, d_chans, g_chans, title, bsize_sec=2, Fs=1, iqr_thresh=None, units='V', **mtm_kw):
+def plot_avg_psds(ecog_chans, ground_chans, title, bsize_sec=2, Fs=1, iqr_thresh=None, units='V', **mtm_kw):
     # make two plots with
     # 1) all spectra
     # 2) average +/- sigma, and outliers
 
-    freqs, psds = block_psds(data + 1e-10, bsize_sec, Fs, **mtm_kw)
-    psds, p_mn, p_err_lo, p_err_hi = logged_estimators(psds, sem=False)
-    g_psds = np.sqrt(psds[g_chans]) if len(g_chans) else None
-    d_psds = np.sqrt(psds[d_chans])
-    ## g_psds = psds[g_chans] if len(g_chans) else None
-    ## d_psds = psds[d_chans]
+    freqs, e_psds = block_psds(ecog_chans, bsize_sec, Fs, **mtm_kw)
+    e_psds = logged_estimators(e_psds, sem=False)[0]
+    np.sqrt(e_psds, e_psds)
+
+    if len(ground_chans):
+        freqs, g_psds = block_psds(ground_chans, bsize_sec, Fs, **mtm_kw)
+        g_psds = logged_estimators(g_psds, sem=False)[0]
+        np.sqrt(g_psds, g_psds)
 
     ttl_str = '%s Fs=%d' % (title, round(Fs))
-    ymax = 10 ** np.ceil(np.log10(d_psds.max()) + 1)
+    ymax = 10 ** np.ceil(np.log10(e_psds.max()) + 1)
     ymin = ymax * 1e-6
     fig = plot_psds(
-        freqs, g_psds, d_psds, Fs / 2, ttl_str,
+        freqs, g_psds, e_psds, Fs / 2, ttl_str,
         ylims=(ymin, ymax),
         iqr_thresh=iqr_thresh, units=units, root_hz=True
     )
     fig_avg = plot_mean_psd(
-        freqs, g_psds, d_psds, Fs / 2, ttl_str,
+        freqs, g_psds, e_psds, Fs / 2, ttl_str,
         ylims=(ymin, ymax),
         iqr_thresh=iqr_thresh, units=units, root_hz=True
     )
@@ -275,11 +277,11 @@ def plot_avg_psds(data, d_chans, g_chans, title, bsize_sec=2, Fs=1, iqr_thresh=N
     return fig, fig_avg
 
 
-def plot_centered_rxx(data, d_chans, chan_map, label, pitch=1.0, cmap='bwr', normed=True, clim=None):
+def plot_centered_rxx(data, chan_map, label, pitch=1.0, cmap='bwr', normed=True, clim=None):
     import matplotlib.pyplot as pp
     from seaborn import JointGrid
 
-    cxx = safe_corrcoef(data[d_chans], 2000, normed=normed)
+    cxx = safe_corrcoef(data, 2000, normed=normed)
     n = cxx.shape[0]
 
     pitch = chan_map.pitch
@@ -431,7 +433,7 @@ def spatial_variance(data, chan_map, label, normed=False):
     return f
 
 
-def scatter_correlations(data, d_chans, chan_map, mask, title, highlight='rows', pitch=1.0):
+def scatter_correlations(data, chan_map, mask, title, highlight='rows', pitch=1.0):
 
     # plot the pairwise correlation values against distance of the pair
     # Highlight channels that
@@ -444,7 +446,7 @@ def scatter_correlations(data, d_chans, chan_map, mask, title, highlight='rows',
     import matplotlib.pyplot as pp
 
     # data[g_chans] = np.nan
-    cxx = safe_corrcoef(data[d_chans[mask]], 2000)
+    cxx = safe_corrcoef(data[mask], 2000)
     n = cxx.shape[0]
 
     cxx_pairs = cxx[np.triu_indices(n, k=1)]
@@ -469,12 +471,12 @@ def scatter_correlations(data, d_chans, chan_map, mask, title, highlight='rows',
         return fig
 
     # xxx: hardwired for 16 channel muxing with grounded input on 1st chan
-    mux_index = np.arange(len(d_chans)).reshape(-1, 15).transpose()[1:]
+    mux_index = np.arange(len(data)).reshape(-1, 15).transpose()[1:]
     nrow, ncol = mux_index.shape
     mux_index -= np.arange(1, ncol + 1)
 
     colors = dict(rows='#E480DA', cols='#80E48A')
-    cxx = safe_corrcoef(data[d_chans], 2000)
+    cxx = safe_corrcoef(data, 2000)
     cxx_pairs = cxx[np.triu_indices(len(cxx), k=1)]
     chan_combs = chan_map.site_combinations
 
@@ -562,12 +564,11 @@ def scatter_correlations(data, d_chans, chan_map, mask, title, highlight='rows',
     return fig
 
 
-def plot_mux_columns(data, d_chans, g_chans, title, color_lims=True, units='uV'):
+def plot_mux_columns(data, title, color_lims=True, units='uV'):
     import matplotlib.pyplot as pp
 
     # data[g_chans] = np.nan
     rms = safe_avg_power(data, 2000)
-    rms[g_chans] = np.nan
     if color_lims:
         vals = rms[np.isfinite(rms)]
         # basically try to clip out anything small
@@ -577,12 +578,7 @@ def plot_mux_columns(data, d_chans, g_chans, title, color_lims=True, units='uV')
     else:
         clim = (np.nanmin(rms), np.nanmax(rms))
 
-    d_rms = rms[d_chans].reshape(-1, 15)
-    if len(g_chans):
-        rms = np.column_stack((rms[g_chans], d_rms))
-    else:
-        rms = d_rms
-    # rms.shape = (-1, 16)
+    rms = rms.reshape(-1, 15)
     fig = pp.figure()
     cm = nancmap('hot', nanc='dodgerblue')
     pp.imshow(rms.T, origin='upper', cmap=cm, clim=clim)
@@ -596,11 +592,9 @@ def plot_mux_columns(data, d_chans, g_chans, title, color_lims=True, units='uV')
     return fig
 
 
-def plot_rms_array(data, d_chans, chan_map, title, color_lims=True, units='uV'):
+def plot_rms_array(data, chan_map, title, color_lims=True, units='uV'):
     import matplotlib.pyplot as pp
-    # data[g_chans] = np.nan
     rms = safe_avg_power(data, 2000)
-    rms = rms[d_chans]
     if color_lims:
         vals = rms[np.isfinite(rms)]
         # basically try to clip out anything small
@@ -623,10 +617,10 @@ def plot_rms_array(data, d_chans, chan_map, title, color_lims=True, units='uV'):
     return f
 
 
-def plot_site_corr(data, d_chans, title):
+def plot_site_corr(data, title):
     import matplotlib.pyplot as pp
     # data[g_chans] = np.nan
-    cxx = safe_corrcoef(data[d_chans], 2000)
+    cxx = safe_corrcoef(data, 2000)
     n = cxx.shape[0]
     cxx.flat[0:n * n:n + 1] = np.nan
 

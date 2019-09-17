@@ -2,6 +2,7 @@ from functools import partial
 import numpy as np
 
 from ecogdata.parallel.split_methods import multi_taper_psd
+from ecogdata.datasource import ElectrodeDataSource
 from ecogdata.filt.blocks import BlockedSignal, BlockSignalBase
 from ecogdata.filt.time import ar_whiten_blocks
 from ecogdata.util import fenced_out, nextpow2
@@ -114,37 +115,45 @@ def block_psds(data, btime, Fs, max_blocks=-1, **mtm_kw):
     if 'NW' not in mtm_kw:
         mtm_kw['NW'] = 2.5
 
-    if data.ndim > 2:
-        nblock, nchan, bsize = data.shape
-        blk_data = data.reshape(nblock * nchan, bsize)
-    else:
+    if isinstance(data, ElectrodeDataSource):
+        # if data is a data source, then it can generate blocks internally
         bsize = int(round(Fs * btime))
-        nchan, npt = data.shape
-        nblock = npt // bsize
-        blk_data = data[..., :bsize * nblock].reshape(-1, nblock, bsize)
-        blk_data = blk_data.transpose(1, 0, 2).copy()
-        blk_data = blk_data.reshape(nblock * nchan, bsize)
-    if max_blocks > 0:
-        nblock = min(max_blocks, nblock)
+        nfft = nextpow2(bsize)
+        nchan = len(data)
+        block_itr = data.iter_blocks(block_length=bsize)
+    else:
+        # otherwise data is an array, which can can be shaped to iterate multiple blocks at a time
+        if data.ndim > 2:
+            nblock, nchan, bsize = data.shape
+            blk_data = data.reshape(nblock * nchan, bsize)
+        else:
+            bsize = int(round(Fs * btime))
+            nchan, npt = data.shape
+            nblock = npt // bsize
+            blk_data = data[..., :bsize * nblock].reshape(-1, nblock, bsize)
+            blk_data = blk_data.transpose(1, 0, 2).copy()
+            blk_data = blk_data.reshape(nblock * nchan, bsize)
+        nfft = nextpow2(bsize)
+        # try to keep computation chunks to modest sizes.. 6 GB
+        # so (2*NW) * nfft * nchan * sizeof(complex128) * comp_blocks < 3 GB
+        n_tapers = 2.0 * mtm_kw['NW']
+        global_params = load_params()
+        mem_limit = global_params.memory_limit / 2.0
+        comp_blocks = mem_limit / n_tapers / nfft / (2 * data.dtype.itemsize)
+        comp_blocks = max(1, int(comp_blocks))
+        n_comp_blocks = nchan * nblock // comp_blocks + int((nchan * nblock) % comp_blocks > 0)
+        block_itr = np.array_split(blk_data, n_comp_blocks, axis=0)
 
-    nfft = nextpow2(bsize)
-    # try to keep computation chunks to modest sizes.. 6 GB
-    # so (2*NW) * nfft * nchan * sizeof(complex128) * comp_blocks < 3 GB
-    n_tapers = 2.0 * mtm_kw['NW']
-    global_params = load_params()
-    mem_limit = global_params.memory_limit / 2.0
-    comp_blocks = mem_limit / n_tapers / nfft / (2 * data.dtype.itemsize)
-    comp_blocks = max(1, int(comp_blocks))
-    n_comp_blocks = nchan * nblock // comp_blocks + \
-                    int((nchan * nblock) % comp_blocks > 0)
     psds = list()
 
-    for blocks in np.array_split(blk_data[:nblock * nchan], n_comp_blocks, axis=0):
+    for n, blocks in enumerate(block_itr):
         freqs, psds_, _ = multi_taper_psd(
             blocks, NFFT=nfft, Fs=Fs, **mtm_kw
         )
         # unwrap into blocks x chans x pts
         psds.append(psds_)
+        if max_blocks > 0 and n + 1 >= max_blocks:
+            break
 
     psds = np.concatenate(psds, axis=0)
     return freqs, psds.reshape(-1, nchan, psds.shape[1])
