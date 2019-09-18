@@ -83,6 +83,32 @@ def bad_channel_mask(pwr_est, iqr=4.0, **kwargs):
     return m
 
 
+def make_block_generator(data, block_size):
+    if isinstance(data, BlockSignalBase):
+        block_itr = data
+        nblock = len(data)
+        nchan = data.array_shape[0]
+    elif isinstance(data, ElectrodeDataSource):
+        # if data is a data source, then it can generate blocks internally
+        block_itr = data.iter_blocks(block_length=block_size, not_strided=True)
+        nchan = len(data)
+        nblock = len(block_itr)
+    else:
+        # otherwise data is an array, which can can be shaped to iterate multiple blocks at a time
+        if data.ndim > 2:
+            nblock, nchan, block_size = data.shape
+            blk_data = data.reshape(nblock * nchan, block_size)
+        else:
+            nchan, npt = data.shape
+            nblock = npt // block_size
+            blk_data = data[..., :block_size * nblock].reshape(-1, nblock, block_size)
+            blk_data = blk_data.transpose(1, 0, 2).copy()
+            blk_data = blk_data.reshape(nblock * nchan, block_size)
+        block_itr = blk_data
+    return block_itr, nchan, nblock, block_size
+
+
+
 def block_psds(data, btime, Fs, max_blocks=-1, **mtm_kw):
     """
     Parameters
@@ -115,26 +141,12 @@ def block_psds(data, btime, Fs, max_blocks=-1, **mtm_kw):
     if 'NW' not in mtm_kw:
         mtm_kw['NW'] = 2.5
 
-    if isinstance(data, ElectrodeDataSource):
-        # if data is a data source, then it can generate blocks internally
-        bsize = int(round(Fs * btime))
-        nfft = nextpow2(bsize)
-        nchan = len(data)
-        block_itr = data.iter_blocks(block_length=bsize)
-    else:
-        # otherwise data is an array, which can can be shaped to iterate multiple blocks at a time
-        if data.ndim > 2:
-            nblock, nchan, bsize = data.shape
-            blk_data = data.reshape(nblock * nchan, bsize)
-        else:
-            bsize = int(round(Fs * btime))
-            nchan, npt = data.shape
-            nblock = npt // bsize
-            blk_data = data[..., :bsize * nblock].reshape(-1, nblock, bsize)
-            blk_data = blk_data.transpose(1, 0, 2).copy()
-            blk_data = blk_data.reshape(nblock * nchan, bsize)
-        nfft = nextpow2(bsize)
-        # try to keep computation chunks to modest sizes.. 6 GB
+    bsize = int(round(Fs * btime))
+    block_itr, nchan, nblock, bsize = make_block_generator(data, bsize)
+    nfft = nextpow2(bsize)
+    if not isinstance(data, ElectrodeDataSource):
+        # If data is not a data source, then control how many blocks are processed simultaneously.
+        # Try to keep computation chunks to modest sizes.. 6 GB
         # so (2*NW) * nfft * nchan * sizeof(complex128) * comp_blocks < 3 GB
         n_tapers = 2.0 * mtm_kw['NW']
         global_params = load_params()
@@ -142,7 +154,7 @@ def block_psds(data, btime, Fs, max_blocks=-1, **mtm_kw):
         comp_blocks = mem_limit / n_tapers / nfft / (2 * data.dtype.itemsize)
         comp_blocks = max(1, int(comp_blocks))
         n_comp_blocks = nchan * nblock // comp_blocks + int((nchan * nblock) % comp_blocks > 0)
-        block_itr = np.array_split(blk_data, n_comp_blocks, axis=0)
+        block_itr = np.array_split(block_itr, n_comp_blocks, axis=0)
 
     psds = list()
 
@@ -217,18 +229,7 @@ def safe_avg_power(data, bsize=2000, iqr_thresh=3.0, mean=True, mask_per_chan=Fa
         Robust average of (or all) RMS blocks.
 
     """
-    if isinstance(data, BlockSignalBase):
-        iterator = data
-        nblock = len(data)
-        nchan = data.array_shape[0]
-    elif data.ndim < 3:
-        bdata = BlockedSignal(data, bsize, partial_block=False)
-        nchan = data.shape[0]
-        nblock = len(bdata)
-        iterator = bdata.fwd()
-    else:
-        nblock, nchan = data.shape[:2]
-        iterator = (b for b in data)
+    iterator, nchan, nblock, bsize = make_block_generator(data, bsize)
     rms_vals = np.zeros((nblock, nchan))
     for n, blk in enumerate(iterator):
         rms_vals[n] = blk.std(axis=-1)
@@ -272,18 +273,7 @@ def safe_corrcoef(data, bsize=2000, iqr_thresh=3.0, mean=True, normed=True, semi
         Covariance/correlation/semivariance matrix.
 
     """
-    if isinstance(data, BlockSignalBase):
-        iterator = data
-        nblock = len(data)
-        nchan = data.array_shape[0]
-    elif data.ndim < 3:
-        bdata = BlockedSignal(data, bsize, partial_block=False)
-        nchan = data.shape[0]
-        nblock = len(bdata)
-        iterator = bdata.fwd()
-    else:
-        nblock, nchan = data.shape[:2]
-        iterator = (b for b in data)
+    iterator, nchan, nblock, bsize = make_block_generator(data, bsize)
     cxx = np.zeros((nblock, nchan, nchan))
     results = []
     if not semivar:
