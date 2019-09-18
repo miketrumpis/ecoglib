@@ -286,7 +286,7 @@ def matern_semivariogram(x, theta=1.0, nu=1.0, nugget=0, sill=None, y=(), free=(
             Nh = Nh[keep]
     else:
         # else get the observed bin counts (even if ones)
-        Nh = np.array(list(map(len, ybinned), dtype='d'))
+        Nh = np.array(list(map(len, ybinned)), dtype='d')
     # If weights are *not* supplied in inverse-variance weighted mode,
     # then define weights
     if wls_mode.lower() == 'var' and not len(weights):

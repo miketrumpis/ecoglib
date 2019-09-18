@@ -277,7 +277,7 @@ def plot_avg_psds(ecog_chans, ground_chans, title, bsize_sec=2, Fs=1, iqr_thresh
     return fig, fig_avg
 
 
-def plot_centered_rxx(data, chan_map, label, pitch=1.0, cmap='bwr', normed=True, clim=None):
+def plot_centered_rxx(data, chan_map, label, cmap='bwr', normed=True, clim=None):
     import matplotlib.pyplot as pp
     from seaborn import JointGrid
 
@@ -644,7 +644,7 @@ def plot_site_corr_new(data, chan_map, title, bsize=2000, cmap=None, normed=True
 
     clim = (-1, 1) if normed else np.percentile(cxx, [2, 98])
     if cmap is None:
-        import ecogana.anacode.colormaps as cmaps
+        import ecoglib.vis.colormaps as cmaps
         cmap = cmaps.diverging_cm(clim[0], clim[1], ((0, 0, 0), (1, 0, 0)))
 
     f, axs = pp.subplots(1, 2, figsize=(12, 5))
