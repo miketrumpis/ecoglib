@@ -401,7 +401,12 @@ def mtm_complex_demodulate(x, NW, nfft=None, adaptive=True, low_bias=True,
             x_tf1 /= 2
         x_tf = x_tf1
     if (ix < 0).any():
-        ix_mask = (ix >= 0) & (ix < N - 0.5)
+        if resample_point == 0.5:
+            # limit last point to an interior point between samples
+            ix_mask = (ix >= 0) & (ix < N - 0.5 * t_res)
+        else:
+            # limit last point to actual last point
+            ix_mask = (ix >= 0) & (ix < N)
         # print('Cutting to {} samps bewteen 0-{}'.format(ix_mask.sum(), N))
         x_tf = x_tf[..., ix_mask]
         ix = ix[ix_mask]
