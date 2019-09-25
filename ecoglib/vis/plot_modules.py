@@ -326,8 +326,6 @@ class StaticFunctionPlot(LongNarrowPlot):
         if 'ylim' not in bplot_kws:
             bplot_kws['ylim'] = (np.nanmin(x), np.nanmax(x))
         super(StaticFunctionPlot, self).__init__(figure=figure, **bplot_kws)
-        # XXX: why setting traits after construction?
-        # self.trait_set(**bplot_kws)
         if t0 is None:
             t0 = t[0]
         ts_line = self.create_fn_image(x, t=t, **plot_line_props)
@@ -520,7 +518,7 @@ class PagedFunctionPlot(StaticFunctionPlot):
         t_init, x_init = self._data_page()
         super(PagedFunctionPlot, self).__init__(t_init, x_init, **traits)
         self.trait_setq(page_length=page_length)
-        # xxx: probably bad form here
+        # Rename the list of Line objects as traces
         self.traces = self.static_artists[:]
         self.page_in(self.page)
 
@@ -720,9 +718,6 @@ class ColorCodedPlot(ProtoPlot):
             t, x, 14.0, c=cx, norm=norm, cmap=cmap, **plot_line_props
         )
         return pc
-
-# XXX: would be nice to have an option to write class labels,
-# possible with "annotate" fn.
 
 
 class ClassSegmentedPlot(ProtoPlot):

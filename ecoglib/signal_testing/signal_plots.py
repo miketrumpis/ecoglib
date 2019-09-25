@@ -470,7 +470,7 @@ def scatter_correlations(data, chan_map, mask, title, highlight='rows', pitch=1.
         fig.text(0.5, .96, title, fontsize=16, va='baseline', ha='center')
         return fig
 
-    # xxx: hardwired for 16 channel muxing with grounded input on 1st chan
+    # hardwired for 16 channel muxing with grounded input on 1st chan
     mux_index = np.arange(len(data)).reshape(-1, 15).transpose()[1:]
     nrow, ncol = mux_index.shape
     mux_index -= np.arange(1, ncol + 1)

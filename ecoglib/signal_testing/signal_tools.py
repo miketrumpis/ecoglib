@@ -32,7 +32,7 @@ def band_power(f, pf, fc=None, root_hz=True):
         Integral of spectrum up to cutoff frequency.
 
     """
-    # xxx: freq axis must be last axis
+    # freq axis must be last axis
     # and assuming real and one-sided
     f_mask = f < fc if fc else slice(None)
     p_slice = pf[..., f_mask]
