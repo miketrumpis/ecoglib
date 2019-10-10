@@ -19,7 +19,13 @@ from .tile_images import quick_tiles, calibration_axes  # need to de-pyplot
 from .colormaps import rgba_field  # need to de-pyplot
 
 import seaborn as sns
-sns.reset_orig()
+# Fix until MPL or seaborn gets straightened out
+import warnings
+with warnings.catch_warnings():
+    import matplotlib as mpl
+    warnings.simplefilter('ignore', mpl.cbook.MatplotlibDeprecationWarning)
+    sns.reset_orig()
+
 
 
 # just use Figure rather than figure

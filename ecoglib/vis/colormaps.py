@@ -8,8 +8,13 @@ import matplotlib.cm as cm
 from itertools import cycle
 
 import seaborn as sns
+# Fix until MPL or seaborn gets straightened out
+import warnings
+with warnings.catch_warnings():
+    import matplotlib as mpl
+    warnings.simplefilter('ignore', mpl.cbook.MatplotlibDeprecationWarning)
+    sns.reset_orig()
 
-sns.reset_orig()
 
 _cmap_db = dict()
 

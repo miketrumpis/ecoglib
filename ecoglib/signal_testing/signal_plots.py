@@ -12,7 +12,12 @@ from .signal_tools import bad_channel_mask, band_power, block_psds, logged_estim
     spatial_autocovariance
 
 import seaborn as sns
-sns.reset_orig()
+# Fix until MPL or seaborn gets straightened out
+import warnings
+with warnings.catch_warnings():
+    import matplotlib as mpl
+    warnings.simplefilter('ignore', mpl.cbook.MatplotlibDeprecationWarning)
+    sns.reset_orig()
 
 
 __all__ = ['plot_psds', 'plot_electrode_graph', 'plot_avg_psds', 'plot_centered_rxx', 'plot_channel_mask',

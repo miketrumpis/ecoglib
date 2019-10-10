@@ -13,9 +13,13 @@ from ecoglib.vis.traitsui_bridge import MPLFigureEditor, PingPongStartup
 from ecoglib.vis.plot_util import light_boxplot
 from .signal_tools import safe_avg_power, bad_channel_mask
 import seaborn as sns
+# Fix until MPL or seaborn gets straightened out
+import warnings
+with warnings.catch_warnings():
+    import matplotlib as mpl
+    warnings.simplefilter('ignore', mpl.cbook.MatplotlibDeprecationWarning)
+    sns.reset_orig()
 
-
-sns.reset_orig()
 
 
 __all__ = ['interactive_mask', 'ChannelPicker']
