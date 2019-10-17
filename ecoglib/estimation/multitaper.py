@@ -2,16 +2,21 @@
 
 import numpy as np
 import scipy.signal as signal
-import scipy.interpolate as interpolate
-import nitime.algorithms as alg
+from scipy.signal.windows import dpss as get_dpss
+try:
+    import scipy.fft as fft
+    POCKET_FFT = True
+except ImportError:
+    import scipy.fftpack as fft
+    POCKET_FFT = False
 import nitime.utils as nt_utils
 
-from ecogdata.parallel.split_methods import multi_taper_psd
 from ecogdata.parallel.array_split import shared_ndarray
 import ecogdata.filt.blocks as blocks
 from ecogdata.util import nextpow2
 
 from .resampling import Jackknife
+
 
 
 __all__ = ['mtm_spectrogram_basic',
@@ -23,13 +28,16 @@ __all__ = ['mtm_spectrogram_basic',
 
 def _parse_mtm_args(N, kw_dict):
     NFFT = kw_dict.pop('NFFT', None)
+    if NFFT is None:
+        NFFT = N
+    elif NFFT == 'auto':
+        NFFT = nextpow2(N)
     BW = kw_dict.pop('BW', None)
     Fs = kw_dict.pop('Fs', 1)
     NW = kw_dict.pop('NW', None)
     if BW is not None:
         # BW wins in a contest (since it was the original implementation)
-        norm_BW = np.round(BW * N / Fs)
-        NW = norm_BW / 2.0
+        NW = bw2nw(BW, N, Fs, halfint=True)
     elif NW is None:
         # default NW
         NW = 4
@@ -38,14 +46,271 @@ def _parse_mtm_args(N, kw_dict):
     return NW, NFFT, lb
 
 
-def _prepare_dpss(N, NW, low_bias=True):
-    dpss, eigs = alg.dpss_windows(N, NW, 2 * NW)
-    if low_bias:
-        low_bias = 0.99 if float(low_bias) == 1.0 else low_bias
-        keepers = eigs > low_bias
-        dpss = dpss[keepers]
-        eigs = eigs[keepers]
-    return dpss, eigs
+def bw2nw(bw, n, fs, halfint=True):
+    """Full BW to NW, given sequence length n"""
+    # nw = tw = t(bw)/2 = (n/fs)(bw)/2
+    bw, n, fs = list(map(float, (bw, n, fs)))
+    nw = (n / fs) * (bw / 2)
+    if halfint:
+        # round 2NW to the closest integer and then halve again
+        nw = round(2 * nw) / 2.0
+    return nw
+
+
+def nw2bw(nw, n, fs):
+    """NW to full BW, given sequence length n"""
+    # bw = 2w = 2(tw)/t = 2(nw)/t = 2(nw) / (n/fs) = 2(nw)(fs/n)
+    nw, n, fs = list(map(float, (nw, n, fs)))
+    return 2 * nw * fs / n
+
+
+class _DPSScache:
+
+    cache = dict()
+
+    @classmethod
+    def prepare_dpss(cls, N, NW, low_bias=True):
+        if (N, NW) in cls.cache:
+            dpss, eigs = cls.cache[(N, NW)]
+        else:
+            dpss, eigs = get_dpss(N, NW, Kmax=int(2 * NW), sym=False, norm=2, return_ratios=True)
+            # always store 2NW eigenvectors/values
+            cls.cache[(N, NW)] = (dpss, eigs)
+        if low_bias:
+            low_bias = 0.99 if float(low_bias) == 1.0 else low_bias
+            keepers = eigs > low_bias
+            dpss = dpss[keepers]
+            eigs = eigs[keepers]
+        return dpss, eigs
+
+
+class MultitaperEstimator:
+    """
+    Class to handle multitaper method spectral estimation.
+    """
+
+    def __init__(self, N, NW, fs=1.0, nfft=None, low_bias=True, dpss=None):
+        """
+        Constructs a multitaper estimator based on length-bandwidth parameters. Constructs discrete prolate
+        spheroidal sequences (DPSS) and the estimator's frequency grid.
+
+        Parameters
+        ----------
+        N: int
+            Length of sequences
+        NW: float
+            Time-bandwidth product to define DPSS. 2NW DPSS will be constructed and K <= 2NW will be used based on
+            spectral concentration and the low_bias argument.
+        fs: float
+            Sampling frequency (or 1 for normalized digital frequencies).
+        nfft: int
+            Compute the FFT with this many points, rather than N. If the value is 'auto', use the next highest power
+            of two.
+        low_bias: bool, float
+            Restrict DPSS tapers based on bandpass concentration ratios, given by eigenvalues. If True, then restrict
+            to tapers with eigenvalues > 0.99. If a number is given, then use that threshold.
+        dpss: 2-tuple
+            If DPSS and eigenvalues were pre-created, use them instead. Specify as dpss=(dpss_vecs, eigs)
+
+        """
+        if dpss is not None:
+            self.dpss, self.eigs = dpss
+        else:
+            self.dpss, self.eigs = _DPSScache.prepare_dpss(N, NW, low_bias=low_bias)
+        if nfft is None:
+            self.nfft = N
+        elif nfft == 'auto':
+            self.nfft = nextpow2(N)
+        else:
+            self.nfft = nfft
+        self.NW = NW
+        self.freq = np.linspace(0, fs / 2.0, self.nfft // 2 + 1)
+
+    @property
+    def BW(self):
+        return nw2bw(self.NW, self.dpss.shape[-1], self.freq[-2] * 2)
+
+    def direct_sdfs(self, x, adaptive_weights=False):
+        """
+        Compute uncorrelated direct spectral density functions under each of K tapers for array(s) in x.
+
+        Parameters
+        ----------
+        x: ndarray
+            1- or 2-dimension timeseries array. SDFs are computed for series in the last dimension.
+        adaptive_weights: bool
+            Compute adaptive weightings per frequency. If False, then use standard weights based on eigenvalues.
+
+        Returns
+        -------
+        yk: ndarray
+            Complex array of SDFs shaped (K, nfreq) for 1D input or (M, K, nfreq) for 2D input.
+        w: ndarray
+            SDF weights. If adaptive weighting was used, the shape of w matches yk.shape. Otherwise,
+            dummy-dimensions are used in place of M and/or nfreq.
+
+        Notes
+        -----
+        Since DPSS tapers are orthonormal, these SDFs can also be used as linear coefficients of narrowband
+        subspaces. The subspaces are defined by frequency-shifted DPSS tapers: v(k, n) * exp(-j * w[b] * n)
+        where w[b] is the FFT bin at b. The bandwidth of each subspace centered at w[b] is determined by the
+        NW taper parameter.
+
+        """
+        shp = x.shape
+        # x must be 2D (even if shaped (1, T))
+        x = np.atleast_2d(x)
+        M = x.shape[0]
+        K = len(self.dpss)
+        tapered = x[..., np.newaxis, :] * self.dpss
+        fft_args = dict(axis=-1, n=self.nfft, overwrite_x=True)
+        if POCKET_FFT:
+            fft_args['workers'] = -1
+        yk = fft.fft(tapered, **fft_args)
+        half_pts = self.nfft // 2 + 1
+        if adaptive_weights:
+            w = np.zeros((M, K, half_pts))
+            for m in range(M):
+                w[m], _ = nt_utils.adaptive_weights(yk[m], self.eigs)
+        else:
+            w = np.sqrt(self.eigs[None, :, None])
+            # w = np.tile(w, (M, 1, half_pts))
+        # TODO: tiling weights and cutting/copying yk are fairly expensive (e.g. 700 ms for (300, 2 ** 15) input)
+        yk = yk[..., :half_pts].copy()
+        # if input was 1D then only return SDFs for single timeseries (get rid of dummy dimension)
+        if len(shp) == 1:
+            return yk[0], w[0]
+        else:
+            return yk, w
+
+    def compute_psd(self, x, adaptive_weights=False, jackknife=False, detrend=None):
+        """
+        Compute the multitaper psd estimate(s) of series in x. PSD normalization is defined such that the integral of
+        spectral power per Hz equals to the total variance in x:
+
+        E{(x - E{x}) ** 2} = integral P(f) * df (eval from f=0 to f=Fs / 2)
+
+        Parameters
+        ----------
+        x: ndarray
+            1- or 2-dim array with timeseries in last dimension.
+        adaptive_weights: bool
+            Use adaptive weights in combining multitaper estimates.
+        jackknife: bool
+            Use jackknife resampling in combining multitaper estimates.
+        detrend: str, bool
+            Remove order-1 (detrend='linear') or order-0 (detrend='constant') trends. If detrend=True, remove constant.
+
+        Returns
+        -------
+        freqs: ndarray
+            Frequency grid
+        psds: ndarray
+            Power spectral density estimate(s) in power / Hz.
+
+        """
+        # TODO: return jackknife or chi2 confidence interval
+        if detrend is not None:
+            if isinstance(detrend, bool):
+                detrend = 'constant'
+            x = detrend(x, axis=-1, type=detrend)
+        shp = x.shape
+        x = np.atleast_2d(x).reshape(-1, x.shape[-1])
+        yk, w = self.direct_sdfs(x, adaptive_weights=adaptive_weights)
+
+        def _combine_spectra(Y, w, axis=None):
+            return np.sum(w * Y, axis=1) / np.sum(w, axis=1)
+
+        # funny -- this is faster (in one step) than doing inplace squares
+        yk = np.abs(yk) ** 2
+        # np.power(yk, 2, yk)
+        np.power(w, 2, w)
+        if jackknife:
+            pxx = Jackknife([yk, w], axis=1).estimate(_combine_spectra, correct_bias=True, se=False)
+        else:
+            pxx = _combine_spectra(yk, w)
+        pxx /= (self.freq[-1] * 2)
+        pxx[..., 1:] *= 2
+        return self.freq, pxx.reshape(shp[:-1] + (pxx.shape[-1],))
+
+    @classmethod
+    def psd(cls, x, NW=2.5, fs=1.0, nfft=None, low_bias=True, dpss=None, adaptive_weights=False, jackknife=False):
+        """
+        Shortcut to create a MultitaperEstimator and then compute the psd for x. See arguments for
+        MultitaperEstimator construction and compute_psd
+
+        Returns
+        -------
+        freqs: ndarray
+            Frequency grid
+        psds: ndarray
+            Power spectral density estimate(s) in power / Hz.
+
+        """
+        N = x.shape[-1]
+        mt_estimator = cls(N, NW, fs=fs, nfft=nfft, low_bias=low_bias, dpss=dpss)
+        return mt_estimator.compute_psd(x, adaptive_weights=adaptive_weights, jackknife=jackknife)
+
+    def compute_csd(self, x, y=None, adaptive_weights=False, jackknife=False, detrend=None):
+        """
+        Compute cross-spectra either between timeseries x and y, or between
+        all the combinations in the vector timeseries x. Other arguments follow compute_psd.
+
+        Returns
+        -------
+        freqs: ndarray
+            Frequency grid
+        csds: ndarray
+            (M, M, nfreq) matrix of cross spectral densities. M=2 if x and y are specified separarely, else M=len(x).
+
+        """
+
+        if x.ndim == 1 and y is None:
+            raise ValueError('Need two or more vectors')
+        if y is not None:
+            x = np.vstack([x, y])
+        if detrend is not None:
+            if isinstance(detrend, bool):
+                detrend = 'constant'
+            x = detrend(x, axis=-1, type=detrend)
+        yk, w = self.direct_sdfs(x, adaptive_weights=adaptive_weights)
+
+        def _combine_spectra(y, w, axis=None):
+            # weighted sdfs
+            yw = y * w
+            numer = np.einsum('mkl,nkl->mnl', yw, yw.conj())
+            wsum = np.sum(w ** 2, axis=1) ** 0.5
+            denom = wsum[:, None, :] * wsum[None, :, :]
+            return numer / denom
+
+        if jackknife:
+            cxy = Jackknife([yk, w], axis=1).estimate(_combine_spectra, correct_bias=True, se=False)
+        else:
+            cxy = _combine_spectra(yk, w)
+        cxy /= (self.freq[-1] * 2)
+        cxy[..., 1:] *= 2
+        return self.freq, cxy
+
+    @classmethod
+    def csd(cls, x, y=None, NW=2.5, fs=1.0, nfft=None, low_bias=True, dpss=None,
+            adaptive_weights=False, jackknife=False):
+        """
+        Shortcut to create a MultitaperEstimator and then compute the csds for x. See arguments for
+        MultitaperEstimator construction and compute_csd
+
+        Returns
+        -------
+        freqs: ndarray
+            Frequency grid
+        csds: ndarray
+            (M, M, nfreq) matrix of cross spectral densities. M=2 if x and y are specified separarely, else M=len(x).
+
+
+        """
+        N = x.shape[-1]
+        mt_estimator = cls(N, NW, fs=fs, nfft=nfft, low_bias=low_bias, dpss=dpss)
+        return mt_estimator.compute_csd(x, y=y, adaptive_weights=adaptive_weights, jackknife=jackknife)
+
 
 
 def mtm_spectrogram_basic(x, n, pl=0.25, detrend='', **mtm_kwargs):
@@ -72,14 +337,16 @@ def mtm_spectrogram_basic(x, n, pl=0.25, detrend='', **mtm_kwargs):
 
     if x.ndim < 2:
         x = x.reshape((1,) + x.shape)
-    mtm_kwargs.setdefault('adaptive', True)
+    N, NW, low_bias = _parse_mtm_args(x.shape[-1], mtm_kwargs)
+    mtm_kwargs.setdefault('adaptive_weights', True)
     mtm_kwargs.setdefault('jackknife', False)
     xb = blocks.BlockedSignal(x, n, overlap=pl, partial_block=False)
     x_lapped = xb._x_blk.copy()
     if detrend:
         x_lapped = signal.detrend(x_lapped, type=detrend, axis=-1).copy()
 
-    fx, psds, nu = multi_taper_psd(x_lapped, **mtm_kwargs)
+    # fx, psds, nu = multi_taper_psd(x_lapped, **mtm_kwargs)
+    fx, psds = MultitaperEstimator.psd(x_lapped, NW=NW, low_bias=low_bias, **mtm_kwargs)
 
     # infer time-resolution
     lag = round((1 - pl) * n)
@@ -182,7 +449,7 @@ def mtm_spectrogram(
                                    samp_factor=(1.0 / delta if delta > 1 else 0))
     nfft = nextpow2(pad_n)
     # print(n, pad_n, float(pad_n * NW) / n)
-    dpss, eigs = _prepare_dpss(pad_n, float(pad_n * NW) / n, low_bias=lb)
+    dpss, eigs = _DPSScache.prepare_dpss(pad_n, float(pad_n * NW) / n, low_bias=lb)
     fx = np.linspace(0, Fs / 2, nfft // 2 + 1)
 
     if freqs is None:
@@ -201,7 +468,7 @@ def mtm_spectrogram(
         n_avg, pts_per_block, overlap=psd_pl, partial_block=False
     )
     
-    # dpss, eigs = _prepare_dpss(n, NW, low_bias=lb)
+    # dpss, eigs = _DPSScache.prepare_dpss(n, NW, low_bias=lb)
     # print('n_tapers:', len(dpss))
     ind = (np.arange(pts_per_block) + 0.5) * delta
     dpss_sub = dpss[..., ind.astype('i')]
@@ -265,20 +532,6 @@ def mtm_spectrogram(
         fx = freqs
 
     return tx, fx, psd_matrix
-
-
-def bw2nw(bw, n, fs):
-    """Full BW to NW, given sequence length n"""
-    # nw = tw = t(bw)/2 = (n/fs)(bw)/2
-    bw, n, fs = list(map(float, (bw, n, fs)))
-    return (n / fs) * (bw / 2)
-
-
-def nw2bw(nw, n, fs):
-    """NW to full BW, given sequence length n"""
-    # bw = 2w = 2(tw)/t = 2(nw)/t = 2(nw) / (n/fs) = 2(nw)(fs/n)
-    nw, n, fs = list(map(float, (nw, n, fs)))
-    return 2 * nw * fs / n
 
 
 def mtm_complex_demodulate(x, NW, nfft=None, adaptive=True, low_bias=True,
@@ -366,30 +619,25 @@ def mtm_complex_demodulate(x, NW, nfft=None, adaptive=True, low_bias=True,
     if dpss is None:
         BW = float(NW) / N
         NW_pad = BW * N_pad
-        dpss, eigs = _prepare_dpss(N_pad, NW_pad, low_bias=low_bias)
+        dpss, eigs = _DPSScache.prepare_dpss(N_pad, NW_pad, low_bias=low_bias)
     if nfft is None:
         nfft = nextpow2(N_pad)
     K = len(eigs)
 
-    fmax = int(round(fmax * nfft)) + 1
-    xk = alg.tapered_spectra(x, dpss, NFFT=nfft)
+    # xk = alg.tapered_spectra(x, dpss, NFFT=nfft)
+    mtm = MultitaperEstimator(N_pad, NW_pad, nfft=nfft, dpss=(dpss, eigs))
+    xk, weight = mtm.direct_sdfs(x, adaptive_weights=adaptive)
     if adaptive:
-        if xk.ndim == 2:
-            xk.shape = (1,) + xk.shape
-        weight = np.empty((xk.shape[0], nfft // 2 + 1), 'd')
-        for m in range(xk.shape[0]):
-            w, _ = nt_utils.adaptive_weights(xk[m], eigs, sides='onesided')
-            weight[m] = np.sum(w**2, axis=0)
-            xk[m, :, :fmax] = xk[m, :, :fmax] * w[:, :fmax]
-        xk = np.squeeze(xk)[..., :fmax]
-        weight = np.squeeze(weight)
+        xk *= weight
+        # repurpose weight as the sum of squared weights across K direct SDFs
+        weight = np.sum(weight ** 2, axis=-2)
     else:
-        xk = xk[..., :fmax]
         weight = float(K)
 
     xk *= np.sqrt(eigs[:, None])
 
-    xk_win_ax = 0 + x.ndim - 1
+    xk_win_ax = x.ndim - 1
+    # expand the complex coefficients at each frequency with the baseband DPSS vectors
     x_tf = np.tensordot(xk, dpss, axes=(xk_win_ax, 0))
     if resample_point == 0.5:
         t1 = (ix + neg_segs * t_res).astype('i')
@@ -462,7 +710,7 @@ def bispectrum(
     """
 
     N = x.shape[-1]
-    dpss, eigs = _prepare_dpss(N, NW, low_bias=low_bias)
+    dpss, eigs = _DPSScache.prepare_dpss(N, NW, low_bias=low_bias)
 
     x_tf, ix, w = mtm_complex_demodulate(
         x, NW, nfft=nfft, dpss=dpss, eigs=eigs, samp_factor=1, fmax=fmax, pad=False
@@ -552,6 +800,163 @@ def bispectrum(
     return (r(pv.mean(0)), r(pv.std(0) / K**0.5)) if se else r(pv.mean(0))
 
 
+def coherence(
+        x, NW, msc=True, dpss=None, eigs=None, jackknife=True, se=False,
+        low_bias=True, nfft='auto', fmax=0.5, seed=None
+        ):
+    """Estimate the coherence spectrum between different signals.
+
+    Parameters
+    ----------
+    x : ndarray (M, N)
+        Vector timeseries of sources
+    NW : float
+        Time-bandwidth product defining the Slepian tapers
+    msc : {True | False}
+        Compute the magnitude-square coherence (MSC) of the
+        dual spectrum.
+    dpss : None
+        Precomputed Slepian tapers vk(N,W)
+    eigs : None
+        Eigenvalues of precomputed tapers
+    jackknife : bool
+        Use the jackknife to estimate the dual spectrum (or dual MSC)
+    se : bool
+        Also return standard error of the estimator
+        (sets jackknife to True)
+    low_bias : {True | False | 0 < p < 1}
+        Only use eigenvalues above 0.99 (by default), or the value
+    nfft : {None, int, 'auto'}
+        Number of FFT points to use (default is next-power-of-2)
+
+    Returns
+    -------
+    spec : ndarray (..., nfreq, nfreq)
+        Dual spectrum (or MSC)
+    se : ndarray (..., nfreq, nfreq)
+        Standard error (if se==True)
+    
+    """
+
+    N = x.shape[-1]
+    if dpss is None:
+        dpss, eigs = _DPSScache.prepare_dpss(N, NW, low_bias=low_bias)
+
+    mtm = MultitaperEstimator(N, NW, nfft=nfft, dpss=(dpss, eigs))
+    xk, weight = mtm.direct_sdfs(x, adaptive_weights=False)
+
+    if se:
+        jackknife = True
+
+    def _coh_estimator(Y, axis=None):
+        # Y is (M, K, Nf)
+        print(Y.shape)
+        if seed is not None:
+            coh = (Y * Y[seed].conj()).mean(-2)
+        else:
+            coh = np.einsum('mkn,pkn->mpn', Y, Y.conj())
+            K = Y.shape[1]
+            coh /= K
+        y_auto = np.mean( np.abs(Y)**2, axis=-2 )
+        ## if msc:
+        ##     coh = np.abs(coh) ** 2
+        ## else:
+        np.sqrt(y_auto, y_auto)
+        if seed is not None:
+            y_auto *= y_auto[seed]
+            coh /= y_auto
+        else:
+            coh = coh / y_auto[None, :, :]
+            coh = coh / y_auto[:, None, :]
+        return coh
+
+    print('orig shape:', xk.shape)
+    if jackknife:
+        d_spec, err = Jackknife(xk, axis=-2).estimate(_coh_estimator, se=True)
+    else:
+        d_spec = _coh_estimator(xk)
+    if msc:
+        d_spec = np.abs(d_spec) ** 2
+    ## if msc:
+    ##     np.clip(d_spec, 0, 1, out=d_spec)
+    return (d_spec, err) if se else d_spec
+
+
+def semiherence(
+        x, NW, real=True, dpss=None, eigs=None, jackknife=True, se=False,
+        low_bias=True, nfft='auto', fmax=0.5, seed=None
+        ):
+    """Estimate the coherence spectrum between different signals.
+
+    Parameters
+    ----------
+    x : ndarray (M, N)
+        Vector timeseries of sources
+    NW : float
+        Time-bandwidth product defining the Slepian tapers
+    msc : {True | False}
+        Compute the magnitude-square coherence (MSC) of the
+        dual spectrum.
+    dpss : None
+        Precomputed Slepian tapers vk(N,W)
+    eigs : None
+        Eigenvalues of precomputed tapers
+    jackknife : bool
+        Use the jackknife to estimate the dual spectrum (or dual MSC)
+    se : bool
+        Also return standard error of the estimator
+        (sets jackknife to True)
+    low_bias : {True | False | 0 < p < 1}
+        Only use eigenvalues above 0.99 (by default), or the value
+    nfft : {None, int, 'auto'}
+        Number of FFT points to use (default is next-power-of-2)
+
+    Returns
+    -------
+    spec : ndarray (..., nfreq, nfreq)
+        Dual spectrum (or MSC)
+    se : ndarray (..., nfreq, nfreq)
+        Standard error (if se==True)
+    
+    """
+
+    N = x.shape[-1]
+    if dpss is None:
+        dpss, eigs = _DPSScache.prepare_dpss(N, NW, low_bias=low_bias)
+
+    mtm = MultitaperEstimator(N, NW, nfft=nfft, dpss=(dpss, eigs))
+    xk, weight = mtm.direct_sdfs(x, adaptive_weights=False)
+
+    if se:
+        jackknife = True
+
+    def _sh_estimator(Y, axis=None):
+        # Y is (M, K, Nf)
+        if seed is not None:
+            semih = (Y * Y[seed].conj()).mean(-2)
+        else:
+            semih = np.einsum('mkn,pkn->mpn', Y, Y.conj())
+            K = Y.shape[1]
+            semih /= K
+        y_auto = np.mean( np.abs(Y)**2, axis=-2 )
+        if real:
+            semih = np.abs(semih.real)
+        else:
+            semih = np.abs(semih)
+
+        semih *= -1
+        semih += 0.5 * y_auto[:, None, :]
+        semih += 0.5 * y_auto[None, :, :]
+        return semih
+        
+    if jackknife:
+        d_spec, err = Jackknife(xk, axis=-2).estimate(_sh_estimator, se=True)
+    else:
+        d_spec = _sh_estimator(xk)
+    np.clip(d_spec, 0, d_spec.max(), out=d_spec)
+    return (d_spec, err) if se else d_spec
+
+
 def dual_spectrum(
         x1, x2, NW, msc=True, dpss=None, eigs=None, jackknife=True, se=False,
         low_bias=True, nfft='auto', fmax=0.5
@@ -595,20 +1000,11 @@ def dual_spectrum(
     N = x1.shape[-1]
     assert x2.shape[-1] == N, 'need same length sequences'
     if dpss is None:
-        dpss, eigs = _prepare_dpss(N, NW, low_bias=low_bias)
-    if nfft == 'auto':
-        nfft = nextpow2(N)
-    if nfft is None:
-        nfft = N
-    assert nfft % 2 == 0, 'Please use even-length fft'
+        dpss, eigs = _DPSScache.prepare_dpss(N, NW, low_bias=low_bias)
 
-    x1k = alg.tapered_spectra(x1, dpss, NFFT=nfft)
-    x2k = alg.tapered_spectra(x2, dpss, NFFT=nfft)
-
-    nf = int(round(2 * fmax * (nfft // 2 + 1)))
-
-    x1k = x1k[..., :nf]
-    x2k = x2k[..., :nf]
+    mtm = MultitaperEstimator(N, NW, nfft=nfft, dpss=(dpss, eigs))
+    x1k, weight1 = mtm.direct_sdfs(x1, adaptive_weights=False)
+    x2k, weight2 = mtm.direct_sdfs(x2, adaptive_weights=False)
 
     if se:
         jackknife = True
@@ -655,3 +1051,8 @@ def normalize_spectrogram(x, baseline):
 
     z = (np.log(x).mean(0) - b_spec[:, None]) / b_rms[:, None]
     return z
+
+
+if __name__ == '__main__':
+    arr = np.random.randn(300, 2 ** 15)
+    freqs, psds = MultitaperEstimator.psd(arr, NW=5, fs=1.0, adaptive_weights=False, jackknife=True, low_bias=0.9)
