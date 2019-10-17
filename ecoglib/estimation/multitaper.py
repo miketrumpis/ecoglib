@@ -2,7 +2,6 @@
 
 import numpy as np
 import scipy.signal as signal
-from scipy.signal.windows import dpss as get_dpss
 try:
     import scipy.fft as fft
     POCKET_FFT = True
@@ -13,7 +12,7 @@ import nitime.utils as nt_utils
 
 from ecogdata.parallel.array_split import shared_ndarray
 import ecogdata.filt.blocks as blocks
-from ecogdata.util import nextpow2
+from ecogdata.util import nextpow2, dpss_windows
 
 from .resampling import Jackknife
 
@@ -73,7 +72,7 @@ class _DPSScache:
         if (N, NW) in cls.cache:
             dpss, eigs = cls.cache[(N, NW)]
         else:
-            dpss, eigs = get_dpss(N, NW, Kmax=int(2 * NW), sym=False, norm=2, return_ratios=True)
+            dpss, eigs = dpss_windows(N, NW, int(2 * NW))
             # always store 2NW eigenvectors/values
             cls.cache[(N, NW)] = (dpss, eigs)
         if low_bias:
