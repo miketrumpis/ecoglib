@@ -12,8 +12,8 @@ def test_boot_sample_size():
     N = 10
     r = np.random.randn(N)
 
-    assert_true(Bootstrap(r, 4).all_samples().shape == (4, 10))
-    assert_true(Bootstrap(r, 4, sample_size=8).all_samples().shape == (4, 8))
+    assert_true(np.array(Bootstrap(r, 4).all_samples()).shape == (4, 10))
+    assert_true(np.array(Bootstrap(r, 4, sample_size=8).all_samples()).shape == (4, 8))
 
 
 def test_jn_sample_size():
@@ -63,6 +63,44 @@ def test_jn_nd():
     s = Jackknife(r, axis=2).all_samples()
     assert_true(len(s) == N3)
     assert_true(s[0].shape == (N1, N2, N3 - 1))
+
+
+def test_jn_multiarray():
+    """Tests correct sample size for multiple inputs"""
+
+    # match 1st axis but let others be whatever
+    N1, N2, N3 = np.random.randint(5, 10, size=3)
+    M1 = N1
+    M2, M3 = np.random.randint(5, 10, size=2)
+    r1 = np.zeros((N1, N2, N3))
+    r2 = np.zeros((M1, M2, M3))
+    s = Jackknife([r1, r2], axis=0).all_samples()
+    assert_true(len(s) == N1)
+    assert_true(len(s[0]) == 2)
+    assert_true(s[0][0].shape == (N1 - 1, N2, N3))
+    assert_true(s[0][1].shape == (M1 - 1, M2, M3))
+
+    N1, N2, N3 = np.random.randint(5, 10, size=3)
+    M2 = N2
+    M1, M3 = np.random.randint(5, 10, size=2)
+    r1 = np.zeros((N1, N2, N3))
+    r2 = np.zeros((M1, M2, M3))
+    s = Jackknife([r1, r2], axis=1).all_samples()
+    assert_true(len(s) == N2)
+    assert_true(len(s[0]) == 2)
+    assert_true(s[0][0].shape == (N1, N2 - 1, N3))
+    assert_true(s[0][1].shape == (M1, M2 - 1, M3))
+
+    N1, N2, N3 = np.random.randint(5, 10, size=3)
+    M3 = N3
+    M1, M2 = np.random.randint(5, 10, size=2)
+    r1 = np.zeros((N1, N2, N3))
+    r2 = np.zeros((M1, M2, M3))
+    s = Jackknife([r1, r2], axis=2).all_samples()
+    assert_true(len(s) == N3)
+    assert_true(len(s[0]) == 2)
+    assert_true(s[0][0].shape == (N1, N2, N3 - 1))
+    assert_true(s[0][1].shape == (M1, M2, M3 - 1))
 
 
 def test_jn_nd_estimator():

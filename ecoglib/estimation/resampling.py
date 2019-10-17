@@ -4,7 +4,7 @@ import random
 import numpy as np
 from scipy.special import comb
 from itertools import combinations
-from contextlib import closing
+from contextlib import closing, ExitStack
 import ecogdata.parallel.mproc as mp
 from ecogdata.parallel.array_split import SharedmemManager
 
@@ -37,7 +37,7 @@ def _resampler(index):
     The multiprocess Pool is initialized so that these variables are in
     global memory:
 
-    * shm_array
+    * shm_arrays: list of arrays to be resampled on the given axis
     * axis
     * estimator
     * e_args
@@ -45,11 +45,15 @@ def _resampler(index):
 
     """
 
-    with shm_array.get_ndarray() as array:
-        samps = np.take(array, index, axis=axis)
+    with ExitStack() as stack:
+        arrays = [stack.enter_context(shm.get_ndarray()) for shm in shm_arrays]
+    # with shm_array.get_ndarray() as array:
+        samps = [np.take(array, index, axis=axis) for array in arrays]
     if estimator is not None:
         e_kwargs['axis'] = axis
-        return estimator(samps, *e_args, **e_kwargs)
+        return estimator(*samps, *e_args, **e_kwargs)
+    if len(samps) == 1:
+        samps = samps[0]
     return samps
 
 
@@ -58,14 +62,14 @@ class Bootstrap:
     Bootstrap resampler
     """
 
-    def __init__(self, array, num_samples, axis=-1, sample_size=None, n_jobs=None, ordered_samples=False):
+    def __init__(self, arrays, num_samples, axis=-1, sample_size=None, n_jobs=None, ordered_samples=False):
         """
         Make a bootstrap resampler for an array.
 
         Parameters
         ----------
-        array: ndarray
-            Multidimensional sample data
+        array: Sequence or ndarray
+            Multidimensional sample data (or list of multiple arrays to be resampled)
         num_samples: int
             Number of bootstrap samples to create
         axis: int
@@ -80,11 +84,14 @@ class Bootstrap:
 
         """
 
-        self._array = array
+        if not isinstance(arrays, (tuple, list)):
+            self._arrays = [arrays]
+        else:
+            self._arrays = arrays
         self._axis = axis
         self._num_samples = num_samples
         if sample_size is None:
-            self._sample_size = array.shape[axis]
+            self._sample_size = self._arrays[0].shape[axis]
         else:
             self._sample_size = sample_size
         self._resampler = None
@@ -95,7 +102,7 @@ class Bootstrap:
         self._ordered_samples = ordered_samples
 
     def _init_sampler(self):
-        max_n = self._array.shape[self._axis]
+        max_n = self._arrays[0].shape[self._axis]
         samp_size = self._sample_size
 
         def anon_sampler():
@@ -115,14 +122,17 @@ class Bootstrap:
         parallel = self._n_jobs is None or self._n_jobs > 1
         if not parallel:
             for samp_idx in self._resampler:
-                samps = np.take(self._array, samp_idx, axis=self._axis)
+                samps = [np.take(arr, samp_idx, axis=self._axis) for arr in self._arrays]
                 if estimator is not None:
                     e_kwargs['axis'] = self._axis
-                    yield estimator(samps, *e_args, **e_kwargs)
+                    yield estimator(*samps, *e_args, **e_kwargs)
                 else:
+                    if len(samps) == 1:
+                        samps = samps[0]
                     yield samps
             return
-        pool_args = dict(shm_array=SharedmemManager(self._array, use_lock=True),
+        shm_arrays = [SharedmemManager(arr, use_lock=True) for arr in self._arrays]
+        pool_args = dict(shm_arrays=shm_arrays,
                          axis=self._axis, estimator=estimator,
                          e_args=e_args, e_kwargs=e_kwargs)
         with closing(mp.Pool(processes=self._n_jobs,
@@ -138,7 +148,9 @@ class Bootstrap:
     def all_samples(self, estimator=None, e_args=(), **e_kwargs):
         """Return all samples from the generator"""
         samps = list(self.sample(estimator=estimator, e_args=e_args, **e_kwargs))
-        return np.array(samps)
+        # return np.array(samps)
+        # I think it is on the user to make this an array in the appropriate form
+        return samps
 
     def estimate(self, estimator, se=False, e_args=(), **e_kwargs):
         vals = self.all_samples(estimator=estimator, e_args=e_args, **e_kwargs)
@@ -159,7 +171,7 @@ class Jackknife(Bootstrap):
 
     Parameters
     ----------
-    array : ndarray
+    arrays : Sequence or ndarray
         Samples to jack-knife
     n_out : int
         Number of samples to leave out of each jack-knife
@@ -170,14 +182,17 @@ class Jackknife(Bootstrap):
 
     """
 
-    def __init__(self, array, n_out=1, axis=-1, max_samps=-1, n_jobs=None, ordered_samples=False):
-        N = array.shape[axis]
+    def __init__(self, arrays, n_out=1, axis=-1, max_samps=-1, n_jobs=None, ordered_samples=False):
+        if isinstance(arrays, np.ndarray):
+            N = arrays.shape[axis]
+        else:
+            N = arrays[0].shape[axis]
         if max_samps > 0:
             num_samples = max_samps
         else:
             r = N - n_out
             num_samples = comb(N, r)
-        super(Jackknife, self).__init__(array, num_samples, axis=axis, n_jobs=n_jobs, ordered_samples=ordered_samples)
+        super(Jackknife, self).__init__(arrays, num_samples, axis=axis, n_jobs=n_jobs, ordered_samples=ordered_samples)
         self.__choose = (range(N), N - n_out)
         self._max_samps = max_samps
 
@@ -193,9 +208,10 @@ class Jackknife(Bootstrap):
         """Return the bias-correcting pseudovalues of the estimator"""
         if not len(jn_samples):
             jn_samples = self.all_samples(estimator=estimator, e_args=e_args, **e_kwargs)
+        jn_samples = np.asarray(jn_samples)
         e_kwargs['axis'] = self._axis
-        theta = estimator(self._array, *e_args, **e_kwargs)
-        N1 = float(self._array.shape[self._axis])
+        theta = estimator(*self._arrays, *e_args, **e_kwargs)
+        N1 = float(self._arrays[0].shape[self._axis])
         d = N1 - self.__choose[1]
         return N1 / d * theta - (N1 - d) * jn_samples / d
 
@@ -215,7 +231,7 @@ class Jackknife(Bootstrap):
         """
 
         e_kwargs['axis'] = self._axis
-        theta = estimator(self._array, *e_args, **e_kwargs)
+        theta = estimator(*self._arrays, *e_args, **e_kwargs)
         pv = self.pseudovals(estimator, jn_samples=jn_samples, e_args=e_args, **e_kwargs)
         # mean of PV = theta - bias
         # bias = theta - avg{PV}
@@ -229,7 +245,7 @@ class Jackknife(Bootstrap):
         """
 
         pv = self.pseudovals(estimator, jn_samples=jn_samples, e_args=e_args, **e_kwargs)
-        N1 = float(self._array.shape[self._axis])
+        N1 = float(self._arrays[0].shape[self._axis])
         return np.var(pv, axis=0) / N1
 
     @classmethod
