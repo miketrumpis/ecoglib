@@ -5,6 +5,7 @@ ipython
 lxml
 matplotlib
 mpmath
+nbsphinx
 networkx
 numexpr
 numpy
@@ -21,6 +22,8 @@ scikit-learn
 scipy
 seaborn
 setuptools
+Sphinx
+sphinx-rtd-theme
 six
 statsmodels
 traits
