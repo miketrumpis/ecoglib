@@ -1,3 +1,5 @@
+.. |date| date::
+.. |time| date:: %H:%M
 
 Welcome to ecoglib's documentation!
 ===================================
@@ -8,7 +10,10 @@ Welcome to ecoglib's documentation!
 
    api
 
+Misc
+====
 
+Documents rebuilt |date| at |time|.
 
 Indices and tables
 ==================
