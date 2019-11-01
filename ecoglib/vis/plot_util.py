@@ -394,7 +394,7 @@ def _median_ci(samps, boots=1000, ci=95.0):
 
     resampler = Bootstrap(samps, boots)
     quantiles = resampler.all_samples(estimator=np.percentile, e_args=([25, 50, 75],))
-    q1, md, q3 = quantiles.T
+    q1, md, q3 = np.array(quantiles).T
     margin = 100.0 - ci
     md_lo, md, md_hi = np.percentile(
         md, [margin / 2.0, 50, 100 - margin / 2.0], axis=0
