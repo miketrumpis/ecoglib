@@ -3,6 +3,7 @@ from scipy.interpolate import interp1d
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 import matplotlib.animation as _animation
+from IPython.display import HTML
 import os
 import subprocess
 from tqdm import trange
@@ -60,12 +61,19 @@ def write_frames(
         quicktime=quicktime, qtdpi=qtdpi
         )
 
-def animate_frames(frames, fps=5, blit=False, **anim_kwargs):
+def animate_frames(frames, fps=5, blit=False, notebook=False, **anim_kwargs):
     f, func = _setup_animated_frames(frames, figure_canvas=True, **anim_kwargs)
     anim = _animation.FuncAnimation(
         f, func, frames=len(frames), interval=1000.0 / fps, blit=blit
         )
-    return anim
+    if notebook:
+        # return HTML(ani.to_html5_video())
+        import matplotlib.pyplot as plt
+        plt.close(anim._fig)
+        return HTML(anim.to_jshtml())
+    else:
+        return anim
+
     
 def h264_encode_files(in_pattern, out, fps, quicktime=False):
     """Use ffmpeg to encode a list of files matching a pattern
@@ -222,7 +230,7 @@ def dynamic_frames_and_series(
         
             
 def animate_frames_and_series(
-        frames, series, blit=False, **kwargs
+        frames, series, blit=False, notebook=False, **kwargs
         ):
 
     fps = kwargs.pop('fps', 5)
@@ -232,4 +240,10 @@ def animate_frames_and_series(
         fig, func, frames=frames.shape[0],
         interval=1000.0/fps, blit=blit
         )
-    return ani
+    if notebook:
+        # return HTML(ani.to_html5_video())
+        import matplotlib.pyplot as plt
+        plt.close(ani._fig)
+        return HTML(ani.to_jshtml())
+    else:
+        return ani
