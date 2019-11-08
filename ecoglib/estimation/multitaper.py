@@ -211,7 +211,8 @@ class MultitaperEstimator:
             Remove order-1 (detrend='linear') or order-0 (detrend='constant') trends. If detrend=True, remove constant.
         ci: bool or float
             Compute the confidence interval at (100 * ci) percent or 95% by default. If jackknife is not used,
-            then the standard chi-squared assumption is used.
+            then the standard chi-squared assumption is used. If adaptive weights are used, the minimum chi-squared
+            DOF will be clipped to 1.
 
         Returns
         -------
@@ -274,6 +275,7 @@ class MultitaperEstimator:
                 pxx[..., 0] /= (self.freq[-1] * 2)
                 pxx[..., -1] /= (self.freq[-1] * 2)
                 nu.shape = pxx.shape
+                np.putmask(nu, nu < 1, 1)
                 chi2_iv_lo = dists.chi2.ppf(p / 2, nu)
                 chi2_iv_hi = dists.chi2.ppf(1 - p / 2, nu)
                 conf_iv = np.array([nu * pxx / chi2_iv_hi, nu * pxx / chi2_iv_lo])
