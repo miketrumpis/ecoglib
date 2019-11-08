@@ -2,6 +2,7 @@
 
 import numpy as np
 import scipy.signal as signal
+import scipy.stats.distributions as dists
 try:
     import scipy.fft as fft
     POCKET_FFT = True
@@ -15,7 +16,6 @@ import ecogdata.filt.blocks as blocks
 from ecogdata.util import nextpow2, dpss_windows
 
 from .resampling import Jackknife
-
 
 
 __all__ = ['mtm_spectrogram_basic',
@@ -129,7 +129,7 @@ class MultitaperEstimator:
     def BW(self):
         return nw2bw(self.NW, self.dpss.shape[-1], self.freq[-2] * 2)
 
-    def direct_sdfs(self, x, adaptive_weights=False):
+    def direct_sdfs(self, x, adaptive_weights=False, dof=False):
         """
         Compute uncorrelated direct spectral density functions under each of K tapers for array(s) in x.
 
@@ -139,6 +139,8 @@ class MultitaperEstimator:
             1- or 2-dimension timeseries array. SDFs are computed for series in the last dimension.
         adaptive_weights: bool
             Compute adaptive weightings per frequency. If False, then use standard weights based on eigenvalues.
+        dof: bool
+            Return "approximate" chi-square degrees of freedom based on adaptive weights. Otherwise nu=2K
 
         Returns
         -------
@@ -167,22 +169,28 @@ class MultitaperEstimator:
             fft_args['workers'] = -1
         yk = fft.fft(tapered, **fft_args)
         half_pts = self.nfft // 2 + 1
+        nu = np.zeros((M, half_pts))
         if adaptive_weights:
             w = np.zeros((M, K, half_pts))
             for m in range(M):
-                w[m], _ = nt_utils.adaptive_weights(yk[m], self.eigs)
+                w[m], nu[m] = nt_utils.adaptive_weights(yk[m], self.eigs)
         else:
             w = np.sqrt(self.eigs[None, :, None])
+            nu[:] = 2 * K
             # w = np.tile(w, (M, 1, half_pts))
         # TODO: tiling weights and cutting/copying yk are fairly expensive (e.g. 700 ms for (300, 2 ** 15) input)
         yk = yk[..., :half_pts].copy()
         # if input was 1D then only return SDFs for single timeseries (get rid of dummy dimension)
         if len(shp) == 1:
-            return yk[0], w[0]
+            yk = yk[0]
+            w = w[0]
+            nu = nu[0]
+        if dof:
+            return yk, w, nu
         else:
             return yk, w
 
-    def compute_psd(self, x, adaptive_weights=False, jackknife=False, detrend=None):
+    def compute_psd(self, x, adaptive_weights=False, jackknife=False, detrend=None, ci=False):
         """
         Compute the multitaper psd estimate(s) of series in x. PSD normalization is defined such that the integral of
         spectral power per Hz equals to the total variance in x:
@@ -196,9 +204,14 @@ class MultitaperEstimator:
         adaptive_weights: bool
             Use adaptive weights in combining multitaper estimates.
         jackknife: bool
-            Use jackknife resampling in combining multitaper estimates.
+            Use jackknife resampling in combining multitaper estimates. In this mode, standard error is calculated
+            after log-transforming jackknifed estimates. The confidence interval is calculated for the log domain
+            based on Student's t distribution for K - 1 degrees of freedom, but is then exponentiated before return.
         detrend: str, bool
             Remove order-1 (detrend='linear') or order-0 (detrend='constant') trends. If detrend=True, remove constant.
+        ci: bool or float
+            Compute the confidence interval at (100 * ci) percent or 95% by default. If jackknife is not used,
+            then the standard chi-squared assumption is used.
 
         Returns
         -------
@@ -215,25 +228,65 @@ class MultitaperEstimator:
             x = detrend(x, axis=-1, type=detrend)
         shp = x.shape
         x = np.atleast_2d(x).reshape(-1, x.shape[-1])
-        yk, w = self.direct_sdfs(x, adaptive_weights=adaptive_weights)
+        yk, w, nu = self.direct_sdfs(x, adaptive_weights=adaptive_weights, dof=True)
 
-        def _combine_spectra(Y, w, axis=None):
-            return np.sum(w * Y, axis=1) / np.sum(w, axis=1)
+        def _combine_spectra(Y, w, axis=None, logout=False):
+            sk = np.sum(w * Y, axis=1) / np.sum(w, axis=1)
+            if logout:
+                return np.log(sk)
+            else:
+                return sk
 
         # funny -- this is faster (in one step) than doing inplace squares
         yk = np.abs(yk) ** 2
         # np.power(yk, 2, yk)
         np.power(w, 2, w)
         if jackknife:
-            pxx = Jackknife([yk, w], axis=1).estimate(_combine_spectra, correct_bias=True, se=False)
+            pxx, se = Jackknife([yk, w], axis=1).estimate(_combine_spectra, correct_bias=True, se=True, logout=True)
         else:
             pxx = _combine_spectra(yk, w)
-        pxx /= (self.freq[-1] * 2)
-        pxx[..., 1:] *= 2
-        return self.freq, pxx.reshape(shp[:-1] + (pxx.shape[-1],))
+
+        # PSD needs normalization:
+        # P(f) <-- 2 * Pf / samp_rate (for 0 < f < f_nyq)
+        # P(f) <-- Pf / samp_rate (for DC and nyquist)
+        # Save normalization for different scenarios, but reshape to output here
+        pxx = pxx.reshape(shp[:-1] + (pxx.shape[-1],))
+        if ci:
+            if isinstance(ci, float):
+                p = 1 - ci
+            else:
+                p = 1 - 0.95
+            if jackknife:
+                # normalize pxx from log domain
+                pxx[..., 1:-1] += np.log(2) - np.log(self.freq[-1] * 2)
+                pxx[..., 0] -= np.log(self.freq[-1] * 2)
+                pxx[..., -1] -= np.log(self.freq[-1] * 2)
+                se.shape = pxx.shape
+                # Since SE is computed under log transform, it doesn't need to be scaled. The PSD normalization here
+                # is just a shift in the mean
+                t_iv = dists.t.ppf([p / 2, 1 - p / 2], yk.shape[1] - 1)
+                conf_iv = np.array([pxx + t_iv[0] * se, pxx + t_iv[1] * se])
+                np.exp(pxx, out=pxx)
+                np.exp(conf_iv, out=conf_iv)
+            else:
+                # normalize
+                pxx[..., 1:-1] /= self.freq[-1]
+                pxx[..., 0] /= (self.freq[-1] * 2)
+                pxx[..., -1] /= (self.freq[-1] * 2)
+                nu.shape = pxx.shape
+                chi2_iv_lo = dists.chi2.ppf(p / 2, nu)
+                chi2_iv_hi = dists.chi2.ppf(1 - p / 2, nu)
+                conf_iv = np.array([nu * pxx / chi2_iv_hi, nu * pxx / chi2_iv_lo])
+            return self.freq, pxx, conf_iv
+        else:
+            pxx[..., 1:-1] /= self.freq[-1]
+            pxx[..., 0] /= (self.freq[-1] * 2)
+            pxx[..., -1] /= (self.freq[-1] * 2)
+            return self.freq, pxx
 
     @classmethod
-    def psd(cls, x, NW=2.5, fs=1.0, nfft=None, low_bias=True, dpss=None, adaptive_weights=False, jackknife=False):
+    def psd(cls, x, NW=2.5, fs=1.0, nfft=None, low_bias=True, dpss=None, adaptive_weights=False, jackknife=False,
+            ci=False):
         """
         Shortcut to create a MultitaperEstimator and then compute the psd for x. See arguments for
         MultitaperEstimator construction and compute_psd
@@ -248,7 +301,7 @@ class MultitaperEstimator:
         """
         N = x.shape[-1]
         mt_estimator = cls(N, NW, fs=fs, nfft=nfft, low_bias=low_bias, dpss=dpss)
-        return mt_estimator.compute_psd(x, adaptive_weights=adaptive_weights, jackknife=jackknife)
+        return mt_estimator.compute_psd(x, adaptive_weights=adaptive_weights, jackknife=jackknife, ci=ci)
 
     def compute_csd(self, x, y=None, adaptive_weights=False, jackknife=False, detrend=None):
         """
@@ -263,7 +316,7 @@ class MultitaperEstimator:
             (M, M, nfreq) matrix of cross spectral densities. M=2 if x and y are specified separarely, else M=len(x).
 
         """
-
+        # TODO: maybe implement "seed" kwargs -- basically computes only 1 row of the matrix
         if x.ndim == 1 and y is None:
             raise ValueError('Need two or more vectors')
         if y is not None:
@@ -272,7 +325,7 @@ class MultitaperEstimator:
             if isinstance(detrend, bool):
                 detrend = 'constant'
             x = detrend(x, axis=-1, type=detrend)
-        yk, w = self.direct_sdfs(x, adaptive_weights=adaptive_weights)
+        yk, w, nu = self.direct_sdfs(x, adaptive_weights=adaptive_weights, dof=True)
 
         def _combine_spectra(y, w, axis=None):
             # weighted sdfs
@@ -309,7 +362,6 @@ class MultitaperEstimator:
         N = x.shape[-1]
         mt_estimator = cls(N, NW, fs=fs, nfft=nfft, low_bias=low_bias, dpss=dpss)
         return mt_estimator.compute_csd(x, y=y, adaptive_weights=adaptive_weights, jackknife=jackknife)
-
 
 
 def mtm_spectrogram_basic(x, n, pl=0.25, detrend='', **mtm_kwargs):
@@ -443,7 +495,6 @@ def mtm_spectrogram(
     psd_pl = float(overlap) / pts_per_block
     # print(pts_per_block, overlap, psd_len)
 
-
     pad_n = mtm_complex_demodulate(n, NW, nfft=None, pad=pad, return_pad_length=True,
                                    samp_factor=(1.0 / delta if delta > 1 else 0))
     nfft = nextpow2(pad_n)
@@ -466,7 +517,7 @@ def mtm_spectrogram(
     blk_n = blocks.BlockedSignal(
         n_avg, pts_per_block, overlap=psd_pl, partial_block=False
     )
-    
+
     # dpss, eigs = _DPSScache.prepare_dpss(n, NW, low_bias=lb)
     # print('n_tapers:', len(dpss))
     ind = (np.arange(pts_per_block) + 0.5) * delta
@@ -799,10 +850,19 @@ def bispectrum(
     return (r(pv.mean(0)), r(pv.std(0) / K**0.5)) if se else r(pv.mean(0))
 
 
+def _circular_clip(x, eps=0):
+    if x.dtype not in np.sctypes['complex']:
+        return np.clip(x, -1, 1)
+    x_mag = np.abs(x)
+    x_phs = np.angle(x)
+    np.putmask(x, x_mag > 1 - eps, (1 - eps) * np.exp(1j * x_phs))
+    return x
+
+
 def coherence(
-        x, NW, msc=True, dpss=None, eigs=None, jackknife=True, se=False,
-        low_bias=True, nfft='auto', fmax=0.5, seed=None
-        ):
+        x, NW, msc=True, dpss=None, eigs=None, ci=False, fisher=True,
+        low_bias=True, nfft='auto', seed=None
+):
     """Estimate the coherence spectrum between different signals.
 
     Parameters
@@ -818,11 +878,10 @@ def coherence(
         Precomputed Slepian tapers vk(N,W)
     eigs : None
         Eigenvalues of precomputed tapers
-    jackknife : bool
-        Use the jackknife to estimate the dual spectrum (or dual MSC)
-    se : bool
-        Also return standard error of the estimator
-        (sets jackknife to True)
+    ci : bool or float
+        Return a confidence interval based on the jackknife variance of the estimator.
+    fisher: bool
+        Use arc hyperbolic tangent (Fisher) normalization for jackknifing (does not seem to work well!!)
     low_bias : {True | False | 0 < p < 1}
         Only use eigenvalues above 0.99 (by default), or the value
     nfft : {None, int, 'auto'}
@@ -834,7 +893,7 @@ def coherence(
         Dual spectrum (or MSC)
     se : ndarray (..., nfreq, nfreq)
         Standard error (if se==True)
-    
+
     """
 
     N = x.shape[-1]
@@ -843,23 +902,16 @@ def coherence(
 
     mtm = MultitaperEstimator(N, NW, nfft=nfft, dpss=(dpss, eigs))
     xk, weight = mtm.direct_sdfs(x, adaptive_weights=False)
-
-    if se:
-        jackknife = True
+    if not ci:
+        fisher = False
 
     def _coh_estimator(Y, axis=None):
         # Y is (M, K, Nf)
-        print(Y.shape)
         if seed is not None:
-            coh = (Y * Y[seed].conj()).mean(-2)
+            coh = (Y * Y[seed].conj()).sum(-2)
         else:
             coh = np.einsum('mkn,pkn->mpn', Y, Y.conj())
-            K = Y.shape[1]
-            coh /= K
-        y_auto = np.mean( np.abs(Y)**2, axis=-2 )
-        ## if msc:
-        ##     coh = np.abs(coh) ** 2
-        ## else:
+        y_auto = np.sum(np.abs(Y) ** 2, axis=-2)
         np.sqrt(y_auto, y_auto)
         if seed is not None:
             y_auto *= y_auto[seed]
@@ -867,24 +919,52 @@ def coherence(
         else:
             coh = coh / y_auto[None, :, :]
             coh = coh / y_auto[:, None, :]
+        # Need to "circularly clip" imaginary values by shrinking them to the unit circle
+        coh = _circular_clip(coh, eps=1e-16)
+        if msc:
+            coh = np.abs(coh) ** 2
+            if fisher:
+                coh = np.arctanh(coh)
+        elif fisher:
+            # Fisher's transform, but complex
+            # apply transformation separately to real and imag values?
+            coh.real[:] = np.arctanh(coh.real)
+            coh.imag[:] = np.arctanh(coh.imag)
         return coh
 
-    print('orig shape:', xk.shape)
-    if jackknife:
-        d_spec, err = Jackknife(xk, axis=-2).estimate(_coh_estimator, se=True)
-    else:
-        d_spec = _coh_estimator(xk)
+    d_spec = _coh_estimator(xk)
+    if ci:
+        err = Jackknife(xk, axis=-2).variance(_coh_estimator)
+        if isinstance(ci, float):
+            p = 1 - ci
+        else:
+            p = 1 - 0.95
+        t_iv = dists.t.ppf([p / 2, 1 - p / 2], len(xk) - 1)
+        conf_iv = np.array([d_spec + t_iv[0] * err, d_spec + t_iv[1] * err])
+        if fisher:
+            if msc:
+                conf_iv = np.tanh(conf_iv)
+            else:
+                # don't know??
+                pass
+    if fisher:
+        if msc:
+            d_spec = np.tanh(d_spec)
+        else:
+            d_spec.real[:] = np.tanh(d_spec.real)
+            d_spec.imag[:] = np.tanh(d_spec.imag)
+
     if msc:
-        d_spec = np.abs(d_spec) ** 2
-    ## if msc:
-    ##     np.clip(d_spec, 0, 1, out=d_spec)
-    return (d_spec, err) if se else d_spec
+        d_spec = np.clip(d_spec, 0, 1)
+    else:
+        d_spec = _circular_clip(d_spec)
+    return (d_spec, conf_iv) if ci else d_spec
 
 
 def semiherence(
         x, NW, real=True, dpss=None, eigs=None, jackknife=True, se=False,
         low_bias=True, nfft='auto', fmax=0.5, seed=None
-        ):
+):
     """Estimate the coherence spectrum between different signals.
 
     Parameters
@@ -916,7 +996,7 @@ def semiherence(
         Dual spectrum (or MSC)
     se : ndarray (..., nfreq, nfreq)
         Standard error (if se==True)
-    
+
     """
 
     N = x.shape[-1]
@@ -937,7 +1017,7 @@ def semiherence(
             semih = np.einsum('mkn,pkn->mpn', Y, Y.conj())
             K = Y.shape[1]
             semih /= K
-        y_auto = np.mean( np.abs(Y)**2, axis=-2 )
+        y_auto = np.mean(np.abs(Y)**2, axis=-2)
         if real:
             semih = np.abs(semih.real)
         else:
@@ -947,7 +1027,7 @@ def semiherence(
         semih += 0.5 * y_auto[:, None, :]
         semih += 0.5 * y_auto[None, :, :]
         return semih
-        
+
     if jackknife:
         d_spec, err = Jackknife(xk, axis=-2).estimate(_sh_estimator, se=True)
     else:
