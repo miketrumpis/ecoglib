@@ -221,7 +221,13 @@ class Jackknife(Bootstrap):
         else:
             vals = self.all_samples(estimator=estimator, e_args=e_args, **e_kwargs)
         if se:
-            se = np.std(vals, axis=0) / np.sqrt(len(vals))
+            if correct_bias:
+                # The variance of pseudo values is bigger than the JN variance by factor of (n - 1)
+                se = np.std(vals, axis=0, ddof=0) / np.sqrt(len(vals) - 1)
+            else:
+                # basic JN variance is (n - 1) * var(values)
+                n = len(vals)
+                se = np.sqrt(n - 1) * np.std(vals, axis=0, ddof=0)
             return np.mean(vals, axis=0), se
         return np.mean(vals, axis=0)
 
@@ -239,14 +245,14 @@ class Jackknife(Bootstrap):
 
     def variance(self, estimator, jn_samples=(), e_args=(), **e_kwargs):
         """
-        Compute the jack-knife bias of an estimator.
+        Compute the jack-knife variance of an estimator.
 
         NOTE! The normalization is probably wrong for delete-d JN
         """
-
-        pv = self.pseudovals(estimator, jn_samples=jn_samples, e_args=e_args, **e_kwargs)
-        N1 = float(self._arrays[0].shape[self._axis])
-        return np.var(pv, axis=0) / N1
+        if not len(jn_samples):
+            jn_samples = self.all_samples(estimator, e_args=e_args, **e_kwargs)
+        N = float(self._arrays[0].shape[self._axis])
+        return (N - 1) * np.var(jn_samples, axis=0)
 
     @classmethod
     def jackknife_estimate(cls, sample, estimator, axis=-1, e_args=(), **e_kwargs):

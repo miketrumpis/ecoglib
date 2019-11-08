@@ -17,7 +17,7 @@ def test_boot_sample_size():
 
 
 def test_jn_sample_size():
-    "Tests correct sample size"
+    """Tests correct sample size"""
 
     N = 10
     d = 4
@@ -47,7 +47,7 @@ def test_bs_nd():
 
 
 def test_jn_nd():
-    "Tests correct sample size for ND"
+    """Tests correct sample size for ND"""
 
     N1, N2, N3 = 10, 3, 8
     r = np.random.randn(N1, N2, N3)
@@ -104,7 +104,7 @@ def test_jn_multiarray():
 
 
 def test_jn_nd_estimator():
-    "Tests correct estimate size for ND"
+    """Tests correct estimate size for ND"""
 
     N1, N2, N3 = 10, 3, 8
     d = 4
@@ -127,7 +127,7 @@ def test_jn_nd_estimator():
 
 
 def test_jn_sample_consistency():
-    "Test sample-resample equality"
+    """Test sample-resample equality"""
 
     N = 10
     d = 4
@@ -147,7 +147,7 @@ def test_jn_sample_consistency():
 
 
 def test_jn_pseudoval_consistency():
-    "Check PVs sum up to bias-corrected estimator"
+    """Check PVs sum up to bias-corrected estimator"""
 
     N = 10
     d = 4
@@ -166,3 +166,17 @@ def test_jn_pseudoval_consistency():
     s = jn.all_samples(estimator=np.std)
     bias = float(N - d) * (np.mean(s, axis=0) - est) / d
     assert_almost_equal(bias, jn.bias(np.std))
+
+
+def test_jn_variance():
+    """Jackknife variance should equal standard SEM calculation"""
+    r = np.random.randn(10)
+
+    sem = np.std(r) / np.sqrt(len(r) - 1)
+
+    jn_se1 = Jackknife(r).estimate(np.mean, se=True, correct_bias=True)[1]
+    assert_almost_equal(jn_se1, sem, err_msg='Jackknife SE with pseudovalues not almost equal')
+    jn_se2 = Jackknife(r).estimate(np.mean, se=True, correct_bias=False)[1]
+    assert_almost_equal(jn_se2, sem, err_msg='Standard Jackknife SE not almost equal')
+    jn_se3 = Jackknife(r).variance(np.mean) ** 0.5
+    assert_almost_equal(jn_se3, sem, err_msg='Standard(2) Jackknife SE not almost equal')
