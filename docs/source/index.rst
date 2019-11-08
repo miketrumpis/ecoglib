@@ -9,6 +9,7 @@ Welcome to ecoglib's documentation!
    :caption: Contents:
 
    api
+   usage_demos/index
 
 Misc
 ====
