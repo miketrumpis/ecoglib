@@ -9,17 +9,20 @@ import subprocess
 from tqdm import trange
 import warnings
 
-def _setup_animated_frames(
-        frames, timer='ms', time=(), static_title='', axis_toggle='on',
-        figsize=None, colorbar=False, cbar_label='', cbar_orientation='vertical',
-        figure_canvas=True,
-        **imshow_kw
-        ):
+def _setup_animated_frames(frames, timer='ms', time=(), static_title='', axis_toggle='on',
+                           figsize=None, clim='auto', colorbar=False, cbar_label='',
+                           cbar_orientation='vertical', figure_canvas=True,
+                           **imshow_kw):
     if figure_canvas:
         from matplotlib.pyplot import figure
         f = figure(figsize=figsize)
     else:
         f = Figure(figsize=figsize)
+    # do some tidying of imshow arguments
+    if isinstance(clim, str) and clim == 'auto':
+        clim = np.nanpercentile(frames, [2, 98])
+    imshow_kw['clim'] = clim
+    imshow_kw.setdefault('origin', 'upper')
     ax = f.add_subplot(111)
     im = ax.imshow(frames[0], **imshow_kw)
     ax.axis('image')
