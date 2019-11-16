@@ -83,7 +83,37 @@ def bad_channel_mask(pwr_est, iqr=4.0, **kwargs):
     return m
 
 
-def make_block_generator(data, block_size):
+def make_block_generator(data, block_size, block_for_channels=True):
+    """
+    Prepare a block generator from data, which may be
+
+    * ndarray that is pre-shaped as blocks or is a matrix
+    * BlockSignalBase -- already is a block iterator
+    * ElectrodeDataSource -- knows how to issue its own blocks
+
+    Parameters
+    ----------
+    data: ndarray or BlockSignalBase or ElectrodeDataSource
+        Data to block and yield
+    block_size: int
+        Size of blocks
+    block_for_channels: bool
+        If True, each block much be sized (nchan, block_size).
+        Otherwise may yield >n_chan blocks at a time. In this case
+        the block sequence will always be reshapable as (nblock, nchan)
+
+    Returns
+    -------
+    block_itr: iterator
+        block iterator
+    nchan: int
+        size of the channels dimension
+    nblock: int
+        number of blocks to expect
+    block_size: int
+        block size
+
+    """
     if isinstance(data, BlockSignalBase):
         block_itr = data
         nblock = len(data)
@@ -103,7 +133,8 @@ def make_block_generator(data, block_size):
             nblock = npt // block_size
             blk_data = data[..., :block_size * nblock].reshape(-1, nblock, block_size)
             blk_data = blk_data.transpose(1, 0, 2).copy()
-            blk_data = blk_data.reshape(nblock * nchan, block_size)
+            if not block_for_channels:
+                blk_data = blk_data.reshape(nblock * nchan, block_size)
         block_itr = blk_data
     return block_itr, nchan, nblock, block_size
 
