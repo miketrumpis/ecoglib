@@ -68,18 +68,23 @@ class _DPSScache:
     cache = dict()
 
     @classmethod
-    def prepare_dpss(cls, N, NW, low_bias=True):
+    def prepare_dpss(cls, N, NW, low_bias=True, Kmax=None):
         if (N, NW) in cls.cache:
-            dpss, eigs = cls.cache[(N, NW)]
+            dpss_c, eigs_c = cls.cache[(N, NW)]
+            dpss = dpss_c.copy()
+            eigs = eigs_c.copy()
         else:
             dpss, eigs = dpss_windows(N, NW, int(2 * NW))
             # always store 2NW eigenvectors/values
-            cls.cache[(N, NW)] = (dpss, eigs)
+            cls.cache[(N, NW)] = (dpss.copy(), eigs.copy())
         if low_bias:
             low_bias = 0.99 if float(low_bias) == 1.0 else low_bias
             keepers = eigs > low_bias
             dpss = dpss[keepers]
             eigs = eigs[keepers]
+        if Kmax is not None and len(eigs) > Kmax:
+            dpss = dpss[:Kmax]
+            eigs = eigs[:Kmax]
         return dpss, eigs
 
 
