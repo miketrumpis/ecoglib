@@ -673,9 +673,9 @@ def mtm_complex_demodulate(x, NW, nfft=None, adaptive=True, low_bias=True,
         neg_segs = 0
         ix = (np.arange(N // t_res) + resample_point) * t_res
 
+    BW = float(NW) / N
+    NW_pad = BW * N_pad
     if dpss is None:
-        BW = float(NW) / N
-        NW_pad = BW * N_pad
         dpss, eigs = _DPSScache.prepare_dpss(N_pad, NW_pad, low_bias=low_bias)
     if nfft is None:
         nfft = nextpow2(N_pad)
