@@ -147,6 +147,7 @@ def dynamic_frames_and_series(
         xlabel='Epoch (s)', ylabel='V', 
         stack_traces=True, interp=1,
         imshow_kw={}, line_props={},
+        trace_labels=(),
         title='Array Movie', vertical=True,
         image_sz=0.5, figsize=(), pyplot=True
         ):
@@ -193,7 +194,9 @@ def dynamic_frames_and_series(
     ylim = line_props.pop('ylim', ())
     if not ylim:
         ylim = (series.min(), series.max())
-    trace_ax.plot(tx_plot, series, **line_props)
+    lines = trace_ax.plot(tx_plot, series, **line_props)
+    if trace_labels:
+        trace_ax.legend(lines, trace_labels)
     trace_ax.set_xlabel(xlabel)
     trace_ax.set_ylabel(ylabel)
     trace_ax.set_ylim(ylim)
