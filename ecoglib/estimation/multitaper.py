@@ -231,7 +231,7 @@ class MultitaperEstimator:
         if detrend is not None:
             if isinstance(detrend, bool):
                 detrend = 'constant'
-            x = detrend(x, axis=-1, type=detrend)
+            x = signal.detrend(x, axis=-1, type=detrend)
         shp = x.shape
         x = np.atleast_2d(x).reshape(-1, x.shape[-1])
         yk, w, nu = self.direct_sdfs(x, adaptive_weights=adaptive_weights, dof=True)
@@ -331,7 +331,7 @@ class MultitaperEstimator:
         if detrend is not None:
             if isinstance(detrend, bool):
                 detrend = 'constant'
-            x = detrend(x, axis=-1, type=detrend)
+            x = signal.detrend(x, axis=-1, type=detrend)
         yk, w, nu = self.direct_sdfs(x, adaptive_weights=adaptive_weights, dof=True)
 
         def _combine_spectra(y, w, axis=None):
