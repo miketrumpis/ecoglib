@@ -292,8 +292,8 @@ class MultitaperEstimator:
             return self.freq, pxx
 
     @classmethod
-    def psd(cls, x, NW=2.5, fs=1.0, nfft=None, low_bias=True, dpss=None, adaptive_weights=False, jackknife=False,
-            ci=False):
+    def psd(cls, x, NW=2.5, fs=1.0, nfft=None, low_bias=True, dpss=None,
+            adaptive_weights=False, jackknife=False, detrend=None, ci=False):
         """
         Shortcut to create a MultitaperEstimator and then compute the psd for x. See arguments for
         MultitaperEstimator construction and compute_psd
@@ -308,7 +308,8 @@ class MultitaperEstimator:
         """
         N = x.shape[-1]
         mt_estimator = cls(N, NW, fs=fs, nfft=nfft, low_bias=low_bias, dpss=dpss)
-        return mt_estimator.compute_psd(x, adaptive_weights=adaptive_weights, jackknife=jackknife, ci=ci)
+        return mt_estimator.compute_psd(x, adaptive_weights=adaptive_weights, jackknife=jackknife,
+                                        detrend=detrend, ci=ci)
 
     def compute_csd(self, x, y=None, adaptive_weights=False, jackknife=False, detrend=None):
         """
@@ -352,7 +353,7 @@ class MultitaperEstimator:
 
     @classmethod
     def csd(cls, x, y=None, NW=2.5, fs=1.0, nfft=None, low_bias=True, dpss=None,
-            adaptive_weights=False, jackknife=False):
+            adaptive_weights=False, jackknife=False, detrend=None):
         """
         Shortcut to create a MultitaperEstimator and then compute the csds for x. See arguments for
         MultitaperEstimator construction and compute_csd
@@ -368,7 +369,8 @@ class MultitaperEstimator:
         """
         N = x.shape[-1]
         mt_estimator = cls(N, NW, fs=fs, nfft=nfft, low_bias=low_bias, dpss=dpss)
-        return mt_estimator.compute_csd(x, y=y, adaptive_weights=adaptive_weights, jackknife=jackknife)
+        return mt_estimator.compute_csd(x, y=y, adaptive_weights=adaptive_weights,
+                                        jackknife=jackknife, detrend=detrend)
 
 
 def mtm_spectrogram_basic(x, n, pl=0.25, detrend='', **mtm_kwargs):
