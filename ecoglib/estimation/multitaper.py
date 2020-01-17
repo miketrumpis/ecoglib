@@ -480,13 +480,8 @@ def mtm_spectrogram(
         p = np.ceil(m / user_delta)
         if (m // p) * p < m:
             m = p * (m // p)
-            # print('resetting pl from %0.2f' % pl, end=' ')
             pl = 1 - float(m) / n
-            # print(' to %0.2f' % pl)
         delta = m // p
-        #delta -= delta % 2
-
-    # print(user_delta, delta, m)
 
     # check contiguous
     if not x.flags.c_contiguous:
@@ -498,16 +493,13 @@ def mtm_spectrogram(
     # calculate the number of psd matrix time points
     # total size of time-frequency array
     pts_per_block = int(n // delta)
-    # pts_per_block = int(np.ceil((n - delta // 2) / delta))
     overlap = pts_per_block - m // delta
     psd_len = int(nblock * pts_per_block - (nblock - 1) * overlap)
     psd_pl = float(overlap) / pts_per_block
-    # print(pts_per_block, overlap, psd_len)
 
     pad_n = mtm_complex_demodulate(n, NW, nfft=None, pad=pad, return_pad_length=True,
                                    samp_factor=(1.0 / delta if delta > 1 else 0))
     nfft = nextpow2(pad_n)
-    # print(n, pad_n, float(pad_n * NW) / n)
     dpss, eigs = _DPSScache.prepare_dpss(pad_n, float(pad_n * NW) / n, low_bias=lb)
     fx = np.linspace(0, Fs / 2, nfft // 2 + 1)
 
@@ -527,19 +519,12 @@ def mtm_spectrogram(
         n_avg, pts_per_block, overlap=psd_pl, partial_block=False
     )
 
-    # dpss, eigs = _DPSScache.prepare_dpss(n, NW, low_bias=lb)
-    # print('n_tapers:', len(dpss))
     ind = (np.arange(pts_per_block) + 0.5) * delta
     dpss_sub = dpss[..., ind.astype('i')]
     weight = delta * dpss_sub.T.dot(dpss_sub.dot(np.ones(pts_per_block)))
-    #weight **= 2
-    # window = np.power(
-    ##     np.cos(np.linspace(-np.pi/2, np.pi/2, pts_per_block)), 0.1
-    # )
     window = np.hamming(pts_per_block)
     weight *= window
     weight = window
-    # print('weight max:', weight.max())
 
     for b in range(len(blk_n)):
         # it's possible to exceed the data blocks, since we're not
@@ -549,9 +534,8 @@ def mtm_spectrogram(
         nwin = blk_n.block(b)
         # nwin[:] += 1 # just keep count of how many times we hit these points
         # oddly sqrt *looks* more right
-        #nwin[:] += weight**.5
+        # nwin[:] += weight**.5
         nwin[:] += weight
-        #nwin[:] = weight
         dwin = blk_x.block(b)
         if detrend:
             dwin = signal.detrend(dwin, type=detrend)
@@ -565,18 +549,14 @@ def mtm_spectrogram(
             f_idx = fx.searchsorted(freqs)
             mtm_pwr = 2 * np.abs(mtm_pwr[f_idx])**2
 
-        ## mtm_pwr *= mtm_pwr
         if np.iterable(weighting):
             mtm_pwr /= weighting[..., None]
         else:
             mtm_pwr /= weighting
         psd_win = blk_psd.block(b)
-        #psd_win[:] = psd_win + mtm_pwr
         psd_win[:] = psd_win + window * mtm_pwr
 
     n_avg[n_avg == 0] = 1
-    #n_avg = np.convolve(n_avg, np.ones(overlap)/overlap, mode='same')
-    # print n_avg
     psd_matrix /= n_avg
     if samp_factor == 0:
         tx = np.arange(psd_matrix.shape[-1], dtype='d')
@@ -664,10 +644,8 @@ def mtm_complex_demodulate(x, NW, nfft=None, adaptive=True, low_bias=True,
         N_pad = neg_length + 2 * N - 1
         if return_pad_length:
             return N_pad
-        # print('t_res: {}, padding {} times negative'.format(t_res, neg_segs))
         x = np.hstack([x[..., 1:1 + neg_length][..., ::-1], x, x[..., :-1][..., ::-1]])
         ix = ((np.arange(N_pad // t_res) - neg_segs) + resample_point) * t_res
-        # print(ix)
     else:
         if return_pad_length:
             return N
@@ -683,7 +661,6 @@ def mtm_complex_demodulate(x, NW, nfft=None, adaptive=True, low_bias=True,
         nfft = nextpow2(N_pad)
     K = len(eigs)
 
-    # xk = alg.tapered_spectra(x, dpss, NFFT=nfft)
     mtm = MultitaperEstimator(N_pad, NW_pad, nfft=nfft, dpss=(dpss, eigs))
     xk, weight = mtm.direct_sdfs(x, adaptive_weights=adaptive)
     if adaptive:
@@ -714,7 +691,6 @@ def mtm_complex_demodulate(x, NW, nfft=None, adaptive=True, low_bias=True,
         else:
             # limit last point to actual last point
             ix_mask = (ix >= 0) & (ix < N)
-        # print('Cutting to {} samps bewteen 0-{}'.format(ix_mask.sum(), N))
         x_tf = x_tf[..., ix_mask]
         ix = ix[ix_mask]
 
@@ -813,8 +789,6 @@ def bispectrum(
     except ImportError:
         samps = shared_ndarray((K, nf, nf), typecode='D')
         np.einsum('...i,...j->...ij', x_tf, x_tf, out=samps)
-
-        b_tr = np.zeros((nf, nf), dtype=x_tf.dtype)
         tr_i, tr_j = np.tril_indices(nf)
 
         # reflect the row indices to give the upper-left triangle:
