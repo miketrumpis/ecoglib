@@ -6,6 +6,7 @@ from scipy.special import comb
 from itertools import combinations
 from contextlib import closing, ExitStack
 import ecogdata.parallel.mproc as mp
+from ecogdata.util import get_default_args
 from ecogdata.parallel.array_split import SharedmemManager
 
 
@@ -50,7 +51,9 @@ def _resampler(index):
     # with shm_array.get_ndarray() as array:
         samps = [np.take(array, index, axis=axis) for array in arrays]
     if estimator is not None:
-        e_kwargs['axis'] = axis
+        # if there is *not*  an axis, then hope for the best
+        if 'axis' in get_default_args(estimator):
+            e_kwargs['axis'] = axis
         return estimator(*samps, *e_args, **e_kwargs)
     if len(samps) == 1:
         samps = samps[0]
@@ -124,7 +127,8 @@ class Bootstrap:
             for samp_idx in self._resampler:
                 samps = [np.take(arr, samp_idx, axis=self._axis) for arr in self._arrays]
                 if estimator is not None:
-                    e_kwargs['axis'] = self._axis
+                    if 'axis' in get_default_args(estimator):
+                        e_kwargs['axis'] = self._axis
                     yield estimator(*samps, *e_args, **e_kwargs)
                 else:
                     if len(samps) == 1:
@@ -160,8 +164,8 @@ class Bootstrap:
         return np.mean(vals, axis=0)
 
     @classmethod
-    def bootstrap_estimate(cls, sample, num_resample, estimator, axis=-1, e_args=(), **e_kwargs):
-        bootstrapper = Bootstrap(sample, num_resample, axis=axis)
+    def bootstrap_estimate(cls, sample, num_resample, estimator, axis=-1, n_jobs=None, e_args=(), **e_kwargs):
+        bootstrapper = Bootstrap(sample, num_resample, axis=axis, n_jobs=n_jobs)
         return bootstrapper.estimate(estimator, e_args=e_args, **e_kwargs)
 
 
@@ -209,7 +213,8 @@ class Jackknife(Bootstrap):
         if not len(jn_samples):
             jn_samples = self.all_samples(estimator=estimator, e_args=e_args, **e_kwargs)
         jn_samples = np.asarray(jn_samples)
-        e_kwargs['axis'] = self._axis
+        if 'axis' in get_default_args(estimator):
+            e_kwargs['axis'] = self._axis
         theta = estimator(*self._arrays, *e_args, **e_kwargs)
         N1 = float(self._arrays[0].shape[self._axis])
         d = N1 - self.__choose[1]
@@ -236,7 +241,8 @@ class Jackknife(Bootstrap):
         Compute the jack-knife bias of an estimator.
         """
 
-        e_kwargs['axis'] = self._axis
+        if 'axis' in get_default_args(estimator):
+            e_kwargs['axis'] = self._axis
         theta = estimator(*self._arrays, *e_args, **e_kwargs)
         pv = self.pseudovals(estimator, jn_samples=jn_samples, e_args=e_args, **e_kwargs)
         # mean of PV = theta - bias
@@ -255,6 +261,7 @@ class Jackknife(Bootstrap):
         return (N - 1) * np.var(jn_samples, axis=0)
 
     @classmethod
-    def jackknife_estimate(cls, sample, estimator, axis=-1, e_args=(), **e_kwargs):
-        sampler = Jackknife(sample, axis=axis)
-        return sampler.estimate(estimator, e_args=e_args, **e_kwargs)
+    def jackknife_estimate(cls, sample, estimator, correct_bias=True, se=False,
+                           axis=-1, n_jobs=None, e_args=(), **e_kwargs):
+        sampler = Jackknife(sample, axis=axis, n_jobs=n_jobs)
+        return sampler.estimate(estimator, correct_bias=correct_bias, se=se, e_args=e_args, **e_kwargs)
