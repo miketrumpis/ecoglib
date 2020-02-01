@@ -175,14 +175,16 @@ class Jackknife(Bootstrap):
 
     Parameters
     ----------
-    arrays : Sequence or ndarray
+    arrays: Sequence or ndarray
         Samples to jack-knife
-    n_out : int
+    n_out: int
         Number of samples to leave out of each jack-knife
-    axis : int
+    axis: int
         Which axis to resample
-    max_samps : int
+    max_samps: int
         If N-choose-L is large, limit the number of jack-knife samples
+    ordered_samples: bool
+        Return jackknife samples in the normal series order: X_{\not 1}, X_{\not 2}, ...
 
     """
 
@@ -202,7 +204,7 @@ class Jackknife(Bootstrap):
 
     def _init_sampler(self):
         if self._max_samps < 0:
-            self._resampler = combinations(*self.__choose)
+            self._resampler = list(combinations(*self.__choose))[::-1]
         elif self._resampler is None:
             iterable, r = self.__choose
             self._resampler = random_combinations(iterable, r, self._max_samps)
