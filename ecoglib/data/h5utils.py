@@ -38,7 +38,7 @@ class HDF5Bunch(Bunch):
         self.close()
 
 
-def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
+def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0, skip_pickles=False):
     """
     Save a Bunch type to an HDF5 group in a new or existing table.
 
@@ -68,7 +68,8 @@ def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
             return save_bunch(
                 f, path, b, 
                 overwrite_paths=overwrite_paths,
-                compress_arrays=compress_arrays
+                compress_arrays=compress_arrays,
+                skip_pickles=skip_pickles
                 )
 
     # If we want to overwrite a node, check to see that it exists.
@@ -114,15 +115,20 @@ def save_bunch(f, path, b, mode='a', overwrite_paths=False, compress_arrays=0):
             pickle_bunch[key] = val
 
     # 2) pickle the remaining items (that are not bunches)
-    p_arr = f.create_vlarray(path, 'b_pickle', atom=tables.ObjectAtom())
-    p_arr.append(pickle_bunch)
+    if len(pickle_bunch):
+        if skip_pickles:
+            print('Warning: these keys are being skipped on path {}'.format(path))
+            print(pickle_bunch)
+        else:
+            p_arr = f.create_vlarray(path, 'b_pickle', atom=tables.ObjectAtom())
+            p_arr.append(pickle_bunch)
 
     # 3) repeat these steps for any bunch elements that are also bunches
     for n, b in sub_bunches:
         #print 'saving', n, b
         subpath = path + '/' + n if path != '/' else path + n
         save_bunch(
-            f, subpath, b, compress_arrays=compress_arrays
+            f, subpath, b, compress_arrays=compress_arrays, skip_pickles=skip_pickles
             )
     return
 
