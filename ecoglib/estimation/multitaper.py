@@ -18,7 +18,10 @@ from ecogdata.util import nextpow2, dpss_windows
 from .resampling import Jackknife
 
 
-__all__ = ['mtm_spectrogram_basic',
+__all__ = ['bw2nw',
+           'nw2bw',
+           'MultitaperEstimator',
+           'mtm_spectrogram_basic',
            'mtm_spectrogram',
            'mtm_complex_demodulate',
            'bispectrum',
