@@ -173,7 +173,7 @@ def block_psds(data, btime, Fs, max_blocks=-1, **mtm_kw):
         mtm_kw['NW'] = 2.5
 
     bsize = int(round(Fs * btime))
-    block_itr, nchan, nblock, bsize = make_block_generator(data, bsize)
+    block_itr, nchan, nblock, bsize = make_block_generator(data, bsize, block_for_channels=False)
     nfft = nextpow2(bsize)
     if not isinstance(data, ElectrodeDataSource):
         # If data is not a data source, then control how many blocks are processed simultaneously.
@@ -197,7 +197,6 @@ def block_psds(data, btime, Fs, max_blocks=-1, **mtm_kw):
         psds.append(psds_)
         if max_blocks > 0 and n + 1 >= max_blocks:
             break
-
     psds = np.concatenate(psds, axis=0)
     return freqs, psds.reshape(-1, nchan, psds.shape[1])
 
