@@ -190,13 +190,16 @@ def dynamic_frames_and_series(
     if series.ndim == 2 and stack_traces:
         ptp = np.median(series.ptp(axis=0))
         series = series + np.arange(series.shape[1])*ptp
+
+    ## Set up array frames
+    f_img = frame_ax.imshow(frames[0], **imshow_kw)
+    frame_ax.axis('image'); #frame_ax.axis('off')
+    
     ## Set up timeseries trace(s)
     ylim = line_props.pop('ylim', ())
     if not ylim:
         ylim = (series.min(), series.max())
     lines = trace_ax.plot(tx_plot, series, **line_props)
-    if trace_labels:
-        trace_ax.legend(lines, trace_labels)
     trace_ax.set_xlabel(xlabel)
     trace_ax.set_ylabel(ylabel)
     trace_ax.set_ylim(ylim)
@@ -208,11 +211,16 @@ def dynamic_frames_and_series(
         if title:
             frame_ax.set_title(title, fontsize=18)
         ttl = None
-    
-    ## Set up array frames
-    f_img = frame_ax.imshow(frames[0], **imshow_kw)
-    frame_ax.axis('image'); #frame_ax.axis('off')
-    
+
+    if fig.canvas is not None:
+        fig.tight_layout()
+
+    if trace_labels:
+        # give a little overhead for some text (enough for 12 pts)
+        buffer = trace_ax.transData.inverted().get_matrix()[1, 1] * 14
+        trace_ax.set_ylim(top=trace_ax.get_ylim()[1] + buffer)
+        trace_ax.legend(lines, trace_labels, ncol=len(trace_labels))
+
     def _step_time(num, tx, frames, frame_img, tm, f_idx=None):
         # frame index array f_idx encodes possible offsets and skips
         # of the frame times with respect to the time axis
@@ -230,8 +238,6 @@ def dynamic_frames_and_series(
     func = lambda x: _step_time(
         x, tx, frames, f_img, time_mark, f_idx=frame_times
         )
-    if fig.canvas is not None:
-        fig.tight_layout()
     return fig, func
         
             
