@@ -65,7 +65,7 @@ class Bootstrap:
     Bootstrap resampler
     """
 
-    def __init__(self, arrays, num_samples, axis=-1, sample_size=None, n_jobs=None, ordered_samples=False):
+    def __init__(self, arrays, num_samples, axis=-1, proba=None, sample_size=None, n_jobs=None, ordered_samples=False):
         """
         Make a bootstrap resampler for an array.
 
@@ -77,6 +77,8 @@ class Bootstrap:
             Number of bootstrap samples to create
         axis: int
             Axis of the array to resample
+        proba: ndarray
+            Draw samples with this probability (uniform probability if proba is None).
         sample_size: int
             If given, then pull so many samples with replacement from the array. Normally equal to the original
             sample size.
@@ -88,9 +90,15 @@ class Bootstrap:
         """
 
         if not isinstance(arrays, (tuple, list)):
-            self._arrays = [arrays]
+            self._arrays = [np.asanyarray(arrays)]
         else:
-            self._arrays = arrays
+            self._arrays = [np.asanyarray(a) for a in arrays]
+        if proba is not None:
+            self._proba = np.asanyarray(proba)
+            # make sure it is unity normalized
+            self._proba = self._proba / self._proba.sum()
+        else:
+            self._proba = None
         self._axis = axis
         self._num_samples = num_samples
         if sample_size is None:
@@ -107,10 +115,17 @@ class Bootstrap:
     def _init_sampler(self):
         max_n = self._arrays[0].shape[self._axis]
         samp_size = self._sample_size
-
-        def anon_sampler():
-            for i in range(self._num_samples):
-                yield np.random.randint(0, max_n, samp_size)
+        # use simple and faster randint if drawing uniform
+        if self._proba is None:
+            def anon_sampler():
+                for i in range(self._num_samples):
+                    yield np.random.randint(0, max_n, samp_size)
+        else:
+            def anon_sampler():
+                r = np.arange(max_n)
+                p = self._proba
+                for i in range(self._num_samples):
+                    yield np.random.choice(r, samp_size, p=p)
         self._resampler = anon_sampler()
 
     def __len__(self):
