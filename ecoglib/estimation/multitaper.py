@@ -11,7 +11,7 @@ except ImportError:
     POCKET_FFT = False
 import nitime.utils as nt_utils
 
-from ecogdata.parallel.array_split import shared_ndarray
+from ecogdata.parallel.sharedmem import shared_ndarray
 import ecogdata.filt.blocks as blocks
 from ecogdata.util import nextpow2, dpss_windows
 
