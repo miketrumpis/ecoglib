@@ -1,4 +1,4 @@
-from nose.tools import assert_true, assert_equal
+from nose.tools import assert_true
 
 from scipy.special import comb
 from numpy.testing import assert_almost_equal
@@ -110,20 +110,26 @@ def test_jn_nd_estimator():
     d = 4
     r = np.random.randn(N1, N2, N3)
 
-    t = Jackknife(r, axis=0).estimate(np.mean)
+    t, se = Jackknife(r, axis=0).estimate(np.mean)
     assert_true(t.shape == (N2, N3))
-    t = Jackknife(r, axis=0).estimate(np.mean, keepdims=True)
+    assert_true(se.shape == (N2, N3))
+    t, se = Jackknife(r, axis=0).estimate(np.mean, keepdims=True)
     assert_true(t.shape == (1, N2, N3))
+    assert_true(se.shape == (1, N2, N3))
 
-    t = Jackknife(r, axis=1).estimate(np.mean)
+    t, se = Jackknife(r, axis=1).estimate(np.mean)
     assert_true(t.shape == (N1, N3))
-    t = Jackknife(r, axis=1).estimate(np.mean, keepdims=True)
+    assert_true(se.shape == (N1, N3))
+    t, se = Jackknife(r, axis=1).estimate(np.mean, keepdims=True)
     assert_true(t.shape == (N1, 1, N3))
+    assert_true(se.shape == (N1, 1, N3))
 
-    t = Jackknife(r, axis=2).estimate(np.mean)
+    t, se = Jackknife(r, axis=2).estimate(np.mean)
     assert_true(t.shape == (N1, N2))
-    t = Jackknife(r, axis=2).estimate(np.mean, keepdims=True)
+    assert_true(se.shape == (N1, N2))
+    t, se = Jackknife(r, axis=2).estimate(np.mean, keepdims=True)
     assert_true(t.shape == (N1, N2, 1))
+    assert_true(se.shape == (N1, N2, 1))
 
 
 def test_jn_sample_consistency():
@@ -138,8 +144,8 @@ def test_jn_sample_consistency():
     s2 = np.array(jn.all_samples())
     assert_true((s1 == s2).all())
 
-    # check for random subset of N-choose-r jackknifes
-    jn = Jackknife(r, n_out=d, max_samps=5, ordered_samples=True)
+    # check for N-choose-r jackknifes
+    jn = Jackknife(r, n_out=d, ordered_samples=True)
     s1 = np.array(jn.all_samples())
     s2 = np.array(jn.all_samples())
     print(list(map(np.shape, (s1, s2))))

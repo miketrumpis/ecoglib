@@ -128,6 +128,11 @@ class BootstrapSampler(mp.Process):
         e_args = self.e_args
         e_kwargs = self.e_kwargs
         sample_generator = self.sample_generator()
+        if estimator is not None:
+            # if there is *not*  an axis, then hope for the best
+            if 'axis' in get_default_args(estimator):
+                e_kwargs['axis'] = axis
+            info('Estimator args: {}, {}'.format(e_args, e_kwargs))
         # be sure to start the RNG in a different state than peers
         self._seed_rng()
         info('Process running {}'.format(timestamp()))
@@ -158,9 +163,6 @@ class BootstrapSampler(mp.Process):
                              for (array, out) in zip(arrays, out_arrays)]
             info('Doing perm {} estimator method {}'.format(self.sample_num, timestamp()))
             if estimator is not None:
-                # if there is *not*  an axis, then hope for the best
-                if 'axis' in get_default_args(estimator):
-                    e_kwargs['axis'] = axis
                 r = estimator(*samps, *e_args, **e_kwargs)
                 info('**** Estimator {} done {} ****'.format(self.sample_num, timestamp()))
                 self.resamples.task_done()
@@ -214,7 +216,7 @@ class Bootstrap:
             If given, then pull so many samples with replacement from the array. Normally equal to the original
             sample size.
         n_jobs: int
-            Number of parallel jobs to make bootstrap samples. None uses cpu_count().
+            Number of processes for bootstrap sampling (parallel is helpful if estimator cost is > O(n))
         ordered_samples: bool
             ???
         subprocess_logging: str
@@ -274,14 +276,23 @@ class Bootstrap:
 
         Parameters
         ----------
-        task_queue
-        results_queue
-        estimator
-        e_args
-        e_kwargs
+        task_queue: mp.JoinableQueue
+            Queue to push resample tasks to workers
+        results_queue: mp.Queue
+            Queue to receive resample estimators from workers
+        estimator: callable
+            Statistic to estimate
+        e_args: tuple
+            Additional arguments for the estimator
+        e_kwargs: dict
+            Additional keyword arguments for the estimator
 
         Returns
         -------
+        samplers: list
+            List of worker process objects
+        output_arrays: list
+            List of shared memory arrays (if workers are returning full resamples)
 
         """
         shm_arrays = [SharedmemManager(arr, use_lock=True) for arr in self._arrays]
@@ -302,8 +313,24 @@ class Bootstrap:
         return samplers, output_arrays
 
     def sample(self, estimator=None, e_args=(), **e_kwargs):
-        """Generate bootstrap samples, or estimates from the samples. The estimator must be a
-        callable that accepts the "axis" keyword.
+        """
+        Generator for bootstrap samples, or estimates from the samples. The estimator must be a
+        callable.
+
+        Parameters
+        ----------
+        estimator: callable
+            Infer statistic distribution using this estimator
+        e_args: tuple
+            Additional arguments for the estimator
+        e_kwargs:
+            Additional keyword arguments for the estimator
+
+        Yields
+        ------
+        r:
+            Bootstrap estimate (or full bootstrap sample if estimator is None)
+
         """
 
         parallel = self._n_jobs > 1
@@ -348,7 +375,7 @@ class Bootstrap:
         # I think it is on the user to make this an array in the appropriate form
         return samps
 
-    def estimate(self, estimator, ci=False, e_args=(), **e_kwargs):
+    def estimate(self, estimator, ci=0.95, e_args=(), **e_kwargs):
         """
         Make a bootstrapped estimate with optional confidence interval.
 
@@ -356,17 +383,19 @@ class Bootstrap:
         ----------
         estimator: callable
             The estimator to bootstrap (e.g. "numpy.mean", trivially)
-        ci: bool, Str
-            If a number < 1, then calculate the alpha-confidence interval based on percentiles.
+        ci: float, Str
+            If a number < 1, then calculate the (1 - alpha) confidence interval based on percentiles.
             E.g. ci=0.95 returns the [0.025, 0.0975] quantile points.
             If ci == 'se', then return the standard deviation of the bootstrapped estimates.
         e_args: tuple
             Extra positional arguments for the estimator.
         e_kwargs:
-            Extra keyword arguments for both Bootstrap.sample and the estimator.
+            Extra keyword arguments for the estimator.
 
         Returns
         -------
+        sample_mean:
+            Estimator of the full sample
         mean_est:
             Mean of the bootstrapped estimates
         error:
@@ -374,20 +403,52 @@ class Bootstrap:
 
         """
         vals = self.all_samples(estimator=estimator, e_args=e_args, **e_kwargs)
-        if ci:
-            if isinstance(ci, str):
-                iv = np.std(vals, axis=0)
-            else:
-                tol = 100 * (1 - ci) / 2
-                iv = np.percentile(vals, [tol, 100 - tol], axis=0)
-            return np.mean(vals, axis=0), iv
-
-        return np.mean(vals, axis=0)
+        if isinstance(ci, str):
+            iv = np.std(vals, axis=0)
+        else:
+            tol = 100 * (1 - ci) / 2
+            iv = np.percentile(vals, [tol, 100 - tol], axis=0)
+        sample_mean = estimator(*self._arrays, *e_args, **e_kwargs)
+        return sample_mean, np.mean(vals, axis=0), iv
 
     @classmethod
-    def bootstrap_estimate(cls, sample, num_resample, estimator, axis=-1, n_jobs=1, e_args=(), **e_kwargs):
+    def bootstrap_estimate(cls, sample, num_resample, estimator, axis=-1, n_jobs=1, ci=0.95, e_args=(), **e_kwargs):
+        """
+        Make a bootstrapped estimate with optional confidence interval.
+
+        Parameters
+        ----------
+        sample: ndarray
+            Data array (or list of arrays) to resample
+        num_resample: int
+            Number of bootstrap resamples to use
+        estimator: callable
+            The estimator to bootstrap (e.g. "numpy.mean", trivially)
+        axis: int
+            If the data array is multivariate, the estimator works as estimator(data, ..., axis=axis)
+        n_jobs: int
+            Number of processes for bootstrap sampling (parallel is helpful if estimator cost is > O(n))
+        ci: float, Str
+            If a number < 1, then calculate the (1 - alpha) confidence interval based on percentiles.
+            E.g. ci=0.95 returns the [0.025, 0.0975] quantile points.
+            If ci == 'se', then return the standard deviation of the bootstrapped estimates.
+        e_args: tuple
+            Extra positional arguments for the estimator.
+        e_kwargs:
+            Extra keyword arguments for the estimator.
+
+        Returns
+        -------
+        sample_mean:
+            Estimator of the full sample
+        mean_est:
+            Mean of the bootstrapped estimates
+        error:
+            Confidence interval or SD of bootstrapped estimates
+
+        """
         bootstrapper = Bootstrap(sample, num_resample, axis=axis, n_jobs=n_jobs)
-        return bootstrapper.estimate(estimator, e_args=e_args, **e_kwargs)
+        return bootstrapper.estimate(estimator, ci=ci, e_args=e_args, **e_kwargs)
 
 
 class Jackknife(Bootstrap):
@@ -409,7 +470,8 @@ class Jackknife(Bootstrap):
 
     """
 
-    def __init__(self, arrays, n_out=1, axis=-1, max_samps=None, n_jobs=1, ordered_samples=False):
+    def __init__(self, arrays, n_out=1, axis=-1, max_samps=None, n_jobs=1, ordered_samples=False,
+                 subprocess_logging='error'):
         if isinstance(arrays, np.ndarray):
             N = arrays.shape[axis]
         else:
@@ -419,7 +481,8 @@ class Jackknife(Bootstrap):
         else:
             r = N - n_out
             num_samples = int(comb(N, r))
-        super(Jackknife, self).__init__(arrays, num_samples, axis=axis, n_jobs=n_jobs, ordered_samples=ordered_samples)
+        super(Jackknife, self).__init__(arrays, num_samples, axis=axis, n_jobs=n_jobs,
+                                        ordered_samples=ordered_samples, subprocess_logging=subprocess_logging)
         # self.__choose = (range(N), N - n_out)
         self._n_out = n_out
         self._max_samps = max_samps
@@ -430,14 +493,23 @@ class Jackknife(Bootstrap):
 
         Parameters
         ----------
-        task_queue
-        results_queue
-        estimator
-        e_args
-        e_kwargs
+        task_queue: mp.JoinableQueue
+            Queue to push resample tasks to workers
+        results_queue: mp.Queue
+            Queue to receive resample estimators from workers
+        estimator: callable
+            Statistic to estimate
+        e_args: tuple
+            Additional arguments for the estimator
+        e_kwargs: dict
+            Additional keyword arguments for the estimator
 
         Returns
         -------
+        samplers: list
+            List of worker process objects
+        output_arrays: list
+            List of shared memory arrays (if workers are returning full resamples)
 
         """
         shm_arrays = [SharedmemManager(arr, use_lock=True) for arr in self._arrays]
@@ -476,7 +548,31 @@ class Jackknife(Bootstrap):
         d = self._n_out
         return N1 / d * theta - (N1 - d) * jn_samples / d
 
-    def estimate(self, estimator, correct_bias=True, se=False, e_args=(), **e_kwargs):
+    def estimate(self, estimator, correct_bias=True, se=True, e_args=(), **e_kwargs):
+        """
+        Jackknife estimate of mean and standard error.
+
+        Parameters
+        ----------
+        estimator: callable
+            Infer distribution of this statistic.
+        correct_bias: bool
+            Jackknife is used to correct bias (but bias estimate itself might be highly variable)
+        se: bool
+            Jackknife is typically used to find the standard error of the estimator (True is recommended).
+        e_args: tuple
+            Additional arguments for the estimator
+        e_kwargs: dict
+            Additional keyword arguments for the estimator
+
+        Returns
+        -------
+        mu:
+            Jackknifed estimator mean
+        se:
+            Jackknifed estimator error (if se is True)
+
+        """
         if correct_bias:
             vals = self.pseudovals(estimator, e_args=e_args, **e_kwargs)
         else:
@@ -517,7 +613,46 @@ class Jackknife(Bootstrap):
         return (N - 1) * np.var(jn_samples, axis=0)
 
     @classmethod
-    def jackknife_estimate(cls, sample, estimator, correct_bias=True, se=False,
+    def jackknife_estimate(cls, sample, estimator, correct_bias=True, se=True,
                            axis=-1, max_samps=None, n_jobs=1, e_args=(), **e_kwargs):
+        """
+        Jackknife estimate of mean and standard error.
+
+        Parameters
+        ----------
+        sample: ndarray
+            Data array (or list of arrays) to jackknife-resample
+        estimator: callable
+            Infer distribution of this statistic.
+        correct_bias: bool
+            Jackknife is used to correct bias (but bias estimate itself might be highly variable)
+        se: bool
+            Jackknife is typically used to find the standard error of the estimator (True is recommended).
+        axis: int
+            For multivariate data, statistic estimator works as estimator(sample, ..., axis=axis)
+        max_samps: int, None
+            If the number of leave-n-out permutations is very large, limit it to max_samps
+        n_jobs: int
+            Number of processes for bootstrap sampling (parallel is helpful if estimator cost is > O(n))
+        e_args: tuple
+            Additional arguments for the estimator
+        e_kwargs: dict
+            Additional keyword arguments for the estimator
+
+        Returns
+        -------
+        mu:
+            Jackknifed estimator mean
+        se:
+            Jackknifed estimator error (if se is True)
+
+        """
+
         sampler = Jackknife(sample, axis=axis, max_samps=max_samps, n_jobs=n_jobs)
         return sampler.estimate(estimator, correct_bias=correct_bias, se=se, e_args=e_args, **e_kwargs)
+
+
+# TODO:
+#  bootstrap estimate: should really emphasize CIs rather than bootstrap mean (which can be biased)
+#  bootstrap regression (optional residual resampling)
+#  bootstrap t-test
