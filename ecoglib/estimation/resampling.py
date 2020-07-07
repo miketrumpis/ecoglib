@@ -653,6 +653,9 @@ class Jackknife(Bootstrap):
 
 
 # TODO:
-#  bootstrap estimate: should really emphasize CIs rather than bootstrap mean (which can be biased)
-#  bootstrap regression (optional residual resampling)
-#  bootstrap t-test
+#  interesting doc: https://arxiv.org/pdf/1411.5279.pdf
+#  * done: bootstrap estimate: should really emphasize CIs rather than bootstrap mean (which can be biased)
+#  * bootstrap-t interval (for each resample, form t_i = (avg(x*) - avg(x)) / se(x*) -- probably requires estimator
+#    function to return SE per sample
+#  * bootstrap regression (optional residual resampling)
+#  * bootstrap t-test

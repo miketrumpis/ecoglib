@@ -66,6 +66,25 @@ def nw2bw(nw, n, fs):
     return 2 * nw * fs / n
 
 
+# These estimator functions used to be closures.
+# They need to be importable for spawn-based multiprocessing.
+def _psd_from_direct_spectra(Y, w, logout=False):
+    sk = np.sum(w * Y, axis=1) / np.sum(w, axis=1)
+    if logout:
+        return np.log(sk)
+    else:
+        return sk
+
+
+def _csd_from_direct_spectra(y, w):
+    # weighted sdfs
+    yw = y * w
+    numer = np.einsum('mkl,nkl->mnl', yw, yw.conj())
+    wsum = np.sum(w ** 2, axis=1) ** 0.5
+    denom = wsum[:, None, :] * wsum[None, :, :]
+    return numer / denom
+
+
 class _DPSScache:
 
     cache = dict()
@@ -241,24 +260,17 @@ class MultitaperEstimator:
         x = np.atleast_2d(x).reshape(-1, x.shape[-1])
         yk, w, nu = self.direct_sdfs(x, adaptive_weights=adaptive_weights, dof=True)
 
-        def _combine_spectra(Y, w, axis=None, logout=False):
-            sk = np.sum(w * Y, axis=1) / np.sum(w, axis=1)
-            if logout:
-                return np.log(sk)
-            else:
-                return sk
-
         # funny -- this is faster (in one step) than doing inplace squares
         yk = np.abs(yk) ** 2
         # np.power(yk, 2, yk)
         np.power(w, 2, w)
         if jackknife:
-            pxx, se = Jackknife([yk, w], axis=1, n_jobs=jn_jobs).estimate(_combine_spectra,
+            pxx, se = Jackknife([yk, w], axis=1, n_jobs=jn_jobs).estimate(_psd_from_direct_spectra,
                                                                           correct_bias=True,
                                                                           se=True,
                                                                           logout=True)
         else:
-            pxx = _combine_spectra(yk, w)
+            pxx = _psd_from_direct_spectra(yk, w)
 
         # PSD needs normalization:
         # P(f) <-- 2 * Pf / samp_rate (for 0 < f < f_nyq)
@@ -343,18 +355,12 @@ class MultitaperEstimator:
             x = signal.detrend(x, axis=-1, type=detrend)
         yk, w, nu = self.direct_sdfs(x, adaptive_weights=adaptive_weights, dof=True)
 
-        def _combine_spectra(y, w, axis=None):
-            # weighted sdfs
-            yw = y * w
-            numer = np.einsum('mkl,nkl->mnl', yw, yw.conj())
-            wsum = np.sum(w ** 2, axis=1) ** 0.5
-            denom = wsum[:, None, :] * wsum[None, :, :]
-            return numer / denom
-
         if jackknife:
-            cxy = Jackknife([yk, w], axis=1, n_jobs=jn_jobs).estimate(_combine_spectra, correct_bias=True, se=False)
+            cxy = Jackknife([yk, w], axis=1, n_jobs=jn_jobs).estimate(_csd_from_direct_spectra,
+                                                                      correct_bias=True,
+                                                                      se=False)
         else:
-            cxy = _combine_spectra(yk, w)
+            cxy = _csd_from_direct_spectra(yk, w)
         cxy /= (self.freq[-1] * 2)
         cxy[..., 1:] *= 2
         return self.freq, cxy
@@ -705,6 +711,12 @@ def mtm_complex_demodulate(x, NW, nfft=None, adaptive=True, low_bias=True,
     return x_tf, ix, weight
 
 
+# bi-coherence estimator -- needs to be importable for pickle & spawn
+def _BIC_ratio(P):
+    D = np.mean(np.abs(P) ** 2, axis=0) ** 0.5
+    return np.abs(P.mean(axis=0)) / D
+
+
 def bispectrum(
         x, NW, low_bias=True, nfft=None, fmax=0.5,
         bic=True, se=True, jackknife=True, jn_jobs=1, all_samps=False,
@@ -822,11 +834,6 @@ def bispectrum(
     if all_samps:
         return r(samps)
 
-    # bi-coherence estimator
-    def _BIC_ratio(P, axis=0):
-        D = np.mean(np.abs(P)**2, axis=axis) ** 0.5
-        return np.abs(P.mean(axis=axis)) / D
-
     if se:
         jackknife = True
 
@@ -850,6 +857,34 @@ def _circular_clip(x, eps=0):
     x_phs = np.angle(x)
     np.putmask(x, x_mag > 1 - eps, (1 - eps) * np.exp(1j * x_phs))
     return x
+
+# coherence estimator: needs to be importable for pickle & spawn
+def _coh_estimator(Y, seed, msc, fisher):
+    # Y is (M, K, Nf)
+    if seed is not None:
+        coh = (Y * Y[seed].conj()).sum(-2)
+    else:
+        coh = np.einsum('mkn,pkn->mpn', Y, Y.conj())
+    y_auto = np.sum(np.abs(Y) ** 2, axis=-2)
+    np.sqrt(y_auto, y_auto)
+    if seed is not None:
+        y_auto *= y_auto[seed]
+        coh /= y_auto
+    else:
+        coh = coh / y_auto[None, :, :]
+        coh = coh / y_auto[:, None, :]
+    # Need to "circularly clip" imaginary values by shrinking them to the unit circle
+    coh = _circular_clip(coh, eps=1e-16)
+    if msc:
+        coh = np.abs(coh) ** 2
+        if fisher:
+            coh = np.arctanh(coh)
+    elif fisher:
+        # Fisher's transform, but complex
+        # apply transformation separately to real and imag values?
+        coh.real[:] = np.arctanh(coh.real)
+        coh.imag[:] = np.arctanh(coh.imag)
+    return coh
 
 
 def coherence(
@@ -900,36 +935,9 @@ def coherence(
     if not ci:
         fisher = False
 
-    def _coh_estimator(Y, axis=None):
-        # Y is (M, K, Nf)
-        if seed is not None:
-            coh = (Y * Y[seed].conj()).sum(-2)
-        else:
-            coh = np.einsum('mkn,pkn->mpn', Y, Y.conj())
-        y_auto = np.sum(np.abs(Y) ** 2, axis=-2)
-        np.sqrt(y_auto, y_auto)
-        if seed is not None:
-            y_auto *= y_auto[seed]
-            coh /= y_auto
-        else:
-            coh = coh / y_auto[None, :, :]
-            coh = coh / y_auto[:, None, :]
-        # Need to "circularly clip" imaginary values by shrinking them to the unit circle
-        coh = _circular_clip(coh, eps=1e-16)
-        if msc:
-            coh = np.abs(coh) ** 2
-            if fisher:
-                coh = np.arctanh(coh)
-        elif fisher:
-            # Fisher's transform, but complex
-            # apply transformation separately to real and imag values?
-            coh.real[:] = np.arctanh(coh.real)
-            coh.imag[:] = np.arctanh(coh.imag)
-        return coh
-
-    d_spec = _coh_estimator(xk)
+    d_spec = _coh_estimator(xk, seed, msc, fisher)
     if ci:
-        err = Jackknife(xk, axis=-2, n_jobs=jn_jobs).variance(_coh_estimator)
+        err = Jackknife(xk, axis=-2, n_jobs=jn_jobs).variance(_coh_estimator, e_args=(seed, msc, fisher))
         if isinstance(ci, float):
             p = 1 - ci
         else:
@@ -954,6 +962,26 @@ def coherence(
     else:
         d_spec = _circular_clip(d_spec)
     return (d_spec, conf_iv) if ci else d_spec
+
+
+def _semiherence_estimator(Y, seed, real):
+    # Y is (M, K, Nf)
+    if seed is not None:
+        semih = (Y * Y[seed].conj()).mean(-2)
+    else:
+        semih = np.einsum('mkn,pkn->mpn', Y, Y.conj())
+        K = Y.shape[1]
+        semih /= K
+    y_auto = np.mean(np.abs(Y)**2, axis=-2)
+    if real:
+        semih = np.abs(semih.real)
+    else:
+        semih = np.abs(semih)
+
+    semih *= -1
+    semih += 0.5 * y_auto[:, None, :]
+    semih += 0.5 * y_auto[None, :, :]
+    return semih
 
 
 def semiherence(
@@ -1006,31 +1034,28 @@ def semiherence(
     if se:
         jackknife = True
 
-    def _sh_estimator(Y, axis=None):
-        # Y is (M, K, Nf)
-        if seed is not None:
-            semih = (Y * Y[seed].conj()).mean(-2)
-        else:
-            semih = np.einsum('mkn,pkn->mpn', Y, Y.conj())
-            K = Y.shape[1]
-            semih /= K
-        y_auto = np.mean(np.abs(Y)**2, axis=-2)
-        if real:
-            semih = np.abs(semih.real)
-        else:
-            semih = np.abs(semih)
-
-        semih *= -1
-        semih += 0.5 * y_auto[:, None, :]
-        semih += 0.5 * y_auto[None, :, :]
-        return semih
-
     if jackknife:
-        d_spec, err = Jackknife(xk, axis=-2, n_jobs=jn_jobs).estimate(_sh_estimator, se=True)
+        d_spec, err = Jackknife(xk, axis=-2, n_jobs=jn_jobs).estimate(_semiherence_estimator,
+                                                                      se=True,
+                                                                      e_args=(seed, real))
     else:
-        d_spec = _sh_estimator(xk)
+        d_spec = _semiherence_estimator(xk, seed, real)
     np.clip(d_spec, 0, d_spec.max(), out=d_spec)
     return (d_spec, err) if se else d_spec
+
+
+# Freq x Freq mean-square coherence estimator: importable for pickle & spawn
+def _dual_msc_estimator(Y):
+    # Y is packed with y1, y2 = Y
+    y1, y2 = Y
+    #d_spec = y1[..., :, :, None] * y2[..., :, None, :].conj()
+    d_spec = np.einsum('...ki,...kj->...kij', y1, y2.conj())
+    d_spec = np.abs(d_spec.mean(axis=-3))**2
+    # get marginal spectral densities
+    S1f = np.mean(np.abs(y1)**2, axis=-2)
+    S2f = np.mean(np.abs(y2)**2, axis=-2)
+    denom = np.einsum('...i,...j->...ij', S1f, S2f)
+    return d_spec / denom
 
 
 def dual_spectrum(
@@ -1099,24 +1124,12 @@ def dual_spectrum(
 
     samps = np.array([x1k, x2k])
 
-    def _msc_estimator(Y, axis=-3):
-        # Y is packed with y1, y2 = Y
-        y1, y2 = Y
-        #d_spec = y1[..., :, :, None] * y2[..., :, None, :].conj()
-        d_spec = np.einsum('...ki,...kj->...kij', y1, y2.conj())
-        d_spec = np.abs(d_spec.mean(axis=-3))**2
-        # get marginal spectral densities
-        S1f = np.mean(np.abs(y1)**2, axis=-2)
-        S2f = np.mean(np.abs(y2)**2, axis=-2)
-        denom = np.einsum('...i,...j->...ij', S1f, S2f)
-
-        return d_spec / denom
     # seems like a slight abuse of the jackknife machinery
     if jackknife:
-        msc, err = Jackknife(samps, axis=-2, n_jobs=jn_jobs).estimate(_msc_estimator, se=True)
+        msc, err = Jackknife(samps, axis=-2, n_jobs=jn_jobs).estimate(_dual_msc_estimator, se=True)
         np.clip(msc, 0, 1, msc)
     else:
-        msc = _msc_estimator(samps)
+        msc = _dual_msc_estimator(samps)
     return (msc, err) if se else msc
 
 
