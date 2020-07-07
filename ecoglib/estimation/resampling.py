@@ -249,6 +249,7 @@ class Bootstrap:
         return resample_with_replacement(max_n, samp_size, self._proba, num_samples=self._num_samples)
 
     def _alloc_output_memory(self):
+        warn('Generating data resamples is generally SLOW with multiprocessing', RuntimeWarning)
         # each sample will have n arrays with these shapes
         output_shapes = [list(a.shape) for a in self._arrays]
         output_types = [a.dtype.char for a in self._arrays]
@@ -286,7 +287,6 @@ class Bootstrap:
         shm_arrays = [SharedmemManager(arr, use_lock=True) for arr in self._arrays]
         if estimator is None:
             # if generating samples avoid heavy data passing -- pre-allocate shared memory
-            warn('Generating data resamples is generally SLOW with multiprocessing', RuntimeWarning)
             print('allocating output memory {}'.format(timestamp()), end='... ')
             output_arrays, output_managers = self._alloc_output_memory()
             print('done {}'.format(timestamp()))
@@ -409,7 +409,7 @@ class Jackknife(Bootstrap):
 
     """
 
-    def __init__(self, arrays, n_out=1, axis=-1, max_samps=None, n_jobs=None, ordered_samples=False):
+    def __init__(self, arrays, n_out=1, axis=-1, max_samps=None, n_jobs=1, ordered_samples=False):
         if isinstance(arrays, np.ndarray):
             N = arrays.shape[axis]
         else:
@@ -443,10 +443,10 @@ class Jackknife(Bootstrap):
         shm_arrays = [SharedmemManager(arr, use_lock=True) for arr in self._arrays]
         if estimator is None:
             # if generating samples avoid heavy data passing -- pre-allocate shared memory
-            print('allocating output memory')
+            print('allocating output memory {}'.format(timestamp()), end='... ')
             output_arrays, output_managers = self._alloc_output_memory()
+            print('done {}'.format(timestamp()))
         else:
-            print('no output allocation')
             output_arrays = output_managers = None
 
         n = self._arrays[0].shape[self._axis]
@@ -518,6 +518,6 @@ class Jackknife(Bootstrap):
 
     @classmethod
     def jackknife_estimate(cls, sample, estimator, correct_bias=True, se=False,
-                           axis=-1, max_samps=None, n_jobs=None, e_args=(), **e_kwargs):
+                           axis=-1, max_samps=None, n_jobs=1, e_args=(), **e_kwargs):
         sampler = Jackknife(sample, axis=axis, max_samps=max_samps, n_jobs=n_jobs)
         return sampler.estimate(estimator, correct_bias=correct_bias, se=se, e_args=e_args, **e_kwargs)
