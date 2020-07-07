@@ -349,11 +349,40 @@ class Bootstrap:
         # I think it is on the user to make this an array in the appropriate form
         return samps
 
-    def estimate(self, estimator, se=False, e_args=(), **e_kwargs):
+    def estimate(self, estimator, ci=False, e_args=(), **e_kwargs):
+        """
+        Make a bootstrapped estimate with optional confidence interval.
+
+        Parameters
+        ----------
+        estimator: callable
+            The estimator to bootstrap (e.g. "numpy.mean", trivially)
+        ci: bool, Str
+            If a number < 1, then calculate the alpha-confidence interval based on percentiles.
+            E.g. ci=0.95 returns the [0.025, 0.0975] quantile points.
+            If ci == 'se', then return the standard deviation of the bootstrapped estimates.
+        e_args: tuple
+            Extra positional arguments for the estimator.
+        e_kwargs:
+            Extra keyword arguments for both Bootstrap.sample and the estimator.
+
+        Returns
+        -------
+        mean_est:
+            Mean of the bootstrapped estimates
+        error:
+            Confidence interval or SD of bootstrapped estimates
+
+        """
         vals = self.all_samples(estimator=estimator, e_args=e_args, **e_kwargs)
-        if se:
-            se = np.std(vals, axis=0) / np.sqrt(len(vals))
-            return np.mean(vals, axis=0), se
+        if ci:
+            if isinstance(ci, str):
+                iv = np.std(vals, axis=0)
+            else:
+                tol = 100 * (1 - ci) / 2
+                iv = np.percentile(vals, [tol, 100 - tol], axis=0)
+            return np.mean(vals, axis=0), iv
+
         return np.mean(vals, axis=0)
 
     @classmethod
