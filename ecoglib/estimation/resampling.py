@@ -1,13 +1,13 @@
 """Iterators and tools for jackknife estimators"""
-import sys
 import random
+from warnings import warn
 import numpy as np
 from scipy.special import comb
 from itertools import combinations
-from contextlib import closing, ExitStack
+from contextlib import ExitStack
 import ecogdata.parallel.mproc as mp
 from ecogdata.util import get_default_args
-from ecogdata.parallel.sharedmem import SharedmemManager, shared_copy
+from ecogdata.parallel.sharedmem import SharedmemManager
 from ecogdata.parallel.array_split import timestamp
 
 
@@ -196,7 +196,7 @@ class Bootstrap:
     """
 
     def __init__(self, arrays, num_samples, axis=-1, proba=None, sample_size=None, n_jobs=1, ordered_samples=False,
-                 subprocess_logging='error', alloc_shared=True):
+                 subprocess_logging='error'):
         """
         Make a bootstrap resampler for an array.
 
@@ -242,7 +242,6 @@ class Bootstrap:
         self._ordered_samples = ordered_samples
         self._n_jobs = n_jobs
         self._loglevel = subprocess_logging
-        self._alloc_shared = alloc_shared
 
     def _init_sampler(self):
         max_n = self._arrays[0].shape[self._axis]
@@ -285,13 +284,13 @@ class Bootstrap:
 
         """
         shm_arrays = [SharedmemManager(arr, use_lock=True) for arr in self._arrays]
-        if estimator is None and self._alloc_shared:
+        if estimator is None:
             # if generating samples avoid heavy data passing -- pre-allocate shared memory
+            warn('Generating data resamples is generally SLOW with multiprocessing', RuntimeWarning)
             print('allocating output memory {}'.format(timestamp()), end='... ')
             output_arrays, output_managers = self._alloc_output_memory()
             print('done {}'.format(timestamp()))
         else:
-            print('no output allocation')
             output_arrays = output_managers = None
 
         resample_args = (self._arrays[0].shape[self._axis], self._sample_size, self._proba)
