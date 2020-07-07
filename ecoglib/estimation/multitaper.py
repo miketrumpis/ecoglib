@@ -198,7 +198,7 @@ class MultitaperEstimator:
         else:
             return yk, w
 
-    def compute_psd(self, x, adaptive_weights=False, jackknife=False, detrend=None, ci=False):
+    def compute_psd(self, x, adaptive_weights=False, jackknife=False, jn_jobs=1, detrend=None, ci=False):
         """
         Compute the multitaper psd estimate(s) of series in x. PSD normalization is defined such that the integral of
         spectral power per Hz equals to the total variance in x:
@@ -215,6 +215,8 @@ class MultitaperEstimator:
             Use jackknife resampling in combining multitaper estimates. In this mode, standard error is calculated
             after log-transforming jackknifed estimates. The confidence interval is calculated for the log domain
             based on Student's t distribution for K - 1 degrees of freedom, but is then exponentiated before return.
+        jn_jobs: int
+            Perform Jackknife resampling on this many processes.
         detrend: str, bool
             Remove order-1 (detrend='linear') or order-0 (detrend='constant') trends. If detrend=True, remove constant.
         ci: bool or float
@@ -251,7 +253,10 @@ class MultitaperEstimator:
         # np.power(yk, 2, yk)
         np.power(w, 2, w)
         if jackknife:
-            pxx, se = Jackknife([yk, w], axis=1).estimate(_combine_spectra, correct_bias=True, se=True, logout=True)
+            pxx, se = Jackknife([yk, w], axis=1, n_jobs=jn_jobs).estimate(_combine_spectra,
+                                                                          correct_bias=True,
+                                                                          se=True,
+                                                                          logout=True)
         else:
             pxx = _combine_spectra(yk, w)
 
@@ -296,7 +301,7 @@ class MultitaperEstimator:
 
     @classmethod
     def psd(cls, x, NW=2.5, fs=1.0, nfft=None, low_bias=True, dpss=None,
-            adaptive_weights=False, jackknife=False, detrend=None, ci=False):
+            adaptive_weights=False, jackknife=False, jn_jobs=1, detrend=None, ci=False):
         """
         Shortcut to create a MultitaperEstimator and then compute the psd for x. See arguments for
         MultitaperEstimator construction and compute_psd
@@ -312,9 +317,9 @@ class MultitaperEstimator:
         N = x.shape[-1]
         mt_estimator = cls(N, NW, fs=fs, nfft=nfft, low_bias=low_bias, dpss=dpss)
         return mt_estimator.compute_psd(x, adaptive_weights=adaptive_weights, jackknife=jackknife,
-                                        detrend=detrend, ci=ci)
+                                        jn_jobs=jn_jobs, detrend=detrend, ci=ci)
 
-    def compute_csd(self, x, y=None, adaptive_weights=False, jackknife=False, detrend=None):
+    def compute_csd(self, x, y=None, adaptive_weights=False, jackknife=False, jn_jobs=1, detrend=None):
         """
         Compute cross-spectra either between timeseries x and y, or between
         all the combinations in the vector timeseries x. Other arguments follow compute_psd.
@@ -347,7 +352,7 @@ class MultitaperEstimator:
             return numer / denom
 
         if jackknife:
-            cxy = Jackknife([yk, w], axis=1).estimate(_combine_spectra, correct_bias=True, se=False)
+            cxy = Jackknife([yk, w], axis=1, n_jobs=jn_jobs).estimate(_combine_spectra, correct_bias=True, se=False)
         else:
             cxy = _combine_spectra(yk, w)
         cxy /= (self.freq[-1] * 2)
@@ -356,7 +361,7 @@ class MultitaperEstimator:
 
     @classmethod
     def csd(cls, x, y=None, NW=2.5, fs=1.0, nfft=None, low_bias=True, dpss=None,
-            adaptive_weights=False, jackknife=False, detrend=None):
+            adaptive_weights=False, jackknife=False, jn_jobs=1, detrend=None):
         """
         Shortcut to create a MultitaperEstimator and then compute the csds for x. See arguments for
         MultitaperEstimator construction and compute_csd
@@ -373,7 +378,7 @@ class MultitaperEstimator:
         N = x.shape[-1]
         mt_estimator = cls(N, NW, fs=fs, nfft=nfft, low_bias=low_bias, dpss=dpss)
         return mt_estimator.compute_csd(x, y=y, adaptive_weights=adaptive_weights,
-                                        jackknife=jackknife, detrend=detrend)
+                                        jackknife=jackknife, jn_jobs=jn_jobs, detrend=detrend)
 
 
 def mtm_spectrogram_basic(x, n, pl=0.25, detrend='', **mtm_kwargs):
@@ -702,7 +707,7 @@ def mtm_complex_demodulate(x, NW, nfft=None, adaptive=True, low_bias=True,
 
 def bispectrum(
         x, NW, low_bias=True, nfft=None, fmax=0.5,
-        bic=True, se=True, jackknife=True, all_samps=False,
+        bic=True, se=True, jackknife=True, jn_jobs=1, all_samps=False,
         return_symmetric=False, return_sparse=False
 ):
     """
@@ -728,6 +733,8 @@ def bispectrum(
         Use jackknife resampling for estimating the bispectrum mean
         and standard error. The Jackknife is ALWAYS used as the
         bicoherence ratio estimator.
+    jn_jobs: int
+            Perform Jackknife resampling on this many processes.
     all_samps : bool {True | False}
         Skip all estimates and return all samples.
     return_symmetric : bool {True | False}
@@ -830,9 +837,9 @@ def bispectrum(
 
     # But jackknife == True does not imply se == True
     if bic:
-        pv = Jackknife(samps, axis=0).pseudovals(_BIC_ratio)
+        pv = Jackknife(samps, axis=0, n_jobs=jn_jobs).pseudovals(_BIC_ratio)
     else:
-        pv = Jackknife(samps, axis=0).pseudovals(np.mean)
+        pv = Jackknife(samps, axis=0, n_jobs=jn_jobs).pseudovals(np.mean)
     return (r(pv.mean(0)), r(pv.std(0) / K**0.5)) if se else r(pv.mean(0))
 
 
@@ -846,7 +853,7 @@ def _circular_clip(x, eps=0):
 
 
 def coherence(
-        x, NW, msc=True, dpss=None, eigs=None, ci=False, fisher=True,
+        x, NW, msc=True, dpss=None, eigs=None, ci=False, jn_jobs=1, fisher=True,
         low_bias=True, nfft='auto', seed=None
 ):
     """Estimate the coherence spectrum between different signals.
@@ -866,6 +873,8 @@ def coherence(
         Eigenvalues of precomputed tapers
     ci : bool or float
         Return a confidence interval based on the jackknife variance of the estimator.
+    jn_jobs: int
+            Perform Jackknife resampling on this many processes.
     fisher: bool
         Use arc hyperbolic tangent (Fisher) normalization for jackknifing (does not seem to work well!!)
     low_bias : {True | False | 0 < p < 1}
@@ -920,7 +929,7 @@ def coherence(
 
     d_spec = _coh_estimator(xk)
     if ci:
-        err = Jackknife(xk, axis=-2).variance(_coh_estimator)
+        err = Jackknife(xk, axis=-2, n_jobs=jn_jobs).variance(_coh_estimator)
         if isinstance(ci, float):
             p = 1 - ci
         else:
@@ -948,7 +957,7 @@ def coherence(
 
 
 def semiherence(
-        x, NW, real=True, dpss=None, eigs=None, jackknife=True, se=False,
+        x, NW, real=True, dpss=None, eigs=None, jackknife=True, jn_jobs=1, se=False,
         low_bias=True, nfft='auto', fmax=0.5, seed=None
 ):
     """Estimate the coherence spectrum between different signals.
@@ -968,6 +977,8 @@ def semiherence(
         Eigenvalues of precomputed tapers
     jackknife : bool
         Use the jackknife to estimate the dual spectrum (or dual MSC)
+    jn_jobs: int
+            Perform Jackknife resampling on this many processes.
     se : bool
         Also return standard error of the estimator
         (sets jackknife to True)
@@ -1015,7 +1026,7 @@ def semiherence(
         return semih
 
     if jackknife:
-        d_spec, err = Jackknife(xk, axis=-2).estimate(_sh_estimator, se=True)
+        d_spec, err = Jackknife(xk, axis=-2, n_jobs=jn_jobs).estimate(_sh_estimator, se=True)
     else:
         d_spec = _sh_estimator(xk)
     np.clip(d_spec, 0, d_spec.max(), out=d_spec)
@@ -1023,7 +1034,7 @@ def semiherence(
 
 
 def dual_spectrum(
-        x1, x2, NW, msc=True, dpss=None, eigs=None, jackknife=True, se=False,
+        x1, x2, NW, msc=True, dpss=None, eigs=None, jackknife=True, jn_jobs=1, se=False,
         low_bias=True, nfft='auto', fmax=0.5
 ):
     """Estimate the dual frequency spectrum between different signals.
@@ -1045,6 +1056,8 @@ def dual_spectrum(
         Eigenvalues of precomputed tapers
     jackknife : bool
         Use the jackknife to estimate the dual spectrum (or dual MSC)
+    jn_jobs: int
+            Perform Jackknife resampling on this many processes.
     se : bool
         Also return standard error of the estimator
         (sets jackknife to True)
@@ -1079,7 +1092,7 @@ def dual_spectrum(
         #samps = x1k[..., :, :, None] * x2k[..., :, None, :].conj()
         samps = np.einsum('...ki,...kj->...kij', x1k, x2k.conj())
         if jackknife:
-            d_spec, err = Jackknife(samps, axis=-3).estimate(np.mean, se=True)
+            d_spec, err = Jackknife(samps, axis=-3, n_jobs=jn_jobs).estimate(np.mean, se=True)
         else:
             d_spec = np.mean(samps, axis=-3)
         return (d_spec, err) if se else d_spec
@@ -1100,7 +1113,7 @@ def dual_spectrum(
         return d_spec / denom
     # seems like a slight abuse of the jackknife machinery
     if jackknife:
-        msc, err = Jackknife(samps, axis=-2).estimate(_msc_estimator, se=True)
+        msc, err = Jackknife(samps, axis=-2, n_jobs=jn_jobs).estimate(_msc_estimator, se=True)
         np.clip(msc, 0, 1, msc)
     else:
         msc = _msc_estimator(samps)
