@@ -77,7 +77,7 @@ def bad_channel_mask(pwr_est, iqr=4.0, **kwargs):
     # now also apply a fairly wide outlier rejection
     kwargs.setdefault('quantiles', (25, 75))
     kwargs.setdefault('thresh', iqr)
-    kwargs.setdefault('low', True)
+    kwargs.setdefault('fences', 'both')
     msub = fenced_out(pwr_est[m], **kwargs)
     m[m] = msub
     return m
