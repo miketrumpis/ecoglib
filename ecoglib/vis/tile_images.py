@@ -496,6 +496,8 @@ def tile_traces_1ax(traces, geo=(), p=(), yl=(), twin=(), plot_style='sample', c
 
     twin : t-limits for each trace
 
+    tilesize : (x-size, y-size) in inches
+
     plot_style : str
         "sample" plots mean and interquartile range margins
 
@@ -563,8 +565,8 @@ def tile_traces_1ax(traces, geo=(), p=(), yl=(), twin=(), plot_style='sample', c
 
     if ax is None:
         # calculate fig size, given geometry and presence of title
-        figsize = (geo[1] * tilesize[1],
-                   geo[0] * tilesize[0] + (len(title) > 0))
+        figsize = (geo[1] * tilesize[0],
+                   geo[0] * tilesize[1] + (len(title) > 0))
         import matplotlib.pyplot as pp
         fig = pp.figure(figsize=figsize)
 
