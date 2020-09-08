@@ -8,6 +8,7 @@ from matplotlib.figure import Figure
 from matplotlib.collections import LineCollection
 from matplotlib.patches import Polygon
 from matplotlib.lines import Line2D
+import matplotlib.offsetbox as offsetbox
 import matplotlib.transforms as transforms
 from matplotlib.ticker import MaxNLocator
 import numpy as np
@@ -18,6 +19,78 @@ from .tile_images import quick_tiles, calibration_axes
 from .colormaps import rgba_field
 from . import plotters
 
+
+class AnchoredScaleBar(offsetbox.AnchoredOffsetbox):
+    """
+    Yoinked and modified from Stackoverflow.
+
+    Creates a scale-bar & text combo. Scale bar size is specified in the data units of the axes.
+    Bounding-box corner location (loc) is in term of 0-1 axes coordinates.
+
+    Parameters
+    ----------
+    loc: sequence
+        Axes coordinate of the anchoring bounding box
+    ax: Axes
+        Axes that this scale refers to
+    size: float
+        Size of the scale bar (Axes data units)
+    label: str
+        Label (e.g. "1 mm")
+    pad: float
+        Space between anchor bbox and this box
+    borderpad: float
+        ?
+    ppad: float
+        ?
+    sep: float
+        Amount of separation between text and bar (figure points)
+    prop:
+        ?
+    frameon: bool
+        Put an opaque frame around the box
+    vertical: bool
+        Vertical scale bar if True, else horizontal
+    linekw: dict
+        Scale Line2D properties
+
+    Notes
+    -----
+
+    An example to position the scale bar just to the left of the y-axis using
+    the Axes-referred position of a ytick label.
+
+    >>> yt = ax.get_yticklabels()[0]
+    >>> xf = yt.get_transform()
+    >>> fig_p = xf.transform(yt.get_position())
+    >>> axes_position_x = ax.transAxes.inverted().transform(fig_p)[0] * 0.25
+    >>> scale_loc = [axes_position_x, 0.25]
+    >>> sbar = AnchoredScaleBar(scale_loc, ax, vertical=True)
+    >>> ax.add_artist(sbar)
+
+    """
+
+    def __init__(self, loc, ax, size=1, label='',
+                 pad=0.4, borderpad=0.5, ppad = 0, sep=2, prop=None,
+                 frameon=False, vertical=True, linekw={}, **kwargs):
+        if vertical:
+            trans = ax.get_yaxis_transform()
+            size_bar = offsetbox.AuxTransformBox(trans)
+            line = Line2D([0, 0], [0, size], **linekw)
+        else:
+            trans = ax.get_xaxis_transform()
+            size_bar = offsetbox.AuxTransformBox(trans)
+            line = Line2D([0, size], [0, 0], **linekw)
+        size_bar.add_artist(line)
+        if vertical:
+            txt = offsetbox.TextArea(label, minimumdescent=False, textprops=dict(fontsize=8, rotation=90))
+            self.pac = offsetbox.HPacker(children=[txt, size_bar], align="center", pad=ppad, sep=sep)
+        else:
+            txt = offsetbox.TextArea(label, minimumdescent=False, textprops=dict(fontsize=8))
+            self.pac = offsetbox.VPacker(children=[size_bar, txt], align="center", pad=ppad, sep=sep)
+        offsetbox.AnchoredOffsetbox.__init__(self, 'center right', pad=pad, bbox_to_anchor=loc,
+                                             borderpad=borderpad, bbox_transform=ax.transAxes,
+                                             child=self.pac, prop=prop, frameon=frameon, **kwargs)
 
 
 # a replacement for pyplot.figure that just uses Figure rather than figure:
