@@ -435,7 +435,7 @@ def mtm_spectrogram_basic(x, n, pl=0.25, detrend='', **mtm_kwargs):
 
 
 def mtm_spectrogram(
-        x, n, pl=0.25, detrend='', Fs=1.0, adaptive=True, samp_factor=1,
+        x, n, pl=0.25, detrend='', Fs=1.0, adaptive_weights=True, samp_factor=1,
         freqs=None, pad=False, **mtm_kwargs
 ):
     """
@@ -450,7 +450,7 @@ def mtm_spectrogram(
         percent overlap between blocks
     detrend: ''
         detrend each block as 'linear', 'constant',  (or not at all)
-    adaptive: bool
+    adaptive_weights: bool
         weight each spectral estimator adaptively
     samp_factor: int
         Each complex demodulate has a temporal resolution of 1/2W, and will
@@ -475,6 +475,9 @@ def mtm_spectrogram(
 
     """
 
+    # clean up possible call signature difference
+    if 'adaptive' in mtm_kwargs:
+        adaptive_weights = mtm_kwargs.pop('adaptive')
     NW, nfft, lb = _parse_mtm_args(n, mtm_kwargs)
     if pl > 1:
         # re-specify in terms of a fraction
@@ -554,7 +557,7 @@ def mtm_spectrogram(
         if detrend:
             dwin = signal.detrend(dwin, type=detrend)
         mtm_pwr, ix, weighting = mtm_complex_demodulate(
-            dwin, NW, nfft=nfft, adaptive=adaptive, dpss=dpss, eigs=eigs,
+            dwin, NW, nfft=nfft, adaptive_weights=adaptive_weights, dpss=dpss, eigs=eigs,
             samp_factor=1.0 / delta if delta > 1 else 0, pad=pad
         )
         if freqs is None:
@@ -587,7 +590,7 @@ def mtm_spectrogram(
     return tx, fx, psd_matrix
 
 
-def mtm_complex_demodulate(x, NW, nfft=None, adaptive=True, low_bias=True,
+def mtm_complex_demodulate(x, NW, nfft=None, adaptive_weights=True, low_bias=True,
                            dpss=None, eigs=None, samp_factor=1,
                            fmax=0.5, pad=False, return_pad_length=False):
     """
@@ -676,8 +679,8 @@ def mtm_complex_demodulate(x, NW, nfft=None, adaptive=True, low_bias=True,
     K = len(eigs)
 
     mtm = MultitaperEstimator(N_pad, NW_pad, nfft=nfft, dpss=(dpss, eigs))
-    xk, weight = mtm.direct_sdfs(x, adaptive_weights=adaptive)
-    if adaptive:
+    xk, weight = mtm.direct_sdfs(x, adaptive_weights=adaptive_weights)
+    if adaptive_weights:
         xk *= weight
         # repurpose weight as the sum of squared weights across K direct SDFs
         weight = np.sum(weight ** 2, axis=-2)
