@@ -66,9 +66,9 @@ class SavesFigure(HasTraits):
     y_lo = Float
     y_hi = Float
 
-    @staticmethod
-    def live_fig(fig, **traits):
-        sfig = SavesFigure(fig, **traits)
+    @classmethod
+    def live_fig(cls, fig, **traits):
+        sfig = cls(fig, **traits)
         v = sfig.default_traits_view()
         v.kind = 'live'
         # sfig.edit_traits(view=v)
