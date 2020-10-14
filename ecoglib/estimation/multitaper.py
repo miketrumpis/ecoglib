@@ -29,11 +29,15 @@ __all__ = ['bw2nw',
 
 
 def _parse_mtm_args(N, kw_dict):
-    NFFT = kw_dict.pop('NFFT', None)
-    if NFFT is None:
-        NFFT = N
-    elif NFFT == 'auto':
-        NFFT = nextpow2(N)
+    # parse args for some retro signatures
+    if 'NFFT' in kw_dict:
+        nfft = kw_dict.pop('NFFT', None)
+    elif 'nfft' in kw_dict:
+        nfft = kw_dict.pop('nfft', None)
+    if nfft is None:
+        nfft = N
+    elif nfft == 'auto':
+        nfft = nextpow2(N)
     BW = kw_dict.pop('BW', None)
     Fs = kw_dict.pop('Fs', 1)
     NW = kw_dict.pop('NW', None)
@@ -45,7 +49,7 @@ def _parse_mtm_args(N, kw_dict):
         NW = 4
     # (else BW is None and NW is not None) ... all set
     lb = kw_dict.pop('low_bias', True)
-    return NW, NFFT, lb
+    return NW, nfft, lb
 
 
 def bw2nw(bw, n, fs, halfint=True):
@@ -411,7 +415,7 @@ def mtm_spectrogram_basic(x, n, pl=0.25, detrend='', **mtm_kwargs):
 
     if x.ndim < 2:
         x = x.reshape((1,) + x.shape)
-    N, NW, low_bias = _parse_mtm_args(x.shape[-1], mtm_kwargs)
+    NW, nfft, low_bias = _parse_mtm_args(x.shape[-1], mtm_kwargs)
     mtm_kwargs.setdefault('adaptive_weights', True)
     mtm_kwargs.setdefault('jackknife', False)
     xb = blocks.BlockedSignal(x, n, overlap=pl, partial_block=False)
@@ -420,7 +424,7 @@ def mtm_spectrogram_basic(x, n, pl=0.25, detrend='', **mtm_kwargs):
         x_lapped = signal.detrend(x_lapped, type=detrend, axis=-1).copy()
 
     # fx, psds, nu = multi_taper_psd(x_lapped, **mtm_kwargs)
-    fx, psds = MultitaperEstimator.psd(x_lapped, NW=NW, low_bias=low_bias, **mtm_kwargs)
+    fx, psds = MultitaperEstimator.psd(x_lapped, NW=NW, nfft=nfft, low_bias=low_bias, **mtm_kwargs)
 
     # infer time-resolution
     lag = round((1 - pl) * n)
