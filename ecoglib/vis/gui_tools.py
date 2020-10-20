@@ -13,6 +13,7 @@ from ecogdata.util import mkdir_p
 
 import ecoglib.vis.traitsui_bridge as tb
 import ecoglib.vis.plot_modules as pm
+from .colormaps import diverging_cm
 
 __all__ = ['SavesFigure', 'ArrayMap', 'EvokedPlot', 'current_screen']
 
@@ -162,9 +163,23 @@ class SavesFigure(HasTraits):
 
     def _cmap(self):
         name = self.cmap_name
+        # Check for a "_z<p>" pattern, which signals a z score map with compressed saturation
+        name_parts = name.split('_')
+        z_map = False
+        if len(name_parts) > 1:
+            z_part = name_parts[-1]
+            if len(z_part) and z_part[0] == 'z':
+                # take the _z code out of the name
+                name = '_'.join(name_parts[:-1])
+                z_map = True
+                try:
+                    p = float(z_part[1:])
+                except ValueError:
+                    p = 1
+        # Go through the logic of looking for a valid colormap
         try:
-            colors = cm.cmap_d[name]
-        except KeyError:
+            colors = cm.get_cmap(name)
+        except ValueError:
             # try to evaluate the string as a function in colormaps module
             try:
                 code = 'cmaps.' + name
@@ -176,6 +191,8 @@ class SavesFigure(HasTraits):
                     colors = eval(code)
                 except:
                     return
+        if z_map:
+            colors = diverging_cm(self.c_lo, self.c_hi, cmap=colors, compression=p)
         for ax in self.fig.axes:
             for im in ax.images:
                 im.set_cmap(colors)

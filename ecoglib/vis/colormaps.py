@@ -80,6 +80,38 @@ def nancmap(cmap_name, nanc=(1, 1, 1, 1), underc=None, overc=None, N=None):
     return cmap
 
 
+def z_cmap(cmap='bwr', N=None, z_max=4):
+    """
+    Return a colormap to be used for Normal "Z" scores, where saturation is tied to the Normal CDF.
+
+    Brightness = 2 * (CDF(|z|) - 1 / 2)
+
+    Parameters
+    ----------
+    cmap: str, matplotlib.colors.Colormap
+        Base map to convert (diverging maps put white in the z=0 zone).
+    z_max: float
+        Saturate at this value (put set_under and set_over at this value).
+
+    Returns
+    -------
+    z_map: colors.ListedColormap
+
+    """
+    if not N:
+        N = mpl.rcParams['image.lut']
+    if not isinstance(cmap, colors.Colormap):
+        cmap = cm.get_cmap(cmap)
+    from scipy.stats.distributions import norm
+    hsv_colors = colors.rgb_to_hsv(cmap(np.linspace(0, 1, N))[:, :3])
+    z_values = np.linspace(-z_max, z_max, N)
+    hsv_colors[:, 2] = 2 * (norm.cdf(np.abs(z_values)) - 0.5)
+    rgb_colors = colors.hsv_to_rgb(hsv_colors)
+    rgb_colors = np.c_[rgb_colors, np.ones(N)]
+    z_map = colors.ListedColormap(rgb_colors, name=cmap.name + '_z')
+    return z_map
+
+
 def diverging_cm(
         mn, mx, cmap='bwr', zero='white', compression=1.0
 ):
@@ -133,7 +165,7 @@ def diverging_cm(
         ##         cpos = colors.hex2color(cmap[1])
     if isinstance(cmap, colors.Colormap):
         # get the neg and pos colors
-        cneg = cmap(0.0);
+        cneg = cmap(0.0)
         cpos = cmap(1.0)
 
     # build new colormap with unbalanced poles
