@@ -31,8 +31,8 @@ bispectrum = Extension(
     )
 
 semivariance = Extension(
-    'ecoglib.estimation._semivariance',
-    ['ecoglib/estimation/_semivariance.pyx'], 
+    'ecoglib.estimation.spatial_variance._semivariance',
+    ['ecoglib/estimation/spatial_variance/_semivariance.pyx'],
     include_dirs = dirs, 
     extra_compile_args=['-O3']
     )
