@@ -127,7 +127,10 @@ def make_block_generator(data, block_size, block_for_channels=True):
         # otherwise data is an array, which can can be shaped to iterate multiple blocks at a time
         if data.ndim > 2:
             nblock, nchan, block_size = data.shape
-            blk_data = data.reshape(nblock * nchan, block_size)
+            if block_for_channels:
+                blk_data = data
+            else:
+                blk_data = data.reshape(nblock * nchan, block_size)
         else:
             nchan, npt = data.shape
             nblock = npt // block_size
@@ -137,7 +140,6 @@ def make_block_generator(data, block_size, block_for_channels=True):
                 blk_data = blk_data.reshape(nblock * nchan, block_size)
         block_itr = blk_data
     return block_itr, nchan, nblock, block_size
-
 
 
 def block_psds(data, btime, Fs, max_blocks=-1, **mtm_kw):
