@@ -30,10 +30,11 @@ __all__ = ['bw2nw',
 
 def _parse_mtm_args(N, kw_dict):
     # parse args for some retro signatures
+    nfft = None
     if 'NFFT' in kw_dict:
-        nfft = kw_dict.pop('NFFT', None)
+        nfft = kw_dict.pop('NFFT')
     elif 'nfft' in kw_dict:
-        nfft = kw_dict.pop('nfft', None)
+        nfft = kw_dict.pop('nfft')
     if nfft is None:
         nfft = N
     elif nfft == 'auto':
