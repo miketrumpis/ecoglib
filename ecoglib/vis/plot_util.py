@@ -2,7 +2,6 @@
 Many visualization utilities
 """
 
-import matplotlib as mpl
 import matplotlib.cm
 from matplotlib.gridspec import GridSpec
 from matplotlib.figure import Figure
@@ -15,20 +14,14 @@ import numpy as np
 from copy import copy
 
 from ecoglib.estimation.resampling import Bootstrap
-from .tile_images import quick_tiles, calibration_axes  # need to de-pyplot
-from .colormaps import rgba_field  # need to de-pyplot
-
-import seaborn as sns
-# Fix until MPL or seaborn gets straightened out
-import warnings
-with warnings.catch_warnings():
-    import matplotlib as mpl
-    warnings.simplefilter('ignore', mpl.cbook.MatplotlibDeprecationWarning)
-    sns.reset_orig()
+from .tile_images import quick_tiles, calibration_axes
+from .colormaps import rgba_field
+from . import plotters
 
 
 
-# just use Figure rather than figure
+# a replacement for pyplot.figure that just uses Figure rather than figure:
+# does not create a canvas or deal with figure manager
 def subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True,
              subplot_kw=None, gridspec_kw=None, **fig_kw):
     """
@@ -297,8 +290,8 @@ def filled_interval(
     """
 
     if not ax:
-        import matplotlib.pyplot as pp
-        f = pp.figure()
+        plt = plotters.plt
+        f = plt.figure()
         ax = f.add_subplot(111)
     else:
         f = ax.figure
@@ -317,7 +310,7 @@ def filled_interval(
 
     fill_fun = ax.fill_betweenx if fillx else ax.fill_between
     elw = pfun_kwargs.get('linewidth',
-                          pfun_kwargs.get('lw', mpl.rcParams['lines.linewidth']))
+                          pfun_kwargs.get('lw', plotters.mpl.rcParams['lines.linewidth']))
     fill_fun(
         x, f_hi, f_lo,
         facecolor=color, alpha=alpha, edgecolor=ec, lw=0.8 * elw
@@ -361,7 +354,7 @@ def plot_on_density(
     bs_rgba, _ = rgba_field(b_map, bs_image.T, afield=bs_image.T,
                             clim=(0, 1), alim=(0, 0.1 * np.nanmax(bs_image)))
     # manually mix RGB levels for correct PDF output
-    ax_bg = mpl.colors.colorConverter.to_rgb(mpl.rcParams['axes.facecolor'])
+    ax_bg = plotters.mpl.colors.colorConverter.to_rgb(plotters.mpl.rcParams['axes.facecolor'])
     ax_bg = (np.array(ax_bg) * 255.0)
     alpha = bs_rgba[..., -1:].astype('d') / 255.0
     bs_rgb = (bs_rgba[..., :3].astype('d') * alpha + (1 - alpha) * ax_bg).astype('B')
@@ -376,7 +369,7 @@ def plot_on_density(
         elif 'linewidth' in plot_kws:
             lw = plot_kws['linewidth'] * 0.25
         else:
-            lw = mpl.rcParams['lines.linewidth'] * 0.25
+            lw = plotters.mpl.rcParams['lines.linewidth'] * 0.25
         ax.plot(t, -outline_sigma * b_sigma,
                 ls='-', lw=lw, color=sigma_color)
         ax.plot(t, outline_sigma * b_sigma,
@@ -457,7 +450,7 @@ def light_boxplot(
     fig : matplotlib figure
 
     """
-
+    sns = plotters.sns
     if not np.iterable(samps[0]):
         samps = [samps]
     outlier_kws = copy(plot_kws)
@@ -476,10 +469,10 @@ def light_boxplot(
 
     x_ax = np.arange(len(samps)) * x_sep
     if not ax:
-        import matplotlib.pyplot as pp
+        plt = plotters.plt
         fs = (figheight, len(samps) * x_sep + 0.75) if horiz else \
             (len(samps) * x_sep + 0.75, figheight)
-        f = pp.figure(figsize=fs)
+        f = plt.figure(figsize=fs)
         ax = f.add_subplot(111)
     else:
         f = ax.figure
@@ -615,7 +608,7 @@ def light_boxplot(
             ax.text(
                 x_, y_, 'n={0}'.format(samp_sizes[n]),
                 va='baseline', ha='center', transform=trans,
-                fontsize=float(mpl.rcParams['font.size'])
+                fontsize=float(plotters.mpl.rcParams['font.size'])
             )
     return f
 
@@ -664,8 +657,8 @@ def line_dist(
     """
 
     if ax is None:
-        import matplotlib.pyplot as pp
-        f, ax = pp.subplots()
+        plt = plotters.plt
+        f, ax = plt.subplots()
     else:
         f = ax.figure
 
@@ -676,7 +669,7 @@ def line_dist(
     else:
         x_labels = None
         x_axis = pts_or_names
-    color_cycle = mpl.rcParams["axes.prop_cycle"].by_key()["color"]
+    color_cycle = plotters.mpl.rcParams["axes.prop_cycle"].by_key()["color"]
     if lcolor is None:
         lcolor = color_cycle[0]
     if mark_median:
@@ -712,7 +705,7 @@ def line_dist(
             meds.append(md)
         if mark_mean:
             means.append(np.nanmean(samp))
-    lcolor = mpl.colors.to_rgb(lcolor)
+    lcolor = plotters.mpl.colors.to_rgb(lcolor)
     whisk_lines = LineCollection(whisk_lines, colors=0.5 + 0.5 * np.array(lcolor), linewidths=lw / 2.0)
     box_lines = LineCollection(box_lines, colors=lcolor, linewidths=lw, zorder=10)
     ax.add_collection(box_lines)
@@ -933,8 +926,8 @@ def stacked_epochs_traces(
 
     n = len(chan_samps)
     m_mx = max([len(s) for s in chan_samps])
-    import matplotlib.pyplot as pp
-    fig = pp.figure(figsize=(1.5 * n + 0.5, 6))
+    plt = plotters.plt
+    fig = plt.figure(figsize=(1.5 * n + 0.5, 6))
     ax = fig.add_subplot(111)
 
     all_line_groups = list()
@@ -991,8 +984,8 @@ def plot_samples(
     sample_label
 
     """
-    import matplotlib.pyplot as pp
-    f = pp.figure()
+    plt = plotters.plt
+    f = plt.figure()
     ax = f.add_subplot(111)
     ax.boxplot(samples, widths=.25)
 
@@ -1001,14 +994,14 @@ def plot_samples(
         label = '_nolegend_'
         if n == 0:
             label = 'site score'
-        pp.plot(
+        plt.plot(
             np.ones_like(pts) * (n + 1.26), pts, 'k+', label=label
         )
         if len(baseline):
             if n == 0:
                 label = 'median bkgrnd score'
             bln = baseline[n]
-            pp.plot(
+            plt.plot(
                 [(n + 1) - 0.125 - 0.3, (n + 1) + 0.125 - 0.3], [bln, bln],
                 'g-', lw=2, label=label
             )
@@ -1017,23 +1010,21 @@ def plot_samples(
     if autolim:
         mx = np.diff(np.percentile(samples, [25, 75])) * 5 + \
              np.median(samples)
-        pp.ylim(0, mx)
-    pp.legend()
-    pp.xticks(np.arange(1, len(tests) + 1), tests, rotation=90, fontsize=8)
+        plt.ylim(0, mx)
+    plt.legend()
+    plt.xticks(np.arange(1, len(tests) + 1), tests, rotation=90, fontsize=8)
     f.subplots_adjust(bottom=.35, top=.9)
     ax.set_title(ttl)
     ax.set_ylabel(sample_label)
     return f
 
 
-def blended_image(
-        fields, colors, afields=None, mode='darken',
-        clip_min=2, clip_max=98
-):
+def blended_image(fields, colors, afields=None, mode='darken', clip_min=2, clip_max=98):
+    sns = plotters.sns
     colors = sns.color_palette(colors, n_colors=len(fields))
     mode = mode.lower()
     blend_to = 'white' if mode == 'darken' else 'black'
-    N = mpl.cm.jet.N
+    N = plotters.mpl.cm.jet.N
     cmaps = [sns.blend_palette([blend_to, c], n_colors=N, as_cmap=True)
              for c in colors]
 
@@ -1086,7 +1077,7 @@ def grid_lims(ax, axis='both'):
     m = ax.transData.get_matrix()
     dx = m[0, 0];
     dy = m[1, 1]
-    lw = mpl.rcParams['grid.linewidth']
+    lw = plotters.mpl.rcParams['grid.linewidth']
     # don't know how to do log-scale yet
     if axis in ('both', 'x') and ax.xaxis.get_scale() == 'linear':
         lx = lw / dx
@@ -1103,9 +1094,9 @@ def waterfall(x, y, z, color='winter', rev_y=False, ax=None):
     """ Plot rows z(x) in z, staggered by levels in y """
 
     if ax is None:
-        import matplotlib.pyplot as pp
+        plt = plotters.plt
         from mpl_toolkits.mplot3d import Axes3D
-        fig = pp.figure()
+        fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1, projection='3d')
     else:
         fig = ax.figure
@@ -1114,7 +1105,7 @@ def waterfall(x, y, z, color='winter', rev_y=False, ax=None):
     for zx in z:
         lines.append(np.c_[x, zx])
 
-    colors = mpl.cm.cmap_d[color](np.linspace(0, 1, len(y)))
+    colors = plotters.mpl.cm.cmap_d[color](np.linspace(0, 1, len(y)))
     lines = LineCollection(
         lines, linewidth=2, colors=colors, zorder=10
     )
@@ -1184,9 +1175,9 @@ def subplot2grid(fig, shape, loc, rowspan=1, colspan=1, **kwargs):
 
 def desaturated_map(values, desat, colormap, drange=(), labels=(), title='', fig=None):
     if not fig:
-        import matplotlib.pyplot as pp
+        plt = plotters.plt
         # set up figure then
-        fig = pp.figure(figsize=(5, 3.5))
+        fig = plt.figure(figsize=(5, 3.5))
 
     if not fig.axes:
         arr_ax = subplot2grid((1, 100), (0, 0), colspan=80)
@@ -1200,7 +1191,7 @@ def desaturated_map(values, desat, colormap, drange=(), labels=(), title='', fig
         ## cbar_ax.images = []
         ## fig.texts = []
 
-    colors = colormap(mpl.colors.Normalize(*drange)(values), bytes=True)
+    colors = colormap(plotters.mpl.colors.Normalize(*drange)(values), bytes=True)
     alpha = np.round(desat * 255).astype(colors.dtype)
     colors[..., -1] = alpha
 
@@ -1234,11 +1225,11 @@ def desaturated_map(values, desat, colormap, drange=(), labels=(), title='', fig
 def colorbar_in_axes(ax, cmap, clim, **kwargs):
     # TODO fill in this method
     if ax is None:
-        import matplotlib.pyplot as pp
-        f, ax = pp.subplots(figsize=(5, 1))
+        plt = plotters.plt
+        f, ax = plt.subplots(figsize=(5, 1))
     else:
         f = ax.figure
-    cb = mpl.colorbar.ColorbarBase(ax, cmap='gray', orientation='horizontal')
+    cb = plotters.mpl.colorbar.ColorbarBase(ax, cmap='gray', orientation='horizontal')
     cb.set_ticks([0, 1])
     cb.set_ticklabels(['neg', 'pos'])
     cb.set_label('Normalized Amplitude')

@@ -10,14 +10,7 @@ from ecoglib.estimation.spatial_variance import covar_to_iqr_lines, matern_semiv
     plot_electrode_graph
 from .signal_tools import bad_channel_mask, band_power, block_psds, logged_estimators, safe_avg_power, safe_corrcoef,\
     spatial_autocovariance
-
-import seaborn as sns
-# Fix until MPL or seaborn gets straightened out
-import warnings
-with warnings.catch_warnings():
-    import matplotlib as mpl
-    warnings.simplefilter('ignore', mpl.cbook.MatplotlibDeprecationWarning)
-    sns.reset_orig()
+from ..vis import plotters
 
 
 __all__ = ['plot_psds', 'plot_electrode_graph', 'plot_avg_psds', 'plot_centered_rxx', 'plot_channel_mask',
@@ -60,56 +53,56 @@ def plot_psds(f, gf, df, fc, title, ylims=(), root_hz=True, units='V', iqr_thres
     if not iqr_thresh:
         iqr_thresh = get_default_args(fenced_out)['thresh']
 
-    import matplotlib.pyplot as pp
-    fig = pp.figure()
+    plt = plotters.plt
+    fig = plt.figure()
     fx = (f > 1) & (f < fc)
     # apply a wide-tolerance mask -- want to avoid plotting any
     # channels with zero (or negligable) power
     s_pwr = band_power(f, df, fc=fc, root_hz=root_hz)
     m = bad_channel_mask(np.log(s_pwr), iqr=iqr_thresh)
     df = df[m]
-    pp.semilogy(
+    plt.semilogy(
         f[fx], df[0, fx], color=psd_colors[0], label='sig channels'
     )
-    pp.semilogy(
+    plt.semilogy(
         f[fx], df[1:, fx].T, color=psd_colors[0], label='_nolegend_'
     )
     df_band_pwr = (df[:, fx] ** 2).mean()
     avg_d = np.sqrt(df_band_pwr * f[-1])
-    pp.axhline(
+    plt.axhline(
         y=np.sqrt(df_band_pwr), color='chartreuse', linestyle='--',
         linewidth=4, label='sig avg RMS/$\sqrt{Hz}$'
     )
 
     if gf is not None and len(gf):
-        pp.semilogy(f[fx], gf[0, fx], color=psd_colors[1], label='ground channels')
+        plt.semilogy(f[fx], gf[0, fx], color=psd_colors[1], label='ground channels')
         if len(gf):
-            pp.semilogy(f[fx], gf[1:, fx].T, color=psd_colors[1], label='_nolegend_')
+            plt.semilogy(f[fx], gf[1:, fx].T, color=psd_colors[1], label='_nolegend_')
         gf_band_pwr = (gf[:, fx] ** 2).mean()
         avg_g = np.sqrt(gf_band_pwr * f[-1])
-        pp.axhline(
+        plt.axhline(
             y=np.sqrt(gf_band_pwr), color='k', linestyle='--', linewidth=4,
             label='gnd avg RMS/$\sqrt{Hz}$'
         )
 
-    pp.legend(loc='upper right')
+    plt.legend(loc='upper right')
     units = nice_unit_text(units).strip('$')
     if root_hz:
         units_label = '$' + units + '/\sqrt{Hz}$'
     else:
         units_label = '$%s^{2}/Hz$' % units
-    pp.ylabel(units_label);
-    pp.xlabel('Hz (half-BW %d Hz)' % int(f[-1]))
+    plt.ylabel(units_label);
+    plt.xlabel('Hz (half-BW %d Hz)' % int(f[-1]))
     title = title + '\nSig RMS %1.2e' % avg_d
     if gf is not None:
         title = title + '; Gnd RMS %1.2e' % avg_g
-    pp.title(title)
-    pp.grid(which='both')
+    plt.title(title)
+    plt.grid(which='both')
     if ylims:
-        pp.ylim(ylims)
+        plt.ylim(ylims)
         offscreen = df[:, fx].mean(axis=1) < ylims[0]
         if np.any(offscreen):
-            pp.gca().annotate(
+            plt.gca().annotate(
                 '%d chans off-screen' % offscreen.sum(),
                 (200, ylims[0]), xycoords='data',
                 xytext=(50, 3 * ylims[0]), textcoords='data',
@@ -149,7 +142,7 @@ def plot_mean_psd(f, gf, df, fc, title, ylims=(), root_hz=True, units='V', iqr_t
 
     """
 
-    import matplotlib.pyplot as pp
+    plt = plotters.plt
     # compute outliers based on sum power
     if not iqr_thresh:
         iqr_thresh = get_default_args(fenced_out)['thresh']
@@ -169,7 +162,7 @@ def plot_mean_psd(f, gf, df, fc, title, ylims=(), root_hz=True, units='V', iqr_t
     avg_d = np.sqrt(s_pwr[s_pwr_mask].mean())
 
     fig, ln = filled_interval(
-        pp.semilogy, f, s_psd_mn, (s_psd_lo, s_psd_hi), psd_colors[0]
+        plt.semilogy, f, s_psd_mn, (s_psd_lo, s_psd_hi), psd_colors[0]
     )
 
     sig_baseline = s_psd_mn[f > f.max() / 2].mean()
@@ -177,14 +170,14 @@ def plot_mean_psd(f, gf, df, fc, title, ylims=(), root_hz=True, units='V', iqr_t
     df_o = None
     if np.any(~s_pwr_mask):
         df_o = np.exp(df[~s_pwr_mask])
-        o_lines = pp.semilogy(f, df_o.T, '#BD6734', lw=0.5)
+        o_lines = plt.semilogy(f, df_o.T, '#BD6734', lw=0.5)
         ln.append(o_lines[0])
         legends.append('outlier signal PSDs')
         # let's label these lines
         chan_txt = 'outlier sig chans: ' + \
                    ', '.join([str(c) for c in (~s_pwr_mask).nonzero()[0]])
         y = 0.5 * (np.ceil(np.log(s_psd_mn.max())) + np.log(sig_baseline))
-        pp.text(200, np.exp(y), chan_txt, fontsize=10, va='baseline')
+        plt.text(200, np.exp(y), chan_txt, fontsize=10, va='baseline')
 
     if gf is not None and len(gf):
         g_pwr = band_power(f, gf, fc=fc, root_hz=root_hz)
@@ -203,13 +196,13 @@ def plot_mean_psd(f, gf, df, fc, title, ylims=(), root_hz=True, units='V', iqr_t
         avg_g = np.sqrt(g_pwr[g_pwr_mask].mean())
 
         fig, g_ln = filled_interval(
-            pp.semilogy, f, g_psd_mn, (g_psd_lo, g_psd_hi), psd_colors[1],
+            plt.semilogy, f, g_psd_mn, (g_psd_lo, g_psd_hi), psd_colors[1],
             ax=fig.axes[0]
         )
         ln.extend(g_ln)
         legends.append(r'mean grounded input $\pm \sigma$')
         if np.any(~g_pwr_mask):
-            o_lines = pp.semilogy(
+            o_lines = plt.semilogy(
                 f, np.exp(gf[~g_pwr_mask]).T, '#06A684', lw=0.5
             )
             ln.append(o_lines[0])
@@ -218,30 +211,30 @@ def plot_mean_psd(f, gf, df, fc, title, ylims=(), root_hz=True, units='V', iqr_t
                        ', '.join([str(c) for c in (~g_pwr_mask).nonzero()[0]])
             y = sig_baseline ** 0.33 * g_psd_mn.mean() ** 0.67
 
-            pp.text(200, y, chan_txt, fontsize=10, va='baseline')
+            plt.text(200, y, chan_txt, fontsize=10, va='baseline')
 
-    pp.legend(ln, legends, loc='upper right', fontsize=11)
+    plt.legend(ln, legends, loc='upper right', fontsize=11)
     units = nice_unit_text(units).strip('$')
     if root_hz:
         units_label = '$' + units + '/\sqrt{Hz}$'
     else:
         units_label = '$%s^{2}/Hz$' % units
-    pp.ylabel(units_label);
-    pp.xlabel('Hz (half-BW %d Hz)' % int(f[-1]))
+    plt.ylabel(units_label);
+    plt.xlabel('Hz (half-BW %d Hz)' % int(f[-1]))
     if gf is not None and len(gf):
         title = title + \
                 '\nGnd RMS %1.2e; Sig RMS %1.2e (to %d Hz)' % (avg_g, avg_d, fc)
     else:
         title = title + \
                 '\nSig RMS %1.2e (to %d Hz)' % (avg_d, fc)
-    pp.title(title)
-    pp.grid(which='both')
+    plt.title(title)
+    plt.grid(which='both')
     if ylims:
-        pp.ylim(ylims)
+        plt.ylim(ylims)
         if df_o is not None:
             offscreen = df_o.mean(axis=1) < ylims[0]
             if np.any(offscreen):
-                pp.gca().annotate(
+                plt.gca().annotate(
                     '%d chans off-screen' % offscreen.sum(),
                     (200, ylims[0]), xycoords='data',
                     xytext=(50, 3 * ylims[0]), textcoords='data',
@@ -283,7 +276,8 @@ def plot_avg_psds(ecog_chans, ground_chans, title, bsize_sec=2, Fs=1, iqr_thresh
 
 
 def plot_centered_rxx(data, chan_map, label, cmap='bwr', normed=True, clim=None):
-    import matplotlib.pyplot as pp
+    plt = plotters.plt
+    sns = plotters.sns
     from seaborn import JointGrid
 
     cxx = safe_corrcoef(data, 2000, normed=normed)
@@ -326,8 +320,8 @@ def plot_centered_rxx(data, chan_map, label, cmap='bwr', normed=True, clim=None)
         ax = jgrid.ax_marg_x
         ax.spines['left'].set_visible(True)
         ax.yaxis.tick_left()
-        pp.setp(ax.yaxis.get_majorticklines(), visible=True)
-        pp.setp(ax.get_yticklabels(), visible=True)
+        plt.setp(ax.yaxis.get_majorticklines(), visible=True)
+        plt.setp(ax.get_yticklabels(), visible=True)
         # arrange as samples over all x-distances
         rxx_mx = np.reshape(centered_rxx, (-1, x))
 
@@ -350,8 +344,8 @@ def plot_centered_rxx(data, chan_map, label, cmap='bwr', normed=True, clim=None)
         ax = jgrid.ax_marg_y
         ax.spines['top'].set_visible(True)
         ax.xaxis.tick_top()
-        pp.setp(ax.xaxis.get_majorticklines(), visible=True)
-        pp.setp(ax.get_xticklabels(), visible=True)
+        plt.setp(ax.xaxis.get_majorticklines(), visible=True)
+        plt.setp(ax.get_xticklabels(), visible=True)
         rxx_my = np.reshape(np.rollaxis(centered_rxx, 2).copy(), (-1, y))
         vals = list()
         for c in rxx_my.T:
@@ -367,7 +361,7 @@ def plot_centered_rxx(data, chan_map, label, cmap='bwr', normed=True, clim=None)
             ax=ax, lw=2, alpha=.6, fillx=True
         )
         ax.set_xticks(np.linspace(-1, 1, 6))
-        pp.setp(ax.xaxis.get_ticklabels(), rotation=-90)
+        plt.setp(ax.xaxis.get_ticklabels(), rotation=-90)
         ax.set_xlim(clim)
 
         jgrid.fig.subplots_adjust(left=0.1, bottom=.1)
@@ -379,7 +373,7 @@ def plot_centered_rxx(data, chan_map, label, cmap='bwr', normed=True, clim=None)
 
 
 def spatial_variance(data, chan_map, label, normed=False):
-    import matplotlib.pyplot as pp
+    plt = plotters.plt
     from seaborn import despine, xkcd_rgb
 
     cxx = safe_corrcoef(data, 2000, normed=normed, semivar=True)
@@ -396,7 +390,7 @@ def spatial_variance(data, chan_map, label, normed=False):
     else:
         pitch_x = pitch_y = chan_map.pitch
     binsize = np.ceil(10 * (pitch_x ** 2 + pitch_y ** 2) ** 0.5) / 10.0
-    clrs = pp.rcParams['axes.prop_cycle'].by_key()['color']
+    clrs = plt.rcParams['axes.prop_cycle'].by_key()['color']
     pts, lines = covar_to_iqr_lines(dist, cxx_pairs, binsize=binsize, linewidths=1, colors=clrs[0])
     xb, yb = pts
     # set a fairly wide range for nugget and sill
@@ -407,7 +401,7 @@ def spatial_variance(data, chan_map, label, normed=False):
         free=('theta', 'nu', 'nugget', 'sill'), dist_limit=0.67,
         wls_mode='irls', fit_mean=True, fraction_nugget=False, bounds=bounds)
 
-    f, ax = pp.subplots(figsize=(8, 5))
+    f, ax = plt.subplots(figsize=(8, 5))
     ax.scatter(dist, cxx_pairs, s=5, color='gray', alpha=0.2, rasterized=True, label='Pairwise semivariance')
     ax.plot(*pts, color=clrs[0], ls='--', marker='o', ms=8, label='Binned semivariance')
     ax.add_collection(lines)
@@ -448,7 +442,7 @@ def scatter_correlations(data, chan_map, mask, title, highlight='rows', pitch=1.
     # 4) are neighbors on a row (highlight='rownabes')
     # 5) are neighbors on a column (highlight='colnabes')
     # 6) any neighbor (4-5) (highlight='allnabes')
-    import matplotlib.pyplot as pp
+    plt = plotters.plt
 
     # data[g_chans] = np.nan
     cxx = safe_corrcoef(data[mask], 2000)
@@ -462,12 +456,12 @@ def scatter_correlations(data, chan_map, mask, title, highlight='rows', pitch=1.
     chan_combs = chan_map.subset(mask).site_combinations
     dists = chan_combs.dist
 
-    fig = pp.figure()
+    fig = plt.figure()
 
     panels = highlight.split(',')
     if panels[0] == highlight:
-        pp.subplot(111)
-        pp.scatter(
+        plt.subplot(111)
+        plt.scatter(
             dists, cxx_pairs, 9, label='_nolegend_', edgecolors='none', alpha=0.25, rasterized=True
         )
         fig.tight_layout()
@@ -488,8 +482,8 @@ def scatter_correlations(data, chan_map, mask, title, highlight='rows', pitch=1.
     dists = chan_combs.dist
 
     for n, highlight in enumerate(panels):
-        pp.subplot(len(panels), 1, n + 1)
-        pp.scatter(
+        plt.subplot(len(panels), 1, n + 1)
+        plt.scatter(
             dists, cxx_pairs, 9, edgecolor='none', label='_nolegend_', alpha=0.25, rasterized=True
         )
         if highlight in ('rows', 'rows+cols'):
@@ -500,7 +494,7 @@ def scatter_correlations(data, chan_map, mask, title, highlight='rows', pitch=1.
                 subset = chan_map.subset(row)
                 subcxx = cxx[row][:, row][np.triu_indices(len(row), k=1)]
                 subdist = subset.site_combinations.dist
-                c = pp.scatter(
+                c = plt.scatter(
                     subdist, subcxx, 20, colors['rows'],
                     edgecolor='white', label='_nolegend_'
                 )
@@ -514,7 +508,7 @@ def scatter_correlations(data, chan_map, mask, title, highlight='rows', pitch=1.
                 subset = chan_map.subset(col)
                 subcxx = cxx[col][:, col][np.triu_indices(len(col), k=1)]
                 subdist = subset.site_combinations
-                c = pp.scatter(
+                c = plt.scatter(
                     subdist, subcxx, 20, colors['cols'],
                     edgecolor='white', label='_nolegend_'
                 )
@@ -535,7 +529,7 @@ def scatter_correlations(data, chan_map, mask, title, highlight='rows', pitch=1.
                     )[0][0]
                     row_cxx.append(cxx_pairs[ii])
                     row_dist.append(dists[ii])
-            c = pp.scatter(
+            c = plt.scatter(
                 row_dist, row_cxx, 20, colors['rows'],
                 edgecolor='white', label='row neighbors'
             )
@@ -553,13 +547,13 @@ def scatter_correlations(data, chan_map, mask, title, highlight='rows', pitch=1.
                     )[0][0]
                     col_cxx.append(cxx_pairs[ii])
                     col_dist.append(dists[ii])
-            c = pp.scatter(
+            c = plt.scatter(
                 col_dist, col_cxx, 20, colors['cols'],
                 edgecolor='white', label='col neighbors'
             )
-        pp.legend(loc='best')
+        plt.legend(loc='best')
 
-    ax = pp.gca()
+    ax = plt.gca()
     ax.set_xlabel('Distance (mm)')
     ax.set_ylabel('Correlation coef.')
     fig.tight_layout()
@@ -570,7 +564,7 @@ def scatter_correlations(data, chan_map, mask, title, highlight='rows', pitch=1.
 
 
 def plot_mux_columns(data, title, color_lims=True, units='uV'):
-    import matplotlib.pyplot as pp
+    plt = plotters.plt
 
     # data[g_chans] = np.nan
     rms = safe_avg_power(data, 2000)
@@ -584,13 +578,13 @@ def plot_mux_columns(data, title, color_lims=True, units='uV'):
         clim = (np.nanmin(rms), np.nanmax(rms))
 
     rms = rms.reshape(-1, 15)
-    fig = pp.figure()
+    fig = plt.figure()
     cm = nancmap('hot', nanc='dodgerblue')
-    pp.imshow(rms.T, origin='upper', cmap=cm, clim=clim)
-    cbar = pp.colorbar()
+    plt.imshow(rms.T, origin='upper', cmap=cm, clim=clim)
+    cbar = plt.colorbar()
     cbar.set_label(nice_unit_text(units) + ' RMS')
-    pp.title(title)
-    pp.xlabel('data column')
+    plt.title(title)
+    plt.xlabel('data column')
     ax = fig.axes[0]
     ax.set_aspect('auto')
     ax.set_xticks(range(rms.shape[0]))
@@ -598,7 +592,7 @@ def plot_mux_columns(data, title, color_lims=True, units='uV'):
 
 
 def plot_rms_array(data, chan_map, title, color_lims=True, units='uV'):
-    import matplotlib.pyplot as pp
+    plt = plotters.plt
     rms = safe_avg_power(data, 2000)
     if color_lims:
         vals = rms[np.isfinite(rms)]
@@ -613,35 +607,35 @@ def plot_rms_array(data, chan_map, title, color_lims=True, units='uV'):
     # np.put(rms_arr, chan_map, rms)
     cm = nancmap('hot', nanc='dodgerblue')
 
-    f = pp.figure()
-    pp.imshow(rms_arr, origin='upper', cmap=cm, clim=clim)
-    cbar = pp.colorbar()
+    f = plt.figure()
+    plt.imshow(rms_arr, origin='upper', cmap=cm, clim=clim)
+    cbar = plt.colorbar()
     cbar.set_label(nice_unit_text(units) + ' RMS')
 
-    pp.title(title)
+    plt.title(title)
     return f
 
 
 def plot_site_corr(data, title):
-    import matplotlib.pyplot as pp
+    plt = plotters.plt
     # data[g_chans] = np.nan
     cxx = safe_corrcoef(data, 2000)
     n = cxx.shape[0]
     cxx.flat[0:n * n:n + 1] = np.nan
 
-    cm = pp.cm.jet
+    cm = plt.cm.jet
 
-    f = pp.figure()
-    pp.imshow(cxx, cmap=cm)
-    cbar = pp.colorbar()
+    f = plt.figure()
+    plt.imshow(cxx, cmap=cm)
+    cbar = plt.colorbar()
     cbar.set_label('avg corr coef')
 
-    pp.title(title)
+    plt.title(title)
     return f
 
 
 def plot_site_corr_new(data, chan_map, title, bsize=2000, cmap=None, normed=True, stagger_x=False, stagger_y=False):
-    import matplotlib.pyplot as pp
+    plt = plotters.plt
     # data[g_chans] = np.nan
     cxx = safe_corrcoef(data, bsize, normed=normed)
     n = cxx.shape[0]
@@ -652,13 +646,13 @@ def plot_site_corr_new(data, chan_map, title, bsize=2000, cmap=None, normed=True
         import ecoglib.vis.colormaps as cmaps
         cmap = cmaps.diverging_cm(clim[0], clim[1], ((0, 0, 0), (1, 0, 0)))
 
-    f, axs = pp.subplots(1, 2, figsize=(12, 5))
+    f, axs = plt.subplots(1, 2, figsize=(12, 5))
 
     corr_ax = axs[0]
     graph_ax = axs[1]
 
-    im = corr_ax.imshow(cxx, cmap=cmap, norm=pp.Normalize(*clim))
-    cbar = pp.colorbar(im, ax=corr_ax, use_gridspec=True)
+    im = corr_ax.imshow(cxx, cmap=cmap, norm=plt.Normalize(*clim))
+    cbar = plt.colorbar(im, ax=corr_ax, use_gridspec=True)
     cbar.set_label('avg corr coef')
     corr_ax.axis('image')
 
@@ -670,12 +664,13 @@ def plot_site_corr_new(data, chan_map, title, bsize=2000, cmap=None, normed=True
 
 
 def plot_channel_mask(data, chan_map, title, units='V', bsize=2000, quantiles=(50, 80), iqr=3):
-    import matplotlib.pyplot as pp
+    plt = plotters.plt
+    sns = plotters.sns
     from seaborn import violinplot, xkcd_rgb
     rms = safe_avg_power(data, bsize=bsize, iqr_thresh=7)
     rms = np.log(rms)
     mask = bad_channel_mask(rms, quantiles=quantiles, iqr=iqr)
-    f = pp.figure(figsize=(7, 4))
+    f = plt.figure(figsize=(7, 4))
     ax = f.add_subplot(121)
     with sns.axes_style('whitegrid'):
         violinplot(
@@ -694,13 +689,13 @@ def plot_channel_mask(data, chan_map, title, units='V', bsize=2000, quantiles=(5
     site_mask = np.ones(chan_map.geometry) * np.nan
     site_mask.flat[chan_map.subset(mask.nonzero()[0])] = 1
     site_mask.flat[chan_map.subset((~mask).nonzero()[0])] = 0
-    N = pp.cm.binary.N
+    N = plt.cm.binary.N
     im = ax.imshow(
         site_mask,
-        cmap=pp.cm.winter, norm=pp.cm.colors.BoundaryNorm([0, .5, 1], N),
+        cmap=plt.cm.winter, norm=plt.cm.colors.BoundaryNorm([0, .5, 1], N),
         alpha=0.5, origin='upper'
     )
-    cbar = pp.colorbar(im)
+    cbar = plt.colorbar(im)
     cbar.set_ticks([0, 1])
     cbar.set_ticklabels(('rejected', 'accepted'))
     ax.axis('image')
@@ -710,7 +705,7 @@ def plot_channel_mask(data, chan_map, title, units='V', bsize=2000, quantiles=(5
 
 
 def sinusoid_gain(data, ref, chan_map, log=True, **im_kws):
-    import matplotlib.pyplot as pp
+    plt = plotters.plt
     ## d_rms = data.std(1)
     ## r_rms = ref.std()
     ## gain = d_rms / r_rms
@@ -718,8 +713,8 @@ def sinusoid_gain(data, ref, chan_map, log=True, **im_kws):
     ref = ref - ref.mean()
     gain = np.dot(data, ref) / np.dot(ref, ref)
 
-    f = pp.figure(figsize=(7.5, 4))
-    ax = pp.subplot2grid((1, 100), (0, 0), colspan=25)
+    f = plt.figure(figsize=(7.5, 4))
+    ax = plt.subplot2grid((1, 100), (0, 0), colspan=25)
 
     light_boxplot(
         np.log10(gain) if log else gain, names=[''],
@@ -727,7 +722,7 @@ def sinusoid_gain(data, ref, chan_map, log=True, **im_kws):
     )
     ax.set_ylabel('log10 gain' if log else 'gain')
 
-    ax = pp.subplot2grid((1, 100), (0, 25), colspan=75)
+    ax = plt.subplot2grid((1, 100), (0, 25), colspan=75)
     _, cbar = chan_map.image(gain, ax=ax, **im_kws)
     cbar.set_label('array gain')
     return f

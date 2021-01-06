@@ -6,29 +6,17 @@ import numpy as np
 import matplotlib.colors as colors
 import matplotlib.cm as cm
 from itertools import cycle
+from . import plotters
 
-import seaborn as sns
-# Fix until MPL or seaborn gets straightened out
-import warnings
-with warnings.catch_warnings():
-    import matplotlib as mpl
-    warnings.simplefilter('ignore', mpl.cbook.MatplotlibDeprecationWarning)
-    sns.reset_orig()
-
-
-_cmap_db = dict()
-
-# put these in the namespace so they can be imported elsewhere
-# without resetting the rcparams
-color_palette = sns.color_palette
-blend_palette = sns.blend_palette
-cubehelix_palette = sns.cubehelix_palette
 
 __all__ = ['nancmap',
            'diverging_cm',
            'rgba_field',
            'composited_color_palette',
            'GroupPlotColors']
+
+
+_cmap_db = dict()
 
 
 def nancmap(cmap_name, nanc=(1, 1, 1, 1), underc=None, overc=None, N=None):
@@ -57,8 +45,8 @@ def nancmap(cmap_name, nanc=(1, 1, 1, 1), underc=None, overc=None, N=None):
 
     """
     if not N:
-        from matplotlib import rcParams
-        N = rcParams['image.lut']
+        mpl = plotters.mpl
+        N = mpl.rcParams['image.lut']
 
     cmap = cm._generate_cmap(cmap_name, N)
     if isinstance(nanc, str):
@@ -99,6 +87,7 @@ def z_cmap(cmap='bwr', N=None, z_max=4):
 
     """
     if not N:
+        mpl = plotters.mpl
         N = mpl.rcParams['image.lut']
     if not isinstance(cmap, colors.Colormap):
         cmap = cm.get_cmap(cmap)
@@ -280,8 +269,9 @@ def rgba_field(cmap, sfield, afield=None, clim=(), alim=()):
 
 def composited_color_palette(alpha=1.0, **pargs):
     """Create a white-mixed color palette from a Seaborn palette.
-    """
 
+    """
+    sns = plotters.sns
     try:
         colors = sns.color_palette(**pargs)
     except TypeError:

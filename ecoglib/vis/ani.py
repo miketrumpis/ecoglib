@@ -8,14 +8,15 @@ import os
 import subprocess
 from tqdm import trange
 import warnings
+from . import plotters
+
 
 def _setup_animated_frames(frames, timer='ms', time=(), static_title='', axis_toggle='on',
                            figsize=None, clim='auto', colorbar=False, cbar_label='',
                            cbar_orientation='vertical', figure_canvas=True,
                            **imshow_kw):
     if figure_canvas:
-        from matplotlib.pyplot import figure
-        f = figure(figsize=figsize)
+        f = plotters.plt.figure(figsize=figsize)
     else:
         f = Figure(figsize=figsize)
     # do some tidying of imshow arguments
@@ -53,6 +54,7 @@ def _setup_animated_frames(frames, timer='ms', time=(), static_title='', axis_to
 
     return f, func
 
+
 def write_frames(
         frames, fname, fps=5, quicktime=False, qtdpi=300,
         title='Array movie', **anim_kwargs
@@ -65,13 +67,14 @@ def write_frames(
         )
 
 def animate_frames(frames, fps=5, blit=False, notebook=False, **anim_kwargs):
+
     f, func = _setup_animated_frames(frames, figure_canvas=True, **anim_kwargs)
     anim = _animation.FuncAnimation(
         f, func, frames=len(frames), interval=1000.0 / fps, blit=blit
         )
     if notebook:
         # return HTML(ani.to_html5_video())
-        import matplotlib.pyplot as plt
+        plt = plotters.plt
         plt.close(anim._fig)
         return HTML(anim.to_jshtml())
     else:
@@ -108,7 +111,8 @@ def h264_encode_files(in_pattern, out, fps, quicktime=False):
     args = args + extra_args + [out]
 
     r = subprocess.call(args)
-    
+
+
 def write_anim(
         fname, fig, func, n_frame,
         title='Array Movie', fps=5, quicktime=False, qtdpi=300, progress=False
@@ -154,8 +158,7 @@ def dynamic_frames_and_series(
     # returns a function that can be used to step through
     # figure frames
     if pyplot:
-        import matplotlib.pyplot as pp
-        fig_fn = pp.figure
+        fig_fn = plotters.plt.figure
     else:
         fig_fn = Figure
         
@@ -254,7 +257,7 @@ def animate_frames_and_series(
         )
     if notebook:
         # return HTML(ani.to_html5_video())
-        import matplotlib.pyplot as plt
+        plt = plotters.plt
         plt.close(ani._fig)
         return HTML(ani.to_jshtml())
     else:

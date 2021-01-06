@@ -6,6 +6,7 @@ from networkx import Graph, draw
 from ecoglib.vis.colormaps import diverging_cm
 from .variogram import binned_variance
 from .kernels import matern_correlation, matern_spectrum
+from ...vis import plotters
 
 
 __all__ = ['covar_to_lines', 'covar_to_iqr_lines', 'make_matern_label', 'matern_demo', 'plot_electrode_graph']
@@ -81,18 +82,18 @@ def matern_demo(
         nus=[0.2, 0.5, 1, 2], thetas=[1, 2, 3, 4], spectrum=False, paired=False,
         reparam=False, context='notebook', figsize=None, semivar=False
 ):
-    import matplotlib.pyplot as pp
-    import seaborn as sns
+    plt = plotters.plt
+    sns = plotters.sns
     # sns.set_style('dark')
     # sns.set_palette('muted')
     xx = np.linspace(0, 2, 200) if spectrum else np.linspace(0.001, 5, 200)
     sns_st = {u'font.sans-serif': [u'Helvetica', u'Arial']}
     with sns.plotting_context(context), sns.axes_style('dark', rc=sns_st), sns.color_palette('muted'):
         if paired:
-            f, ax = pp.subplots()
+            f, ax = plt.subplots()
             axs = [ax]
         else:
-            f, axs = pp.subplots(2, 1, sharex=True, sharey=True, figsize=figsize)
+            f, axs = plt.subplots(2, 1, sharex=True, sharey=True, figsize=figsize)
         ls = itertools.cycle(('-', '--', '-.', ':'))
         if paired:
             for nu, theta in zip(nus, thetas):
@@ -178,13 +179,13 @@ def matern_demo(
 
 def plot_electrode_graph(graph, chan_map, scale='auto', edge_colors=('black', 'red'), ax=None, stagger_x=False,
                          stagger_y=False ):
-    import matplotlib.pyplot as pp
     if not ax:
+        plt = plotters.plt
         figsize = np.array(chan_map.geometry)
         if scale == 'auto':
             scale = 8.0 / max(figsize)
         figsize = tuple(scale * figsize)
-        f = pp.figure(figsize=figsize)
+        f = plt.figure(figsize=figsize)
         ax = f.add_subplot(111)
     else:
         f = ax.figure
@@ -213,6 +214,6 @@ def plot_electrode_graph(graph, chan_map, scale='auto', edge_colors=('black', 'r
     ax.axis('equal')
     ax.set_ylim(chan_map.geometry[0] - 0.5, -0.5)
     ax.set_xlim(-0.5, chan_map.geometry[1] - 0.5)
-    cbar = pp.colorbar(ax.collections[0], ax=ax, use_gridspec=True)
+    cbar = f.colorbar(ax.collections[0], ax=ax, use_gridspec=True)
     cbar.set_label('graph avg rank')
     return f

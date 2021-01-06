@@ -3,7 +3,7 @@ import numpy as np
 
 from ecogdata.parallel.split_methods import multi_taper_psd
 from ecogdata.datasource import ElectrodeDataSource
-from ecogdata.filt.blocks import BlockedSignal, BlockSignalBase
+from ecogdata.filt.blocks import BlockSignalBase
 from ecogdata.filt.time import ar_whiten_blocks
 from ecogdata.util import fenced_out, nextpow2
 from ecogdata.parallel.mproc import multiprocessing as mp

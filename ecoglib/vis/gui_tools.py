@@ -14,6 +14,8 @@ from ecogdata.util import mkdir_p
 import ecoglib.vis.traitsui_bridge as tb
 import ecoglib.vis.plot_modules as pm
 from .colormaps import diverging_cm
+from . import plotters
+
 
 __all__ = ['SavesFigure', 'ArrayMap', 'EvokedPlot', 'current_screen']
 
@@ -182,15 +184,10 @@ class SavesFigure(HasTraits):
         except ValueError:
             # try to evaluate the string as a function in colormaps module
             try:
-                code = 'cmaps.' + name
+                code = 'plotters.sns.' + name
                 colors = eval(code)
             except:
-                # try the same within seaborn
-                try:
-                    code = 'cmaps.sns.' + name
-                    colors = eval(code)
-                except:
-                    return
+                return
         if z_map:
             colors = diverging_cm(self.c_lo, self.c_hi, cmap=colors, compression=p)
         for ax in self.fig.axes:

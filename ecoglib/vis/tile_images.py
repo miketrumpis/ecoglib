@@ -5,8 +5,9 @@ from matplotlib.patches import Polygon
 
 from ecogdata.channel_map import ChannelMap
 from ecogdata.util import ndim_prctile
-
 from ecogdata.devices import units
+
+from . import plotters
 
 
 def _build_map(p, geometry, col_major):
@@ -76,12 +77,12 @@ def tiled_axes(geo, p, tilesize=(1, 1), col_major=True, title='', calib='none'):
         else:
             figsize[1] += 1
             subplots_bottom = 1.0 / figsize[1]
-
-    import matplotlib.pyplot as pp
-    fig, axs = pp.subplots(
+    
+    plt = plotters.plt
+    fig, axs = plt.subplots(
         *geo, figsize=figsize, sharex=True, sharey=True, squeeze=False
     )
-    ## fig = pp.figure(figsize=figsize)
+    ## fig = plt.figure(figsize=figsize)
     fig.subplots_adjust(
         left=subplots_left, right=subplots_right,
         bottom=subplots_bottom, top=subplots_top
@@ -92,7 +93,7 @@ def tiled_axes(geo, p, tilesize=(1, 1), col_major=True, title='', calib='none'):
     for ax in missed_axes:
         ax.axis('off')
     ## ii, jj = p.to_mat()
-    ## subplot_grid = pp.GridSpec(*geo)
+    ## subplot_grid = plt.GridSpec(*geo)
     ## for i, j in zip(ii, jj):
     ##     ax_spec = subplot_grid.new_subplotspec( (i,j) )
     ##     ax = fig.add_subplot(ax_spec)
@@ -463,7 +464,7 @@ def tile_traces(traces, geo=(), p=(), yl=(), twin=(), plot_style='sample', borde
                 ax.yaxis.set_visible(False)
         else:
             ax.axis('off')
-            # pp.axis('off')
+            # plt.axis('off')
 
     fig.subplots_adjust(left=0.05, bottom=0.05, right=0.95, top=1.0)
     if title:
@@ -567,8 +568,8 @@ def tile_traces_1ax(traces, geo=(), p=(), yl=(), twin=(), plot_style='sample', c
         # calculate fig size, given geometry and presence of title
         figsize = (geo[1] * tilesize[0],
                    geo[0] * tilesize[1] + (len(title) > 0))
-        import matplotlib.pyplot as pp
-        fig = pp.figure(figsize=figsize)
+        plt = plotters.plt
+        fig = plt.figure(figsize=figsize)
 
         bottom = left = 0.02
         top = 0.98

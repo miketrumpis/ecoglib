@@ -12,14 +12,6 @@ from ecoglib.vis.data_scroll import ChannelScroller
 from ecoglib.vis.traitsui_bridge import MPLFigureEditor, PingPongStartup
 from ecoglib.vis.plot_util import light_boxplot
 from .signal_tools import safe_avg_power, bad_channel_mask
-import seaborn as sns
-# Fix until MPL or seaborn gets straightened out
-import warnings
-with warnings.catch_warnings():
-    import matplotlib as mpl
-    warnings.simplefilter('ignore', mpl.cbook.MatplotlibDeprecationWarning)
-    sns.reset_orig()
-
 
 
 __all__ = ['interactive_mask', 'ChannelPicker']
@@ -67,7 +59,8 @@ class InteractiveBoxplot(BlitPlot):
         self.trait_setq(ylim=self.ax.get_ylim())
         # self.xlim = self.ax.get_xlim()
         self.trait_setq(xlim=self.ax.get_xlim())
-        sns.despine(ax=self.ax)
+        for spine in ('right', 'top'):
+            self.ax.spines[spine].set_visible(False)
         self.fig.subplots_adjust(left=0.2, right=0.95)
         self.draw()
         self.add_static_artist(self.ax.lines)
