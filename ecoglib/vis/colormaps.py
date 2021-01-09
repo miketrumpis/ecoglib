@@ -48,7 +48,7 @@ def nancmap(cmap_name, nanc=(1, 1, 1, 1), underc=None, overc=None, N=None):
         mpl = plotters.mpl
         N = mpl.rcParams['image.lut']
 
-    cmap = cm._generate_cmap(cmap_name, N)
+    cmap = cm.get_cmap(cmap_name, N)
     if isinstance(nanc, str):
         name = nanc if nanc[0] == '#' else colors.cnames[nanc]
         nanc = colors.hex2color(name)
@@ -142,7 +142,7 @@ def diverging_cm(
         raise ValueError('Range of values must span zero')
 
     if isinstance(cmap, str):
-        cmap = cm.cmap_d[cmap]
+        cmap = cm.get_cmap(cmap)
     elif isinstance(cmap, tuple) or isinstance(cmap, list):
         # parse colors
         cneg, cpos = map(colors.colorConverter.to_rgb, cmap)
@@ -215,7 +215,7 @@ def rgba_field(cmap, sfield, afield=None, clim=(), alim=()):
 
     norm = colors.Normalize(*clim)
     n_sfield = norm(sfield)
-    cmap = cm.cmap_d.get(cmap, cmap)
+    cmap = cm.get_cmap(cmap)
     rgba = cmap(n_sfield, bytes=True)
     if afield is not None:
         n_afield = colors.Normalize(*alim)(afield)

@@ -97,8 +97,9 @@ else:
 
 class _MPLFigureEditor(Editor):
     """
-    This class provides a QT canvas to all MPL figures when drawn
-    under the TraitsUI framework.
+    This class locates or provides a QT canvas to all MPL figures when drawn
+    under the TraitsUI framework. This also works for a HasTraits object with a
+    single MPL figure as .fig attribute.
     """
 
     scrollable = True

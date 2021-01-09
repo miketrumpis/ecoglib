@@ -8,7 +8,7 @@ from matplotlib.figure import Figure
 from matplotlib.patches import FancyBboxPatch, BoxStyle
 import matplotlib.cm as cm
 
-from ecogdata.channel_map import CoordinateChannelMap
+from ecogdata.channel_map import CoordinateChannelMap, ChannelMapError
 from ecogdata.util import mkdir_p
 
 import ecoglib.vis.traitsui_bridge as tb
@@ -68,6 +68,7 @@ class SavesFigure(HasTraits):
     has_graphs = Property
     y_lo = Float
     y_hi = Float
+    tight_layout = Bool(False)
 
     @classmethod
     def live_fig(cls, fig, **traits):
@@ -214,6 +215,10 @@ class SavesFigure(HasTraits):
         self._search_image_props()
         self._search_graph_props()
 
+    def _post_canvas_hook(self):
+        if self.tight_layout:
+            self.fig.tight_layout()
+
     def default_traits_view(self):
         # The figure is put in a panel with correct fig-width and fig-height.
         # Using negative numbers locks in the size. It appears that using
@@ -269,7 +274,8 @@ class SavesFigure(HasTraits):
                     )
                 )
             ),
-            resizable=True
+            resizable=True,
+            handler=tb.PingPongStartup
         )
         return traits_view
 
@@ -356,7 +362,7 @@ class ArrayMap(HasTraits):
             return
         try:
             self.selected_site = self.chan_map.lookup(i, j)
-        except ValueError:
+        except ChannelMapError:
             self.selected_site = -1
 
     @on_trait_change('selected_site')
