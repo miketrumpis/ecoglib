@@ -21,7 +21,7 @@ __all__ = ['SavesFigure', 'ArrayMap', 'EvokedPlot', 'current_screen']
 
 
 # Get current screen geometry -- hide qt4 import unless really needed!
-class Screen(object):
+class Screen:
 
     def _import_and_fetch_screen(self):
         # safe way to get QtGui?
@@ -42,7 +42,16 @@ class Screen(object):
         return V.height()
 
 
-current_screen = Screen()
+class BrowserScreen:
+    # just really big numbers
+    x = 1e9
+    y = 1e9
+
+
+if plotters.jupyter_runtime:
+    current_screen = BrowserScreen()
+else:
+    current_screen = Screen()
 
 
 class SavesFigure(HasTraits):
