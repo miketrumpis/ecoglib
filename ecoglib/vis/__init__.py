@@ -46,5 +46,10 @@ class _plot_libraries:
     def jupyter_runtime(self):
         return 'ipykernel.pylab.backend_inline' in self.mpl.get_backend()
 
+    # Assume that if the agg backend is default, then this is a headless box
+    @property
+    def headless(self):
+        return self.mpl.get_backend() == 'agg'
+
 
 plotters = _plot_libraries()
