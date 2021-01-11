@@ -25,7 +25,8 @@ class BlitPlot(HasTraits):
             self.fig = figure
         else:
             self.fig = Figure(figsize=figsize)
-            self.fig.canvas = None
+            # I think this doesn't need to happen (??)
+            # self.fig.canvas = None
         if axes:
             if not axes in self.fig.axes:
                 self.fig.add_axes(axes)
