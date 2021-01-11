@@ -23,7 +23,7 @@ from matplotlib.figure import Figure
 
 try:
     from traitsui.qt4.editor import Editor
-except RuntimeError:
+except (ImportError, RuntimeError) as e:
     class Editor(object):
         pass
 
