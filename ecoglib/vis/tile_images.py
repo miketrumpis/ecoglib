@@ -281,14 +281,14 @@ def tile_images(maps, geo=(), p=(), col_major=True, border_axes=False, title='',
     # if ndim < 4, then geo must be provided
 
     # filter the cmap in case it's a literal table
-    if imkw.has_key('cmap'):
-        cm = imkw['cmap']
-        if type(cm) == np.ndarray:
-            imkw['cmap'] = mpl.colors.ListedColormap(cm)
+    if 'cmap' in imkw:
+        if isinstance(imkw['cmap'], np.ndarray):
+            cm = mpl.colors.ListedColormap(imkw['cmap'])
+            imkw['cmap'] = cm
 
-    if not (imkw.has_key('clim') or imkw.has_key('vmin') or \
-            imkw.has_key('vmax') or imkw.has_key('norm')):
-        vmin = np.nanmin(maps);
+    # If there is no color limit info, then enforce
+    if not ('clim' in imkw or 'vmin' in imkw or 'vmax' in imkw or 'norm' in imkw):
+        vmin = np.nanmin(maps)
         vmax = np.nanmax(maps)
         imkw['norm'] = mpl.colors.Normalize(vmin, vmax)
 
