@@ -172,9 +172,9 @@ def calibration_axes(ref_ax, y_scale=None, t_scale=None, calib_ax=None, calib_un
 
     # find out how big our calib axes is before computing time scale
     pos = ref_ax.get_position()
-    x0 = pos.x0;
-    x1 = pos.x1;
-    y0 = pos.y0;
+    x0 = pos.x0
+    x1 = pos.x1
+    y0 = pos.y0
     y1 = pos.y1
 
     if not calib_ax:
@@ -610,15 +610,17 @@ def tile_traces_1ax(traces, geo=(), p=(), yl=(), twin=(), plot_style='sample', c
             margins = np.array(np.percentile(traces, [25, 75], axis=1))
             margins = margins.transpose(1, 0, 2)
 
-        lines = [np.c_[np.r_[tx, tx[::-1]], np.r_[m[0], m[1][::-1]]]
-                 for m in margins]
+        lines = list()
+        for m, offset in zip(margins, chan_offsets):
+            x_off, y_off = offset
+            x = np.r_[tx, tx[::-1]] + x_off
+            y = np.r_[m[0], m[1][::-1]] + y_off
+            lines.append(np.c_[x, y])
         fills = PatchCollection(
             [Polygon(line, closed=True) for line in lines],
             match_original=False, edgecolors='none',
-            facecolors=(0.6, 0.6, 0.6)
+            facecolors=(0.6, 0.6, 0.6),
         )
-        fills.set_offset_position('data')
-        fills.set_offsets(chan_offsets)
 
         ax.add_collection(fills)
 

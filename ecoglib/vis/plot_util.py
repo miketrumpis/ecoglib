@@ -1032,7 +1032,8 @@ def stacked_epochs_traces(
         )
 
     ax.set_xlim(tx[0] - tx_pad, n * (len_tx + tx_pad) + tx[0])
-    ax.set_ylim(-offset, m_mx * offset)
+    # set ylim based on n - 1 regular offsets plus enough to cover one of the largest responses
+    ax.set_ylim(-offset, (m_mx - 1) * offset + np.percentile(all_offsets, 95))
     ax.axis('off')
     ax.set_title(title)
     # leave 1 inch for scale
