@@ -19,7 +19,7 @@ import sphinx_rtd_theme
 # -- Project information -----------------------------------------------------
 
 project = 'ecoglib'
-copyright = '2019, M Trumpis'
+copyright = '2021, M Trumpis'
 author = 'M Trumpis'
 
 # The full version, including alpha/beta/rc tags
