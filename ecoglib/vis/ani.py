@@ -80,6 +80,38 @@ def animate_frames(frames, fps=5, blit=False, notebook=False, **anim_kwargs):
     else:
         return anim
 
+
+def array_series_to_frames(channel_map, series, column_space=1):
+    """
+    Embed one or more array timeseries (channels x time) as frames (time x rows x columnns)
+    for animation. If multiple series are given, frames will be extended along columns with NaN padding.
+
+    Parameters
+    ----------
+    channel_map : ecogdata.channel_map.ChannelMap
+    series : np.ndarray, list, tuple
+    column_space : int
+
+    Returns
+    -------
+    frames: np.ndarray
+
+    """
+    if not isinstance(series, (tuple, list)):
+        frames = channel_map.embed(series.T, axis=1)
+        return frames
+    if column_space:
+        rows, cols = channel_map.geometry
+        t = series[0].shape[1]
+        padding = np.ones((t, rows, column_space)) * np.nan
+    sub_frames = []
+    for s in series[:-1]:
+        sub_frames.append(channel_map.embed(s.T, axis=1))
+        if column_space:
+            sub_frames.append(padding)
+    sub_frames.append(channel_map.embed(series[-1].T, axis=1))
+    return np.concatenate(sub_frames, axis=2)
+
     
 def h264_encode_files(in_pattern, out, fps, quicktime=False):
     """Use ffmpeg to encode a list of files matching a pattern
