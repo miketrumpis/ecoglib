@@ -1,5 +1,7 @@
 import numpy as np
-from ecogdata.util import fenced_out
+from itertools import combinations
+from scipy.spatial.distance import pdist
+from ecogdata.util import fenced_out, Bunch
 
 
 __all__ = ['semivariogram', 'fast_semivariogram', 'ergodic_semivariogram', 'semivariogram', 'adapt_bins',
@@ -7,7 +9,19 @@ __all__ = ['semivariogram', 'fast_semivariogram', 'ergodic_semivariogram', 'semi
            'concat_bins']
 
 
-def semivariogram(F, combs, xbin=None, robust=True, trimmed=True, cloud=False, counts=False, se=False):
+def sites_to_bunch(sites):
+    if isinstance(sites, Bunch):
+        return sites
+    site_combos = Bunch()
+    pairs = np.array(list(combinations(range(len(sites)), 2)))
+    site_combos.p1 = pairs[:, 0]
+    site_combos.p2 = pairs[:, 1]
+    # This allows for equality comparisons without rounding problems
+    site_combos.dist = np.round(pdist(sites), decimals=5)
+    return site_combos
+
+
+def semivariogram(F, sites, xbin=None, robust=True, trimmed=True, cloud=False, counts=False, se=False):
     """
     Classical semivariogram estimator with option for Cressie's robust
     estimator. Can also return a semivariogram "cloud".
@@ -17,11 +31,9 @@ def semivariogram(F, combs, xbin=None, robust=True, trimmed=True, cloud=False, c
 
     F : ndarray, (N, ...)
         One or more samples of N field values.
-    combs : Bunch
-        Object representing the site-site pairs between N field
-        points. combs.p1 and combs.p2 are (site_i, site_j) indices.
-        combs.dist is the distance ||site_i - site_j||. This object
-        can be found from the ChannelMap.site_combinations attribute.
+    sites: ndarray (N, num-spatial-dims)
+        The spatial coordinates of each row in F.
+        This can also be provided as a ChannelMap.site_combinations Bunch
     xbin : float (optional)
         Bin site distances with this spacing, rather than the default
         of using all unique distances on the grid.
@@ -53,6 +65,7 @@ def semivariogram(F, combs, xbin=None, robust=True, trimmed=True, cloud=False, c
     """
     # F is an n_site field of values
     # combs is a channel combination bunch
+    combs = sites_to_bunch(sites)
     if cloud:
         x_set = []
         y_set = []
@@ -137,7 +150,7 @@ except ImportError:
         raise NotImplementedError('Cythonized "triu_diffs" method required.')
 
 
-def fast_semivariogram(F, combs, xbin=None, trimmed=True, cloud=False, counts=False, se=False, **kwargs):
+def fast_semivariogram(F, sites, xbin=None, trimmed=True, cloud=False, counts=False, se=False, **kwargs):
     """
     Semivariogram estimator with stationarity assumptions, enabling
     faster "flipped" covariance computation.
@@ -147,11 +160,9 @@ def fast_semivariogram(F, combs, xbin=None, trimmed=True, cloud=False, counts=Fa
 
     F : ndarray, (N, ...)
         One or more samples of N field values.
-    combs : Bunch
-        Object representing the site-site pairs between N field
-        points. combs.p1 and combs.p2 are (site_i, site_j) indices.
-        combs.dist is the distance ||site_i - site_j||. This object
-        can be found from the ChannelMap.site_combinations attribute.
+    sites: ndarray (N, num-spatial-dims)
+        The spatial coordinates of each row in F.
+        This can also be provided as a ChannelMap.site_combinations Bunch
     xbin : float (optional)
         Bin site distances with this spacing, rather than the default
         of using all unique distances on the grid.
@@ -180,7 +191,7 @@ def fast_semivariogram(F, combs, xbin=None, trimmed=True, cloud=False, counts=Fa
     """
     # F is an n_site field of values
     # combs is a channel combination bunch
-
+    combs = sites_to_bunch(sites)
     sv_matrix = ergodic_semivariogram(F, normed=False,
                                       mask_outliers=trimmed, **kwargs)
     x = combs.dist

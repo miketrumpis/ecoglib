@@ -4,7 +4,7 @@ from matplotlib.collections import LineCollection
 from networkx import Graph, draw
 
 from ecoglib.vis.colormaps import diverging_cm
-from .variogram import binned_variance
+from .variogram import binned_variance, semivariogram, fast_semivariogram
 from .kernels import matern_correlation, matern_spectrum
 from ...vis import plotters
 
@@ -61,6 +61,27 @@ def covar_to_iqr_lines(x, y, binsize=None, **lc_kwargs):
     lc = LineCollection(bin_lines, **lc_kwargs)
     med = [y[1] for y in iqr]
     return (xb, med), lc
+
+
+def plot_variogram(field, sites, fast=True, binsize=None, ax=None, lc_kwargs=dict(), **line_kwargs):
+    plt = plotters.plt
+    if ax is None:
+        f, ax = plt.subplots()
+    else:
+        f = ax.figure
+    if fast:
+        x, svar = fast_semivariogram(field, sites, cloud=True)
+    else:
+        x, svar = semivariogram(field, sites, cloud=True)
+    line_kwargs.setdefault('marker', 's')
+    line_kwargs.setdefault('linestyle', '--')
+    (x_bin, sv_med), sv_iqr = covar_to_iqr_lines(x, svar, binsize=binsize, **lc_kwargs)
+    ax.plot(x_bin, sv_med, **line_kwargs)
+    ax.add_collection(sv_iqr)
+    ax.set_xlabel('Distance')
+    ax.set_ylabel('Semivariance')
+    return f
+
 
 
 def make_matern_label(**params):
