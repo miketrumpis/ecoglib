@@ -8,7 +8,7 @@ from contextlib import ExitStack
 import ecogdata.parallel.mproc as mp
 from ecogdata.util import get_default_args
 from ecogdata.parallel.sharedmem import SharedmemManager
-from ecogdata.parallel.array_split import timestamp
+from ecogdata.parallel.mproc import timestamp
 
 
 __all__ = ['random_combinations', 'Jackknife', 'Bootstrap']
