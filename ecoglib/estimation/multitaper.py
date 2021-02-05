@@ -1,5 +1,6 @@
 """Spectral estimation methods for nonstationary/nonlinear timeseries"""
 
+from collections import OrderedDict
 import numpy as np
 import scipy.signal as signal
 import scipy.stats.distributions as dists
@@ -92,7 +93,8 @@ def _csd_from_direct_spectra(y, w):
 
 class _DPSScache:
 
-    cache = dict()
+    max_cached = 50
+    cache = OrderedDict()
 
     @classmethod
     def prepare_dpss(cls, N, NW, low_bias=True, Kmax=None):
@@ -104,6 +106,9 @@ class _DPSScache:
             dpss, eigs = dpss_windows(N, NW, int(2 * NW))
             # always store 2NW eigenvectors/values
             cls.cache[(N, NW)] = (dpss.copy(), eigs.copy())
+            if len(cls.cache) > cls.max_cached:
+                first_key = list(cls.cache.keys())
+                cls.cache.pop(first_key)
         if low_bias:
             low_bias = 0.99 if float(low_bias) == 1.0 else low_bias
             keepers = eigs > low_bias
