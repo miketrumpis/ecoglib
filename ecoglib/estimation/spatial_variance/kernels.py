@@ -48,9 +48,12 @@ def matern_correlation(x, theta=1.0, nu=0.5, d=1.0, **kwargs):
     def _comp(x_):
         scl = 2 ** (1.0 - nu) / math.gamma(nu)
         z = (2 * nu) ** 0.5 * x_ / theta
-        return scl * (z ** nu) * spfn.kv(nu, z)
+        return scl * (z ** nu) * kv(nu, z)
 
-    cf = _comp(x)
+    # Wrap with warnings filter b/c funny values in Bessel fn
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        cf = _comp(x)
     if np.iterable(cf):
         cf[np.isnan(cf)] = 1.0
     elif np.isnan(cf):
@@ -87,7 +90,62 @@ def matern_spectrum(k, theta=1.0, nu=0.5, d=1.0):
     return const / spec
 
 
-def matern_covariance_matrix(chan_map, channel_variance=(), **matern_params):
+def matern_nyquist_density(theta, nu, db=20):
+    """
+    Search for the nyquist spatial density corresponding to an approximate spectral bandwidth.
+    d_nyq = BW ^ -1
+
+    Search for the bandwidth using a line search method.
+
+    Parameters
+    ----------
+    theta: float
+        Matern range
+    nu: float
+        Matern smoothness
+    db: float
+        The approximate full band is twice the frequency at which f(k) < f(0) * 10 ** (-db / 10)
+
+    Returns
+    -------
+    d_nyq: float
+        Nyquist density as defined above
+
+    """
+    d = 2
+    const = 2 ** d * np.pi ** (d / 2.) * math.gamma(nu + d / 2.) * (2 * nu) ** nu
+    const = const / math.gamma(nu) / (theta ** (2 * nu))
+
+    k = 0
+    denom = (2 * nu / theta ** 2 + 4 * np.pi ** 2 * k ** 2) ** (nu + d / 2.0)
+    f0 = const / denom
+    thresh = 10 ** (-db / 10.0) * f0
+
+    def rel_spectrum(k):
+        denom = (2 * nu / theta ** 2 + 4 * np.pi ** 2 * k ** 2) ** (nu + d / 2.0)
+        return const / denom - thresh
+
+    # reasonable upper-/lower-bound guesses, but double check the satisify f(k_upper) < thresh < f(k_lower)
+    k_upper = (0.2 * theta) ** -1
+    while True:
+        # push k_upper until it is less than the threshold
+        if rel_spectrum(k_upper) > 0:
+            k_upper *= 2
+        else:
+            break
+    k_lower = (3 * theta) ** -1
+    while True:
+        # reduce k_lower until it is greater than the threshold
+        if rel_spectrum(k_lower) < 0:
+            k_lower /= 2
+        else:
+            break
+    sol = root_scalar(rel_spectrum, bracket=[k_lower, k_upper], xtol=1e-2)
+    k_opt = sol.root
+    return (2 * k_opt) ** -1
+
+
+def matern_covariance_matrix(chan_map, out=None, channel_variance=(), **matern_params):
     """Returns a model covariance for sites from a ChannelMap
 
     If channel_variance is given, probably a good idea that
@@ -108,13 +166,17 @@ def matern_covariance_matrix(chan_map, channel_variance=(), **matern_params):
     dist_hash = dict(zip(udist, covar_values))
     Kg_flat = [dist_hash[d] for d in np.round(combs.dist, decimals=3)]
     # Kg_flat = (sill - nugget) * matern_correlation(combs.dist, **prm) + kappa
-    Kg = np.zeros((n_chan, n_chan))
+    if out is None:
+        Kg = np.zeros((n_chan, n_chan))
+    else:
+        out.fill(0)
+        Kg = out
     Kg.flat[0::n_chan + 1] = (sill + kappa) / 2.0
     Kg[np.triu_indices(n_chan, k=1)] = Kg_flat
-    Kg = Kg + Kg.T
+    Kg[:] = Kg + Kg.T
     if len(channel_variance):
         cv = np.sqrt(channel_variance / sill)
-        Kg = Kg * np.outer(cv, cv)
+        Kg *= np.outer(cv, cv)
     return Kg
 
 
@@ -177,6 +239,7 @@ def simulate_matern_process(extent, dx, theta=1.0, nu=0.5, nugget=0, sill=1, kap
 # IRLS weights. It looks like the 1 / semivar weighting pushes the
 # estimate very high (at least pushes the nugget high, if it is a free
 # variable).
+# noinspection PyArgumentList
 def matern_semivariogram(x, theta=1.0, nu=1.0, nugget=0, sill=None, y=(), free=('theta', 'nu'), wls_mode='irls',
                          fit_mean=False, binsize=None, dist_limit=None, bin_limit=None, bounds=None, weights=(),
                          fraction_nugget=False, **kwargs):
