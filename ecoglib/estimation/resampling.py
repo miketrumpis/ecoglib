@@ -652,6 +652,58 @@ class Jackknife(Bootstrap):
         return sampler.estimate(estimator, correct_bias=correct_bias, se=se, e_args=e_args, **e_kwargs)
 
 
+def bootstrap_t_test(x, y, num_samples=1000, axis=0):
+    """
+    Perform a hypothesis test for different means (possibly in parallel across multiple variables)
+
+    Parameters
+    ----------
+    x: ndarray
+        Sample(s) 1: must match dimensions of y except along axis
+    y:
+        Sample(s) 2: must match dimensions of x except along axis
+    num_samples: int
+        Number of bootstrap samples to use
+    axis: int
+        If x.ndim > 1, then compare means on this axis
+
+    Returns
+    -------
+    pvalues: ndarray
+        Proportion based p value for the hypothesis that mean(x) == mean(y)
+
+    """
+
+    def calc_t(samp1, samp2):
+        n = samp1.shape[axis]
+        m = samp2.shape[axis]
+        s1_bar = samp1.mean(axis=axis, keepdims=True)
+        s2_bar = samp2.mean(axis=axis, keepdims=True)
+        s1_sig = samp1.var(axis=axis, keepdims=True) / n
+        s2_sig = samp2.var(axis=axis, keepdims=True) / m
+        return (s1_bar - s2_bar) / np.sqrt(s1_sig + s2_sig)
+
+    x_bar = x.mean(axis=axis, keepdims=True)
+    y_bar = y.mean(axis=axis, keepdims=True)
+    t_sample = calc_t(x, y)
+    z_bar = np.mean(np.concatenate([x, y], axis=axis), axis=axis, keepdims=True)
+    x_prime = x - x_bar + z_bar
+    x_prime_boot = Bootstrap(x_prime, axis=axis, num_samples=num_samples)
+    y_prime = y - y_bar + z_bar
+    y_prime_boot = Bootstrap(y_prime, axis=axis, num_samples=num_samples)
+    p_counts = np.zeros(t_sample.shape)
+    for xp, yp in zip(x_prime_boot.sample(), y_prime_boot.sample()):
+        tp = calc_t(xp, yp)
+        p_counts += (np.abs(tp) >= np.abs(t_sample)).astype('d')
+    pvalues = p_counts / num_samples
+    if x.ndim == 1:
+        pvalues = pvalues[0]
+    else:
+        pvalues = pvalues.squeeze()
+    return pvalues
+
+
+
 # TODO:
 #  interesting doc: https://arxiv.org/pdf/1411.5279.pdf
 #  * done: bootstrap estimate: should really emphasize CIs rather than bootstrap mean (which can be biased)
