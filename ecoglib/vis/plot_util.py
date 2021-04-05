@@ -284,6 +284,51 @@ def subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True,
     return ret
 
 
+def choose_grid(n, columns=None, rows=None, max_diff=None):
+    """
+    Return a square-ish grid size that contains n panels.
+    Optionally can specify number of columns or rows.
+    Unless max_diff is set, prefer exactly divisible rectangles over squares.
+
+    Parameters
+    ----------
+    n : int
+        number of panels
+    columns : int
+        fixed number of columns
+    rows : int
+        fixed number of rows
+    max_diff: int
+        maximum difference between rows - columns. E.g. 24 can be exactly (6, 4),
+        but if max_diff is 1, then (5, 5) is returned.
+
+    Returns
+    -------
+    rows: int
+    cols: int
+
+    """
+
+    if rows and columns:
+        return rows, columns
+    if rows:
+        fixed = rows
+        max_diff = None
+    elif columns:
+        fixed = columns
+        max_diff = None
+    else:
+        # this is columns, make it such that the rectangle is more narrow than tall
+        fixed = int(n ** 0.5)
+    floated = n // fixed
+    if floated * fixed < n:
+        floated += 1
+    if max_diff and floated - fixed > max_diff:
+        floated -= 1
+        fixed += 1
+    return (fixed, floated) if rows else (floated, fixed)
+
+
 def embedded_frames(frames, geometry, gap=0.05, border=0.05, fill=np.nan):
     # frames is a sequence of (N x M [x T]) matrices
     # they will be arrayed in "c major" order -- ie rasterized left to right,
