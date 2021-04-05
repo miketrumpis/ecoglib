@@ -153,19 +153,20 @@ class BootstrapSampler(parallel_context.Process):
 
             # This is the *safe* way to go: resample the arrays under a lock.
             # It should also prevent making copies in each subprocess
+            samps = list()
             if shm_output is None:
-                with ExitStack() as stack:
-                    arrays = [stack.enter_context(shm.get_ndarray()) for shm in shm_arrays]
-                    info('Sampling perm {} from arrays {}'.format(self.sample_num, timestamp()))
-                    samps = [np.take(array, permutation, axis=axis) for array in arrays]
+                info('Sampling perm {} from arrays {}'.format(self.sample_num, timestamp()))
+                for shm in shm_arrays:
+                    with shm.shm.get_lock():
+                        array = shm.tonumpyarray(shm.shm, dtype=shm.dtype, shape=shm.shape)
+                        samps.append(np.take(array, permutation, axis=axis))
             else:
-                with ExitStack() as stack:
-                    arrays = [stack.enter_context(shm.get_ndarray()) for shm in shm_arrays]
-                    # de-reference the output memory that was allocated for this sample
-                    out_managers = shm_output[self.sample_num]
-                    out_arrays = [stack.enter_context(shm.get_ndarray()) for shm in out_managers]
-                    samps = [np.take(array, permutation, axis=axis, out=out)
-                             for (array, out) in zip(arrays, out_arrays)]
+                # out_arrays = list()
+                for shm, out_shm in zip(shm_arrays, shm_output[self.sample_num]):
+                    with shm.shm.get_lock(), out_shm.shm.get_lock():
+                        out_array = out_shm.tonumpyarray(out_shm.shm, dtype=out_shm.dtype, shape=out_shm.shape)
+                        array = shm.tonumpyarray(shm.shm, dtype=shm.dtype, shape=shm.shape)
+                        samps.append(np.take(array, permutation, axis=axis, out=out_array))
             info('Doing perm {} estimator method {}'.format(self.sample_num, timestamp()))
             if estimator is not None:
                 r = estimator(*samps, *e_args, **e_kwargs)
