@@ -4,6 +4,7 @@ from scipy.special import comb
 from numpy.testing import assert_almost_equal
 import numpy as np
 
+from ecogdata.parallel.tests import with_start_methods
 from ecoglib.estimation.resampling import Jackknife, Bootstrap
 
 
@@ -186,3 +187,20 @@ def test_jn_variance():
     assert_almost_equal(jn_se2, sem, err_msg='Standard Jackknife SE not almost equal')
     jn_se3 = Jackknife(r).variance(np.mean) ** 0.5
     assert_almost_equal(jn_se3, sem, err_msg='Standard(2) Jackknife SE not almost equal')
+
+
+@with_start_methods
+def test_bs_multi_jobs():
+    # going to resample all ones 100 times and calculate the average (which will be one)
+    a = np.ones(1000)
+    bs = Bootstrap(a, 100, n_jobs=4)
+    estimates = bs.all_samples(estimator=np.mean)
+    assert all([e == 1 for e in estimates])
+
+@with_start_methods
+def test_jn_multi_jobs():
+    # going to jack-knife resample all ones and calculate the average (which will be one)
+    a = np.ones(25)
+    jn = Jackknife(a, n_jobs=4)
+    estimates = jn.all_samples(estimator=np.mean)
+    assert all([e == 1 for e in estimates])

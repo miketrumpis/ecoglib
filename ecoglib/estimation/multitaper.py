@@ -12,7 +12,7 @@ except ImportError:
     POCKET_FFT = False
 import nitime.utils as nt_utils
 
-from ecogdata.parallel.sharedmem import shared_ndarray
+import ecogdata.parallel.sharedmem as shm
 import ecogdata.filt.blocks as blocks
 from ecogdata.util import nextpow2, dpss_windows
 
@@ -822,7 +822,7 @@ def bispectrum(
                 return dm + dm.T
             return sm.todense()
     except ImportError:
-        samps = shared_ndarray((K, nf, nf), typecode='D')
+        samps = shm.shared_ndarray((K, nf, nf), typecode='D')
         np.einsum('...i,...j->...ij', x_tf, x_tf, out=samps)
         tr_i, tr_j = np.tril_indices(nf)
 

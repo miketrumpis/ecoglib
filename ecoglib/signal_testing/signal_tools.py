@@ -6,7 +6,7 @@ from ecogdata.datasource import ElectrodeDataSource
 from ecogdata.filt.blocks import BlockSignalBase
 from ecogdata.filt.time import ar_whiten_blocks
 from ecogdata.util import fenced_out, nextpow2
-from ecogdata.parallel.mproc import multiprocessing as mp
+from ecogdata.parallel.mproc import parallel_context
 from ecogdata.expconfig import load_params
 
 from ecoglib.estimation.spatial_variance import ergodic_semivariogram
@@ -312,7 +312,7 @@ def safe_corrcoef(data, bsize=2000, iqr_thresh=3.0, mean=True, normed=True, semi
         fn = np.corrcoef if normed else np.cov
     else:
         fn = partial(ergodic_semivariogram, normed=normed, mask_outliers=False)
-        pool = mp.Pool(min(8, mp.cpu_count()))
+        pool = parallel_context.Pool(min(8, parallel_context.cpu_count()))
     for n, blk in enumerate(iterator):
         if ar_whiten:
             blk = ar_whiten_blocks(blk)

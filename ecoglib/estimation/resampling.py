@@ -1,14 +1,14 @@
 """Iterators and tools for jackknife estimators"""
 import random
 from warnings import warn
+from time import sleep
 import numpy as np
 from scipy.special import comb
 from itertools import combinations
 from contextlib import ExitStack
-import ecogdata.parallel.mproc as mp
+from ecogdata.parallel.mproc import parallel_context, make_stderr_logger, timestamp
+import ecogdata.parallel.sharedmem as shm
 from ecogdata.util import get_default_args
-from ecogdata.parallel.sharedmem import SharedmemManager
-from ecogdata.parallel.mproc import timestamp
 
 
 __all__ = ['random_combinations', 'Jackknife', 'Bootstrap']
@@ -89,11 +89,13 @@ def leave_n_out_resample(n, r, max_samples, ordered_samples):
         yield index
 
 
-class BootstrapSampler(mp.Process):
+class BootstrapSampler(parallel_context.Process):
 
-    def __init__(self, resamples: mp.JoinableQueue, results: mp.Queue, shm_arrays, shm_output, axis, estimator,
+    def __init__(self,
+                 resamples: parallel_context.JoinableQueue,
+                 results: parallel_context.Queue, shm_arrays, shm_output, axis, estimator,
                  e_args, e_kwargs, resample_args):
-        mp.Process.__init__(self)
+        super().__init__()
         # this is a JoinableQueue that the process will grab resampling permutations from
         self.resamples = resamples
         # this is a Queue that the the process will push results into
@@ -120,7 +122,7 @@ class BootstrapSampler(mp.Process):
         np.random.seed(seed)
 
     def run(self):
-        info = mp.get_logger().info
+        info = parallel_context.get_logger().info
         shm_arrays = self.shm_arrays
         shm_output = self.shm_output
         axis = self.axis
@@ -145,6 +147,9 @@ class BootstrapSampler(mp.Process):
             # this state is important for deterministic sampling (i.e. jackknife)
             self.sample_num = job
             permutation = next(sample_generator)
+
+            # jitter access time from 0-2 ms -- might relieve the strain on acquiring locks for sharedmem
+            # sleep(random.random() * 0.05)
 
             # This is the *safe* way to go: resample the arrays under a lock.
             # It should also prevent making copies in each subprocess
@@ -261,8 +266,8 @@ class Bootstrap:
         shm_output = []
         output_managers = []
         for _ in range(len(self)):
-            arrays = [SharedmemManager.shared_ndarray(s, t) for (s, t) in zip(output_shapes, output_types)]
-            managers = [SharedmemManager(a) for a in arrays]
+            arrays = [shm.SharedmemManager.shared_ndarray(s, t) for (s, t) in zip(output_shapes, output_types)]
+            managers = [shm.SharedmemManager(a) for a in arrays]
             shm_output.append(arrays)
             output_managers.append(managers)
         return shm_output, output_managers
@@ -276,9 +281,9 @@ class Bootstrap:
 
         Parameters
         ----------
-        task_queue: mp.JoinableQueue
+        task_queue: JoinableQueue
             Queue to push resample tasks to workers
-        results_queue: mp.Queue
+        results_queue: Queue
             Queue to receive resample estimators from workers
         estimator: callable
             Statistic to estimate
@@ -295,7 +300,7 @@ class Bootstrap:
             List of shared memory arrays (if workers are returning full resamples)
 
         """
-        shm_arrays = [SharedmemManager(arr, use_lock=True) for arr in self._arrays]
+        shm_arrays = [shm.SharedmemManager(arr, use_lock=True) for arr in self._arrays]
         if estimator is None:
             # if generating samples avoid heavy data passing -- pre-allocate shared memory
             print('allocating output memory {}'.format(timestamp()), end='... ')
@@ -347,10 +352,10 @@ class Bootstrap:
                     yield samps
             return
         # If parallel, build the workers, start the workers, push tasks, and collect results
-        permutations = mp.JoinableQueue()
-        resample_results = mp.Queue()
+        permutations = parallel_context.JoinableQueue()
+        resample_results = parallel_context.Queue()
         samplers, output_arrays = self._sampling_processes(permutations, resample_results, estimator, e_args, e_kwargs)
-        with mp.make_stderr_logger(self._loglevel):
+        with make_stderr_logger(self._loglevel):
             for s in samplers:
                 s.start()
             # put jobs into the queue (just the sample number)
@@ -493,9 +498,9 @@ class Jackknife(Bootstrap):
 
         Parameters
         ----------
-        task_queue: mp.JoinableQueue
+        task_queue: JoinableQueue
             Queue to push resample tasks to workers
-        results_queue: mp.Queue
+        results_queue: Queue
             Queue to receive resample estimators from workers
         estimator: callable
             Statistic to estimate
@@ -512,7 +517,7 @@ class Jackknife(Bootstrap):
             List of shared memory arrays (if workers are returning full resamples)
 
         """
-        shm_arrays = [SharedmemManager(arr, use_lock=True) for arr in self._arrays]
+        shm_arrays = [shm.SharedmemManager(arr, use_lock=True) for arr in self._arrays]
         if estimator is None:
             # if generating samples avoid heavy data passing -- pre-allocate shared memory
             print('allocating output memory {}'.format(timestamp()), end='... ')
