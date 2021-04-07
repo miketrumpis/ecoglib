@@ -1,5 +1,3 @@
-from nose.tools import assert_true
-
 from scipy.special import comb
 from numpy.testing import assert_almost_equal
 import numpy as np
@@ -13,8 +11,8 @@ def test_boot_sample_size():
     N = 10
     r = np.random.randn(N)
 
-    assert_true(np.array(Bootstrap(r, 4).all_samples()).shape == (4, 10))
-    assert_true(np.array(Bootstrap(r, 4, sample_size=8).all_samples()).shape == (4, 8))
+    assert np.array(Bootstrap(r, 4).all_samples()).shape == (4, 10)
+    assert np.array(Bootstrap(r, 4, sample_size=8).all_samples()).shape == (4, 8)
 
 
 def test_jn_sample_size():
@@ -24,9 +22,9 @@ def test_jn_sample_size():
     d = 4
     r = np.random.randn(N)
 
-    assert_true(len(Jackknife(r).all_samples()) == N)
-    assert_true(len(Jackknife(r, n_out=d).all_samples()) == comb(N, d))
-    assert_true(len(Jackknife(r, n_out=d, max_samps=10).all_samples()) == 10)
+    assert len(Jackknife(r).all_samples()) == N
+    assert len(Jackknife(r, n_out=d).all_samples()) == comb(N, d)
+    assert len(Jackknife(r, n_out=d, max_samps=10).all_samples()) == 10
 
 
 def test_bs_nd():
@@ -35,16 +33,16 @@ def test_bs_nd():
     r = np.random.randn(N1, N2, N3)
 
     s = Bootstrap(r, samps, axis=0).all_samples()
-    assert_true(len(s) == samps)
-    assert_true(s[0].shape == (N1, N2, N3))
+    assert len(s) == samps
+    assert s[0].shape == (N1, N2, N3)
 
     s = Bootstrap(r, samps, axis=1).all_samples()
-    assert_true(len(s) == samps)
-    assert_true(s[0].shape == (N1, N2, N3))
+    assert len(s) == samps
+    assert s[0].shape == (N1, N2, N3)
 
     s = Bootstrap(r, samps, axis=2).all_samples()
-    assert_true(len(s) == samps)
-    assert_true(s[0].shape == (N1, N2, N3))
+    assert len(s) == samps
+    assert s[0].shape == (N1, N2, N3)
 
 
 def test_jn_nd():
@@ -54,16 +52,16 @@ def test_jn_nd():
     r = np.random.randn(N1, N2, N3)
 
     s = Jackknife(r, axis=0).all_samples()
-    assert_true(len(s) == N1)
-    assert_true(s[0].shape == (N1 - 1, N2, N3))
+    assert len(s) == N1
+    assert s[0].shape == (N1 - 1, N2, N3)
 
     s = Jackknife(r, axis=1).all_samples()
-    assert_true(len(s) == N2)
-    assert_true(s[0].shape == (N1, N2 - 1, N3))
+    assert len(s) == N2
+    assert s[0].shape == (N1, N2 - 1, N3)
 
     s = Jackknife(r, axis=2).all_samples()
-    assert_true(len(s) == N3)
-    assert_true(s[0].shape == (N1, N2, N3 - 1))
+    assert len(s) == N3
+    assert s[0].shape == (N1, N2, N3 - 1)
 
 
 def test_jn_multiarray():
@@ -76,10 +74,10 @@ def test_jn_multiarray():
     r1 = np.zeros((N1, N2, N3))
     r2 = np.zeros((M1, M2, M3))
     s = Jackknife([r1, r2], axis=0).all_samples()
-    assert_true(len(s) == N1)
-    assert_true(len(s[0]) == 2)
-    assert_true(s[0][0].shape == (N1 - 1, N2, N3))
-    assert_true(s[0][1].shape == (M1 - 1, M2, M3))
+    assert len(s) == N1
+    assert len(s[0]) == 2
+    assert s[0][0].shape == (N1 - 1, N2, N3)
+    assert s[0][1].shape == (M1 - 1, M2, M3)
 
     N1, N2, N3 = np.random.randint(5, 10, size=3)
     M2 = N2
@@ -87,10 +85,10 @@ def test_jn_multiarray():
     r1 = np.zeros((N1, N2, N3))
     r2 = np.zeros((M1, M2, M3))
     s = Jackknife([r1, r2], axis=1).all_samples()
-    assert_true(len(s) == N2)
-    assert_true(len(s[0]) == 2)
-    assert_true(s[0][0].shape == (N1, N2 - 1, N3))
-    assert_true(s[0][1].shape == (M1, M2 - 1, M3))
+    assert len(s) == N2
+    assert len(s[0]) == 2
+    assert s[0][0].shape == (N1, N2 - 1, N3)
+    assert s[0][1].shape == (M1, M2 - 1, M3)
 
     N1, N2, N3 = np.random.randint(5, 10, size=3)
     M3 = N3
@@ -98,10 +96,10 @@ def test_jn_multiarray():
     r1 = np.zeros((N1, N2, N3))
     r2 = np.zeros((M1, M2, M3))
     s = Jackknife([r1, r2], axis=2).all_samples()
-    assert_true(len(s) == N3)
-    assert_true(len(s[0]) == 2)
-    assert_true(s[0][0].shape == (N1, N2, N3 - 1))
-    assert_true(s[0][1].shape == (M1, M2, M3 - 1))
+    assert len(s) == N3
+    assert len(s[0]) == 2
+    assert s[0][0].shape == (N1, N2, N3 - 1)
+    assert s[0][1].shape == (M1, M2, M3 - 1)
 
 
 def test_jn_nd_estimator():
@@ -112,25 +110,25 @@ def test_jn_nd_estimator():
     r = np.random.randn(N1, N2, N3)
 
     t, se = Jackknife(r, axis=0).estimate(np.mean)
-    assert_true(t.shape == (N2, N3))
-    assert_true(se.shape == (N2, N3))
+    assert t.shape == (N2, N3)
+    assert se.shape == (N2, N3)
     t, se = Jackknife(r, axis=0).estimate(np.mean, keepdims=True)
-    assert_true(t.shape == (1, N2, N3))
-    assert_true(se.shape == (1, N2, N3))
+    assert t.shape == (1, N2, N3)
+    assert se.shape == (1, N2, N3)
 
     t, se = Jackknife(r, axis=1).estimate(np.mean)
-    assert_true(t.shape == (N1, N3))
-    assert_true(se.shape == (N1, N3))
+    assert t.shape == (N1, N3)
+    assert se.shape == (N1, N3)
     t, se = Jackknife(r, axis=1).estimate(np.mean, keepdims=True)
-    assert_true(t.shape == (N1, 1, N3))
-    assert_true(se.shape == (N1, 1, N3))
+    assert t.shape == (N1, 1, N3)
+    assert se.shape == (N1, 1, N3)
 
     t, se = Jackknife(r, axis=2).estimate(np.mean)
-    assert_true(t.shape == (N1, N2))
-    assert_true(se.shape == (N1, N2))
+    assert t.shape == (N1, N2)
+    assert se.shape == (N1, N2)
     t, se = Jackknife(r, axis=2).estimate(np.mean, keepdims=True)
-    assert_true(t.shape == (N1, N2, 1))
-    assert_true(se.shape == (N1, N2, 1))
+    assert t.shape == (N1, N2, 1)
+    assert se.shape == (N1, N2, 1)
 
 
 def test_jn_sample_consistency():
@@ -143,14 +141,14 @@ def test_jn_sample_consistency():
     jn = Jackknife(r, ordered_samples=True)
     s1 = np.array(jn.all_samples())
     s2 = np.array(jn.all_samples())
-    assert_true((s1 == s2).all())
+    assert (s1 == s2).all()
 
     # check for N-choose-r jackknifes
     jn = Jackknife(r, n_out=d, ordered_samples=True)
     s1 = np.array(jn.all_samples())
     s2 = np.array(jn.all_samples())
     print(list(map(np.shape, (s1, s2))))
-    assert_true((s1 == s2).all())
+    assert (s1 == s2).all()
 
 
 def test_jn_pseudoval_consistency():
