@@ -103,14 +103,14 @@ class _DPSScache:
             dpss = dpss_c.copy()
             eigs = eigs_c.copy()
         else:
-            dpss, eigs = dpss_windows(N, NW, int(2 * NW))
+            dpss, eigs = dpss_windows(N, NW, int(2 * NW) - 1)
             # always store 2NW eigenvectors/values
             cls.cache[(N, NW)] = (dpss.copy(), eigs.copy())
             if len(cls.cache) > cls.max_cached:
                 first_key = list(cls.cache.keys())
                 cls.cache.pop(first_key)
         if low_bias:
-            low_bias = 0.99 if float(low_bias) == 1.0 else low_bias
+            low_bias = 0.99 if float(low_bias) == 1.0 else float(low_bias)
             keepers = eigs > low_bias
             dpss = dpss[keepers]
             eigs = eigs[keepers]
@@ -135,7 +135,7 @@ class MultitaperEstimator:
         N: int
             Length of sequences
         NW: float
-            Time-bandwidth product to define DPSS. 2NW DPSS will be constructed and K <= 2NW will be used based on
+            Time-bandwidth product to define DPSS. 2NW - 1 DPSS will be constructed and K < 2NW will be used based on
             spectral concentration and the low_bias argument.
         fs: float
             Sampling frequency (or 1 for normalized digital frequencies).
@@ -495,7 +495,7 @@ def mtm_spectrogram(
 
     # set up time-resolution and adjust overlap to a more
     # convenient number if necessary
-    K = 2 * NW
+    K = 2 * NW - 1
     if samp_factor == 0:
         user_delta = 1.0
     else:
