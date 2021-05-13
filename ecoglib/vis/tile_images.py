@@ -3,7 +3,7 @@ import matplotlib as mpl
 from matplotlib.collections import LineCollection, PatchCollection
 from matplotlib.patches import Polygon
 
-from ecogdata.channel_map import ChannelMap
+from ecogdata.channel_map import ChannelMap, CoordinateChannelMap
 from ecogdata.util import ndim_prctile
 from ecogdata.devices import units
 
@@ -11,6 +11,12 @@ from . import plotters
 
 
 def _build_map(p, geometry, col_major):
+    if isinstance(p, CoordinateChannelMap):
+        y, x = p.to_mat()
+        locs = np.c_[y, x]
+        locs -= locs.min(axis=0)
+        locs /= p.min_pitch
+        return CoordinateChannelMap([r for r in locs], geometry='auto')
     if isinstance(p, ChannelMap):
         return p
     return ChannelMap(p, geometry, col_major=col_major)
@@ -477,7 +483,7 @@ def tile_traces(traces, geo=(), p=(), yl=(), twin=(), plot_style='sample', borde
 
 
 def tile_traces_1ax(traces, geo=(), p=(), yl=(), twin=(), plot_style='sample', col_major=True, title='',
-                    tilesize=(1, 1), calib_unit='V', x_labels=(), y_labels=(), table_style='matrix',
+                    tilesize=(1, 1), calib_unit='', x_labels=(), y_labels=(), table_style='matrix',
                     ax=None, **line_kws):
     """
 
@@ -573,7 +579,7 @@ def tile_traces_1ax(traces, geo=(), p=(), yl=(), twin=(), plot_style='sample', c
 
         bottom = left = 0.02
         top = 0.98
-        right = 0.85
+        right = 0.85 if calib_unit else 0.98
         if title:
             top = 1 - 1.0 / figsize[1]
 
@@ -652,18 +658,13 @@ def tile_traces_1ax(traces, geo=(), p=(), yl=(), twin=(), plot_style='sample', c
         ax.add_collection(trig_lines)
 
     ax.axis('off')
-    # ax.axis('auto')
-
-    # ax.set_ylim(yl[0] - txtgap_y, yl[0] + geo[0] * ywid)
-    # ax.set_xlim(twin[0] - tpad - txtgap_x, twin[0] + geo[1] * twid)
-    ax.autoscale_view()
 
     if title:
         fig.text(
             0.5, .95, title, fontsize=18,
             va='baseline', ha='center'
         )
-    if not redraw:
+    if calib_unit and not redraw:
         calibration_axes(
             ax, y_scale=ywid, calib_unit=calib_unit, t_scale=twin[1] - twin[0]
         )
@@ -688,5 +689,10 @@ def tile_traces_1ax(traces, geo=(), p=(), yl=(), twin=(), plot_style='sample', c
                 lab, va='center', ha='center',
                 fontsize=8
             )
+    ax.autoscale(enable=True, tight=True)
+    xl = ax.get_xlim()
+    ax.set_xlim(left=xl[0] - 0.05 * twid, right=xl[1] + 0.05 * twid)
+    yl = ax.get_ylim()
+    ax.set_ylim(bottom=yl[0] - 0.05 * ywid, top=yl[1] + 0.05 * ywid)
 
     return fig
