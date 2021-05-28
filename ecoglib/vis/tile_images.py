@@ -15,7 +15,7 @@ def _build_map(p, geometry, col_major):
         y, x = p.to_mat()
         locs = np.c_[y, x]
         locs -= locs.min(axis=0)
-        locs /= p.min_pitch
+        locs /= p.site_combinations.dist.min()
         return CoordinateChannelMap([r for r in locs], geometry='auto')
     if isinstance(p, ChannelMap):
         return p

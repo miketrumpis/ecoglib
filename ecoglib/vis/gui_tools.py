@@ -385,7 +385,7 @@ class ArrayMap(HasTraits):
             i, j = self.chan_map.rlookup(self.selected_site)
             if self._box:
                 self._box.remove()
-            box_size = self.chan_map.min_pitch if self._coord_map else 1
+            box_size = self.chan_map.site_combinations.dist.min() if self._coord_map else 1
             style = BoxStyle('Round', pad=0.3 * box_size, rounding_size=None)
             self._box = FancyBboxPatch(
                 (j - box_size / 2.0, i - box_size / 2.0), box_size, box_size, boxstyle=style,
