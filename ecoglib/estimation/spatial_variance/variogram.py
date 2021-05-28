@@ -98,7 +98,9 @@ def semivariogram(F, sites, xbin=None, robust=True, trimmed=True, cloud=False, c
                 diffs = diffs[trim_mask]
         if cloud:
             # this should be compressed -- in the event that a pair has no valid differences
-            diff_var = (0.5 * diffs.var(1)).compressed()
+            diff_var = 0.5 * diffs.var(1)
+            if trimmed:
+                diff_var = diff_var.compressed()
             y_set.append(diff_var)
             Nd[n] = len(diff_var)
             x_set.append([x[n]] * Nd[n])
