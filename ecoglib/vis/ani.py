@@ -66,9 +66,11 @@ def write_frames(
         quicktime=quicktime, qtdpi=qtdpi
         )
 
-def animate_frames(frames, fps=5, blit=False, notebook=False, **anim_kwargs):
-
-    f, func = _setup_animated_frames(frames, figure_canvas=True, **anim_kwargs)
+def animate_frames(frames, fps=5, blit=False, notebook=False, func_anim=None, **anim_kwargs):
+    if func_anim is not None:
+        f, func = func_anim
+    else:
+        f, func = _setup_animated_frames(frames, figure_canvas=True, **anim_kwargs)
     anim = _animation.FuncAnimation(
         f, func, frames=len(frames), interval=1000.0 / fps, blit=blit
         )
