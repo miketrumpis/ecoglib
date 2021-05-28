@@ -206,9 +206,7 @@ def fast_semivariogram(F, sites, xbin=None, trimmed=True, cloud=False, counts=Fa
             return x, sv, 1
         return x, sv
 
-    xb, yb = binned_variance(x, sv, binsize=xbin)
-    Nd = np.array(list(map(len, yb)))
-    xb, semivar, serr = binned_variance_aggregate(xb, yb)
+    xb, semivar, serr, Nd = binned_variance_aggregate(x, sv, binsize=xbin)
     if counts and se:
         return xb, semivar, Nd, serr
     if se:
@@ -307,7 +305,8 @@ def binned_variance(x, y, binsize=None):
         xu = np.unique(x)
     else:
         xu, x = adapt_bins(binsize, x, return_map=True)
-    return xu, [y[x == u] for u in xu]
+    y_bin = [y[x == u] for u in xu]
+    return xu, y_bin
 
 
 def subsample_bins(xb, yb, min_bin=-1, max_bin=-1):
@@ -378,7 +377,9 @@ def _get_scale_method(scale_type):
     return methods[scale_type.lower()]
 
 
-def binned_variance_aggregate(xb, y_tab, mid_type='mean', scale_type='sem'):
+def binned_variance_aggregate(xb, y_tab, mid_type='mean', scale_type='sem', min_bin=3, binsize=None):
+    if len(set(xb)) != len(xb):
+        xb, y_tab = binned_variance(xb, y_tab, binsize=binsize)
     mid_fn = {'mean': np.mean,
               'median': np.median}
     if mid_type.lower() not in mid_fn:
@@ -386,7 +387,8 @@ def binned_variance_aggregate(xb, y_tab, mid_type='mean', scale_type='sem'):
     mid_fn = mid_fn.get(mid_type.lower())
     scale_fn = _get_scale_method(scale_type)
 
-    y_mid = np.array([mid_fn(y) for y in y_tab if len(y) > 1])
-    y_scale = np.array([scale_fn(y) for y in y_tab if len(y) > 1])
-    xb = np.array([xb[i] for i in range(len(xb)) if len(y_tab[i]) > 1])
-    return xb, y_mid, y_scale
+    y_mid = np.array([mid_fn(y) for y in y_tab if len(y) >= min_bin])
+    y_scale = np.array([scale_fn(y) for y in y_tab if len(y) >= min_bin])
+    xb = np.array([xb[i] for i in range(len(xb)) if len(y_tab[i]) >= min_bin])
+    counts = np.array([len(y) for y in y_tab if len(y) >= min_bin])
+    return xb, y_mid, y_scale, counts
