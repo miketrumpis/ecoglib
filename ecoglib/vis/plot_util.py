@@ -380,22 +380,22 @@ def filled_interval(
         Ordinate of plot
     f_itvl : array-like
         Interval spec for shaded margin. If 1D, then fill the margin
-	    everywhere between (fx - f_itvl, fx + f_itvl). If
-    	len(f_itvl)==2, then fill the margin between these two levels.
+        everywhere between (fx - f_itvl, fx + f_itvl). If
+        len(f_itvl)==2, then fill the margin between these two levels.
     color : color spec
         Line color (margin is white-blended)
     ax : matplotlib axes (optional)
         axes to plot into. Note that the pfun argument would be
-	    ax.plot, ax.semilogy, etc.
+        ax.plot, ax.semilogy, etc.
     ec : color (optional)
         Optional edgecolor for the margin (default 'none' shows no
-	    distinct edge).
+        distinct edge).
     alpha : float
         Mix the linecolor with (1 - alpha) parts white to get the
-	    margin color.
+        margin color.
     fillx : {True/False}
         If True, reverse the roles of x and fx and make a horizontal
-    	margin.
+        margin.
     pfun_kwargs : dict
         Other keyword arguments for the plotting function.
 
