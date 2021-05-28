@@ -1,8 +1,8 @@
 import itertools
 import numpy as np
 from matplotlib.collections import LineCollection
-from networkx import Graph, draw
 
+from ecogdata.channel_map import ChannelMap, CoordinateChannelMap
 from ecoglib.vis.colormaps import diverging_cm
 from .variogram import binned_variance, semivariogram, fast_semivariogram
 from .kernels import matern_correlation, matern_spectrum
@@ -63,16 +63,17 @@ def covar_to_iqr_lines(x, y, binsize=None, **lc_kwargs):
     return (xb, med), lc
 
 
-def plot_variogram(field, sites, fast=True, binsize=None, ax=None, lc_kwargs=dict(), **line_kwargs):
+def plot_variogram(field, sites, fast=True, binsize=None, ax=None, trimmed=None, weight_bins=False,
+                   lc_kwargs=dict(), **line_kwargs):
     plt = plotters.plt
     if ax is None:
         f, ax = plt.subplots()
     else:
         f = ax.figure
     if fast:
-        x, svar = fast_semivariogram(field, sites, cloud=True)
+        x, svar = fast_semivariogram(field, sites, cloud=True, trimmed=trimmed)
     else:
-        x, svar = semivariogram(field, sites, cloud=True)
+        x, svar = semivariogram(field, sites, cloud=True, trimmed=trimmed)
     line_kwargs.setdefault('marker', 's')
     line_kwargs.setdefault('linestyle', '--')
     (x_bin, sv_med), sv_iqr = covar_to_iqr_lines(x, svar, binsize=binsize, **lc_kwargs)
@@ -80,6 +81,11 @@ def plot_variogram(field, sites, fast=True, binsize=None, ax=None, lc_kwargs=dic
     ax.add_collection(sv_iqr)
     ax.set_xlabel('Distance')
     ax.set_ylabel('Semivariance')
+    ax.autoscale()
+    yl = ax.get_ylim()
+    ax.set_ylim(bottom=min(0, yl[0]))
+    xl = ax.get_xlim()
+    ax.set_xlim(left=min(0, xl[0]))
     return f
 
 
@@ -198,19 +204,21 @@ def matern_demo(
     return f
 
 
-def plot_electrode_graph(graph, chan_map, scale='auto', edge_colors=('black', 'red'), ax=None, stagger_x=False,
-                         stagger_y=False ):
+def plot_electrode_graph(graph: np.ndarray, chan_map: ChannelMap, scale: str='auto', node_map='rank',
+                         edge_colors: tuple=('black', 'red'), edge_clim: tuple=(), max_edge_width: float=1,
+                         ax: plotters.mpl.axes.Axes=None, stagger_x: bool=False, stagger_y: bool=False):
     if not ax:
         plt = plotters.plt
-        figsize = np.array(chan_map.geometry)
+        figsize = np.array(chan_map.geometry[::-1])
         if scale == 'auto':
             scale = 8.0 / max(figsize)
         figsize = tuple(scale * figsize)
         f = plt.figure(figsize=figsize)
         ax = f.add_subplot(111)
+        ax.axis('equal')
     else:
         f = ax.figure
-
+    mpl = plotters.mpl
     ii, jj = chan_map.to_mat()
     if stagger_x:
         jj = jj + (np.random.rand(len(jj)) * 0.7 + 0.1)
@@ -222,19 +230,54 @@ def plot_electrode_graph(graph, chan_map, scale='auto', edge_colors=('black', 'r
     graph = graph.copy()
     graph.flat[::n + 1] = 0
     graph[np.isnan(graph)] = 1e-3
-    rank = np.nansum(np.abs(graph), axis=0) / n
+    if isinstance(node_map, np.ndarray):
+        node = node_map
+        cb_label = ''
+    elif node_map == 'rank':
+        rank = np.nansum(np.abs(graph), axis=0) / n
+        node = rank
+        cb_label = 'Average graph rank'
+    else:
+        node = None
     # make node size somewhere between 40-80 pts
-    nsize = 80 * rank + 40 * (1 - rank)
-    G = Graph(graph)
+    # nsize = 80 * rank + 40 * (1 - rank)
+    if node is None:
+        nsize = 60
+    else:
+        nsize = (80 * node + 40 * (node.max() - node)) / node.max()
+    # G = Graph(graph)
     ew = graph[np.triu_indices(n, k=1)]
 
-    cm = diverging_cm(-1, 1, edge_colors)
-    draw(G, pos, edge_color=ew, edge_cmap=cm, with_labels=False, node_size=nsize, node_color=rank, cmap='Blues',
-         width=np.abs(ew) ** 4, linewidths=0, ax=ax, edge_vmin=-1, edge_vmax=1)
+    if not len(edge_clim):
+        amx = np.abs(ew).max()
+        edge_clim = (-amx, amx)
+    cm = diverging_cm(edge_clim[0], edge_clim[1], edge_colors)
 
-    ax.axis('equal')
-    ax.set_ylim(chan_map.geometry[0] - 0.5, -0.5)
-    ax.set_xlim(-0.5, chan_map.geometry[1] - 0.5)
-    cbar = f.colorbar(ax.collections[0], ax=ax, use_gridspec=True)
-    cbar.set_label('graph avg rank')
+    # Transpose these positions to (x, y)
+    loc_a = chan_map.site_combinations.idx1[:, ::-1]
+    loc_b = chan_map.site_combinations.idx2[:, ::-1]
+    lines = [np.array([i1, i2]) for i1, i2 in zip(loc_a, loc_b)]
+    norm = mpl.colors.Normalize(-amx, amx)
+    edge_colors = cm(norm(ew))
+    edge_width = max_edge_width * (np.abs(ew) / edge_clim[1]) ** 2
+    lines = LineCollection(lines, colors=edge_colors, linewidths=edge_width)
+    ax.add_collection(lines)
+    if node is not None:
+        sct = ax.scatter(jj, ii, s=nsize, c=node, cmap='Blues', edgecolors='none', zorder=10)
+
+    if isinstance(chan_map, CoordinateChannelMap):  # np.all(ii.astype('l') == ii):
+        row_lim = ii.min(), ii.max()
+        row_lim = [row_lim[0] - 0.025 * (row_lim[1] - row_lim[0]),
+                   row_lim[1] + 0.025 * (row_lim[1] - row_lim[0])]
+        col_lim = jj.min(), jj.max()
+        col_lim = [col_lim[0] - 0.025 * (col_lim[1] - col_lim[0]),
+                   col_lim[1] + 0.025 * (col_lim[1] - col_lim[0])]
+        ax.set_xlim(col_lim)
+        ax.set_ylim(row_lim)
+    else:
+        ax.set_ylim(chan_map.geometry[0] - 0.5, -0.5)
+        ax.set_xlim(-0.5, chan_map.geometry[1] - 0.5)
+    if node is not None:
+        cbar = f.colorbar(sct, ax=ax, use_gridspec=True)
+        cbar.set_label(cb_label)
     return f

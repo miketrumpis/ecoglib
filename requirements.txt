@@ -6,7 +6,6 @@ lxml
 matplotlib
 mpmath
 nbsphinx
-networkx
 numexpr
 numpy
 pandas
