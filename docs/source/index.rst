@@ -13,15 +13,14 @@ Generic steps for cloning ecoglib and installing follow.
 If you are using `conda`_ or `pyenv`_ then activate environments and/or change the install procedure accordingly.
 
 .. attention::
-   It is currently necessary to change to the Python3 migration branch using ``git checkout py3_remake``
+   April 2021: the ``py3_remake`` branch has been merged as the primary (``master``) branch. Please update already cloned repositories using the following steps
 
 .. code-block:: bash
 
-    $ git clone git@bitbucket.org:tneuro/ecoglib.git
-    $ cd ecoglib
     $ git checkout py3_remake
-    $ pip install -r requirements.txt
-    $ pip install .
+    $ git fetch
+    $ git branch -D master
+    $ git checkout master
 
 More about ecoglib
 ------------------
