@@ -70,7 +70,7 @@ class AnchoredScaleBar(offsetbox.AnchoredOffsetbox):
 
     """
 
-    def __init__(self, loc, ax, size=1, label='',
+    def __init__(self, loc, ax, size=1, label='', a_loc=None,
                  pad=0.4, borderpad=0.5, ppad = 0, sep=2, prop=None,
                  frameon=False, vertical=True, linekw={}, **kwargs):
         if vertical:
@@ -88,7 +88,12 @@ class AnchoredScaleBar(offsetbox.AnchoredOffsetbox):
         else:
             txt = offsetbox.TextArea(label, minimumdescent=False, textprops=dict(fontsize=8))
             self.pac = offsetbox.VPacker(children=[size_bar, txt], align="center", pad=ppad, sep=sep)
-        offsetbox.AnchoredOffsetbox.__init__(self, 'center right', pad=pad, bbox_to_anchor=loc,
+        if a_loc is None:
+            if vertical:
+                a_loc = 'upper left'
+            else:
+                a_loc = 'lower right'
+        offsetbox.AnchoredOffsetbox.__init__(self, a_loc, pad=pad, bbox_to_anchor=loc,
                                              borderpad=borderpad, bbox_transform=ax.transAxes,
                                              child=self.pac, prop=prop, frameon=frameon, **kwargs)
 
