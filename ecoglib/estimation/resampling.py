@@ -414,7 +414,9 @@ class Bootstrap:
         else:
             tol = 100 * (1 - ci) / 2
             iv = np.percentile(vals, [tol, 100 - tol], axis=0)
-        sample_mean = estimator(*self._arrays, *e_args, **e_kwargs)
+        e_kwargs_ = e_kwargs.copy()
+        e_kwargs_['axis'] = self._axis
+        sample_mean = estimator(*self._arrays, *e_args, **e_kwargs_)
         return sample_mean, np.mean(vals, axis=0), iv
 
     @classmethod
