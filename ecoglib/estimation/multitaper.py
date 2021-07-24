@@ -98,6 +98,7 @@ class _DPSScache:
 
     @classmethod
     def prepare_dpss(cls, N, NW, low_bias=True, Kmax=None):
+        NW = round(2 * NW) / 2
         if (N, NW) in cls.cache:
             dpss_c, eigs_c = cls.cache[(N, NW)]
             dpss = dpss_c.copy()
@@ -660,6 +661,7 @@ def mtm_complex_demodulate(x, NW, nfft=None, adaptive_weights=True, low_bias=Tru
         resample_point = 0.5
     else:
         samp_factor = min(samp_factor, float(N) / (4 * NW))
+        # TODO: this seems too coarse by a factor of 2!!
         t_res = int(np.floor(float(N) / (2 * NW) / samp_factor))
         t_res = max(2, t_res)
         resample_point = 0.5
