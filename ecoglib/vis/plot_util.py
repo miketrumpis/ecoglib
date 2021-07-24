@@ -1396,13 +1396,18 @@ def label_multi_axes(
         l_ax = [x for x in fig.axes if x.is_first_col()]
         if not len(l_ax):
             l_text = 0
-        l_text = []
+        l_text = [0]
+        t = 0
         for ax in l_ax:
+            labels = ax.get_yticklabels()
+            if not len(labels):
+                continue
             l_text.extend([len(tex_filter(t.get_text()))
                            for t in ax.get_yticklabels()])
+            t = labels[0].get_fontsize()
+
         # l_text = np.any(l_text)
-        t = ax.get_yticklabels()[0]
-        l_text = max(l_text) * t.get_fontsize()
+        l_text = max(l_text) * t
     if top:
         t_ax = [x for x in fig.axes if x.is_first_row()]
         if not len(t_ax):
