@@ -702,27 +702,28 @@ def mtm_complex_demodulate(x, NW, nfft=None, adaptive_weights=True, low_bias=Tru
     xk *= np.sqrt(eigs[:, None])
 
     xk_win_ax = x.ndim - 1
-    # expand the complex coefficients at each frequency with the baseband DPSS vectors
-    x_tf = np.tensordot(xk, dpss, axes=(xk_win_ax, 0))
-    if resample_point == 0.5:
-        t1 = (ix + neg_segs * t_res).astype('i')
-        x_tf1 = np.take(x_tf, t1, axis=-1)
-        # print('taking time axis at', t1)
-        if t_res % 2:
-            x_tf1 += np.take(x_tf, t1 + 1, axis=-1)
-            # print('averaging with times at', t1 + 1)
-            x_tf1 /= 2
-        x_tf = x_tf1
-    if (ix < 0).any():
+    # Expand the complex coefficients at each frequency with the baseband DPSS vectors
+    # x_tf is shaped (..., K, f) for K support vectors and f frequencies --
+    # this is K complex coefficients per frequency to linearly combine the dpss.
+    # But do time-axis resampling first to avoid expansion on unneeded time points.
+    if pad:
         if resample_point == 0.5:
             # limit last point to an interior point between samples
             ix_mask = (ix >= 0) & (ix < N - 0.5 * t_res)
         else:
             # limit last point to actual last point
             ix_mask = (ix >= 0) & (ix < N)
-        x_tf = x_tf[..., ix_mask]
         ix = ix[ix_mask]
-
+    if resample_point == 0.5:
+        t1 = (ix + neg_segs * t_res).astype('i')
+        dpss_sub = np.take(dpss, t1, axis=-1)
+        if t_res % 2:
+            dpss_sub += np.take(dpss, t1 + 1, axis=-1)
+            dpss_sub /= 2
+        dpss = dpss_sub
+    else:
+        dpss = dpss[:, ix_mask]
+    x_tf = np.tensordot(xk, dpss, axes=(xk_win_ax, 0))
     return x_tf, ix, weight
 
 
