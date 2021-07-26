@@ -603,7 +603,7 @@ def mtm_spectrogram(
 
 def mtm_complex_demodulate(x, NW, nfft=None, adaptive_weights=True, low_bias=True,
                            dpss=None, eigs=None, samp_factor=1,
-                           fmax=0.5, pad=False, return_pad_length=False):
+                           fmax=0.5, bandpass=(), pad=False, return_pad_length=False):
     """
     Computes the complex demodulate of x. The complex demodulate is
     essentially a time-frequency matrix that holds the complex "baseband"
@@ -723,6 +723,14 @@ def mtm_complex_demodulate(x, NW, nfft=None, adaptive_weights=True, low_bias=Tru
         dpss = dpss_sub
     else:
         dpss = dpss[:, ix_mask]
+    # Also trim the number of frequencies to include, if specified
+    if fmax < 0.5:
+        fmax = int(fmax / 0.5 * xk.shape[-1])
+        xk = xk[..., :fmax]
+    elif len(bandpass):
+        f1 = int(bandpass[0] / 0.5 * xk.shape[-1])
+        f2 = int(bandpass[1] / 0.5 * xk.shape[-1])
+        xk = xk[..., f1:f2]
     x_tf = np.tensordot(xk, dpss, axes=(xk_win_ax, 0))
     return x_tf, ix, weight
 
