@@ -1,7 +1,8 @@
+import warnings
 import numpy as np
 import statsmodels.formula.api as smf
-import scipy.special as spfn
-from scipy.optimize import curve_fit, minimize, minimize_scalar
+from scipy.special import kv
+from scipy.optimize import curve_fit, minimize, minimize_scalar, root_scalar
 import math
 
 from ecogdata.channel_map import ChannelMap
