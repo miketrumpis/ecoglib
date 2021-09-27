@@ -44,7 +44,11 @@ class _plot_libraries:
 
     @property
     def jupyter_runtime(self):
-        return 'ipykernel.pylab.backend_inline' in self.mpl.get_backend()
+        be = self.mpl.get_backend()
+        # This likely can be simplified to "backend_inline" in mpl.get_backend()
+        if 'ipykernel.pylab.backend_inline' in be or 'matplotlib_inline.backend_inline' in be:
+            return True
+        return False
 
     # Assume that if the agg backend is default, then this is a headless box
     @property
