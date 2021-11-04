@@ -1,0 +1,33 @@
+[build-system]
+# For each Python version, build against the oldest numpy C_API_VERSION for
+# which binary numpy wheels exist, and then the newest version of numpy
+# implementing that C_API_VERSION.
+requires = [
+    "setuptools",
+    "wheel",
+    "oldest-supported-numpy",
+    "Cython",
+]
+build-backend = "setuptools.build_meta"
+
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+# addopts = "-ra -q"
+addopts = "-ra"
+testpaths = [
+    "tests",
+]
+
+
+[tool.coverage.run]
+parallel = true
+branch = true
+concurrency = ['multiprocess', 'multiprocessing']
+source = ["ecoglib"]
+
+[tool.coverage.paths]
+source = ['ecoglib']
+
+[tool.coverage.report]
+show_missing = true
