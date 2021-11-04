@@ -709,7 +709,7 @@ def mtm_complex_demodulate(x, NW, nfft=None, adaptive_weights=True, low_bias=Tru
     if pad:
         if resample_point == 0.5:
             # limit last point to an interior point between samples
-            ix_mask = (ix >= 0) & (ix < N - 0.5 * t_res)
+            ix_mask = (ix >= 0) & (ix <= N - 0.5 * t_res)
         else:
             # limit last point to actual last point
             ix_mask = (ix >= 0) & (ix < N)
