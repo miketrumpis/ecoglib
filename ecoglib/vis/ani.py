@@ -168,8 +168,8 @@ def write_anim(
         dpi = fig.dpi
     writer.extra_args = extra_args
     fname = fname.split('.mp4')[0]
+    print('Writing {0} frames'.format(n_frame))
     with writer.saving(fig, fname+'.mp4', dpi):
-        print('Writing {0} frames'.format(n_frame))
         if progress:
             itr = trange(n_frame)
         else:
