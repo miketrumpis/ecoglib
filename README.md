@@ -1,5 +1,9 @@
 # ecoglib: visualization and statistics for high density microecog signals
 
+![building workflow](https://github.com/miketrumpis/ecoglib/actions/workflows/build_wheels.yml/badge.svg?branch=ghactions)
+![tox workflow](https://github.com/miketrumpis/ecoglib/actions/workflows/run_tox.yml/badge.svg?branch=ghactions)
+[![codecov](https://codecov.io/gh/miketrumpis/ecoglib/branch/ghactions/graph/badge.svg?token=DJLCE6UAEN)](https://codecov.io/gh/miketrumpis/ecoglib)
+
 This library contains high-level analysis tools for "topos" and "chronos" aspects of spatio-temporal signals (array timesries).
 The packages are organized for
 
