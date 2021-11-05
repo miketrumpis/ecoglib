@@ -32,7 +32,7 @@ jobs:
           python -m pip install --upgrade pip setuptools
           python -m pip install --upgrade coverage[toml] virtualenv tox tox-gh-actions
       - name: "Run tox targets for ${{ matrix.platform }} ${{ matrix.python-version }}"
-        run: "python -m tox -- -m 'not ghskip'"
+        run: "python -m tox"
       - name: "Get coverage"
         run: |
           python -m coverage combine
