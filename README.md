@@ -13,41 +13,40 @@ This library builds on top of [ecogdata](https://github.com/miketrumpis/ecogdata
 
 First step: set up ``ecogdata`` following instructions here: https://github.com/miketrumpis/ecogdata
 
-Next, clone and install ecogdata, ecoglib and dependencies:
+Whether you have chosen to use conda or a plain virtual environment, use pip to install ecoglib.
+
+**Choose whether to use PyQt5 or PySide2.**
+
+* PyQt5: this is probably the best option (presently), but it is known not to work on Windows 8
+* PySide2: also works, has a less restrictive license
+
+This choice affects the install variation, which is specified in the brackets.
+You can either clone & install in one step (using PyQt5 in these example, replace with "pyside2" if needed):
 
 ```bash
-$ git clone https://bitbucket.org/tneuro/ecoglib
+$ pip install "ecoglib[pyqt] @ git+https://github.com/miketrumpis/ecoglib.git"
 ```
 
-Update requirements. Using pip:
+Or, to track the repository, clone and install separately.
 
 ```bash
-$ pip install -r ecoglib/requirements.txt
+$ git clone https:github.com/miketrumpis/ecoglib.git
+$ pip install ./ecoglib[pyqt]
 ```
 
-Using conda: **change "tables" to "pytables" in requirements.txt** (and add conda forge channel to your settings to avoid "-c")
+## Install variation for testing
+
+To run tests, install with the ``[pyqt,test]`` variation and run
 
 ```bash
-$ conda install -c conda-forge -n <your-env-name> --file ecoglib/requirements.txt
-```
-
-Last, install ecoglib in any way you choose. 
-I use "editable" mode to avoid re-installing after git pulls: pip install -e 
-
-```bash
-$ pip install -e ./ecoglib
-```
-
-Run tests to check install:
-
-```bash
-$ python -m pytest ecoglib
+$ python -m pytest --pyargs ecoglib
 ```
 
 ## Docs & demo notebooks
 
-To build API documentation and usage demos, first install requirements in requirements-docs.txt.
-Then:
+To build API documentation and usage demos, you must clone the repository.
+Then add ``[pyqt,docs]`` to the install command to get Sphinx and other tools.
+You can now run:
 
 ```bash
 $ cd docs
