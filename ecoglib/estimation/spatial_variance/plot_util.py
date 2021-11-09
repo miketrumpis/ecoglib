@@ -98,9 +98,9 @@ def make_matern_label(**params):
     if 'theta' in params:
         label = label + '\u03B8 {theta:.1f} (mm) '
     if 'nugget' in params:
-        label = label + '\u03C3 {nugget:.2f} (uV^2) '
+        label = label + '\u03C3 {nugget:.2f} (\u03BCV\u00B2) '
     if 'sill' in params:
-        label = label + '\u03B6 {sill:.2f} (uV^2) '
+        label = label + '\u03B6 {sill:.2f} (\u03BCV\u00B2) '
 
     return label.format(**params)
 
