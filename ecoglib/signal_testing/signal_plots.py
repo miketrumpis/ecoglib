@@ -14,8 +14,7 @@ from ..vis import plotters
 
 
 __all__ = ['plot_psds', 'plot_electrode_graph', 'plot_avg_psds', 'plot_centered_rxx', 'plot_channel_mask',
-           'plot_mean_psd', 'plot_mux_columns', 'plot_rms_array', 'plot_site_corr', 'plot_site_corr_new',
-           'spatial_variance']
+           'plot_mean_psd', 'plot_mux_columns', 'plot_rms_array', 'plot_site_corr', 'spatial_variance']
 
 
 psd_colors = ["#348ABD", "#A60628"]
@@ -616,25 +615,8 @@ def plot_rms_array(data, chan_map, title, color_lims=True, units='uV'):
     return f
 
 
-def plot_site_corr(data, title):
-    plt = plotters.plt
-    # data[g_chans] = np.nan
-    cxx = safe_corrcoef(data, 2000)
-    n = cxx.shape[0]
-    cxx.flat[0:n * n:n + 1] = np.nan
-
-    cm = plt.cm.jet
-
-    f = plt.figure()
-    plt.imshow(cxx, cmap=cm)
-    cbar = plt.colorbar()
-    cbar.set_label('avg corr coef')
-
-    plt.title(title)
-    return f
-
-
-def plot_site_corr_new(data, chan_map, title, bsize=2000, cmap=None, normed=True, stagger_x=False, stagger_y=False):
+def plot_site_corr(data, chan_map, title, bsize=2000, cmap=None, normed=True, stagger_x=False, stagger_y=False,
+                   axs=None):
     plt = plotters.plt
     # data[g_chans] = np.nan
     cxx = safe_corrcoef(data, bsize, normed=normed)
@@ -646,7 +628,11 @@ def plot_site_corr_new(data, chan_map, title, bsize=2000, cmap=None, normed=True
         import ecoglib.vis.colormaps as cmaps
         cmap = cmaps.diverging_cm(clim[0], clim[1], ((0, 0, 0), (1, 0, 0)))
 
-    f, axs = plt.subplots(1, 2, figsize=(12, 5))
+    if axs is None:
+        f, axs = plt.subplots(1, 2, figsize=(12, 5))
+    else:
+        axs = axs.squeeze()
+        f = axs[0].figure
 
     corr_ax = axs[0]
     graph_ax = axs[1]
