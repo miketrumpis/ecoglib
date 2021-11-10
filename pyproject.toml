@@ -31,3 +31,4 @@ source = ['ecoglib']
 
 [tool.coverage.report]
 show_missing = true
+omit = ['*/test*', '*/__init__.py']
