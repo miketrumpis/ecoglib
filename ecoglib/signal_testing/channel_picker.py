@@ -9,7 +9,6 @@ from ecogdata.datasource import MappedSource, ElectrodeDataSource
 from ecoglib.vis.plot_modules import BlitPlot, PagedTimeSeriesPlot, AxesScrubber
 from ecoglib.vis.gui_tools import ArrayMap
 from ecoglib.vis.data_scroll import ChannelScroller
-from ecoglib.vis.traitsui_bridge import MPLFigureEditor, PingPongStartup
 from ecoglib.vis.plot_util import light_boxplot
 from .signal_tools import safe_avg_power, bad_channel_mask
 
@@ -447,6 +446,7 @@ else:
             return scr
 
         def default_traits_view(self):
+            from ecoglib.vis.traitsui_bridge import MPLFigureEditor, PingPongStartup
             view = View(
                 HSplit(
                     Item(

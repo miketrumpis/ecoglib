@@ -11,7 +11,6 @@ import matplotlib.cm as cm
 from ecogdata.channel_map import CoordinateChannelMap, ChannelMapError
 from ecogdata.util import mkdir_p
 
-import ecoglib.vis.traitsui_bridge as tb
 import ecoglib.vis.plot_modules as pm
 from .colormaps import diverging_cm
 from . import plotters
@@ -232,6 +231,7 @@ class SavesFigure(HasTraits):
         # The figure is put in a panel with correct fig-width and fig-height.
         # Using negative numbers locks in the size. It appears that using
         # positive numbers enforces a minimum size.
+        import ecoglib.vis.traitsui_bridge as tb
         fig = self.fig
         fh = int(fig.get_figheight() * fig.get_dpi())
         fw = int(fig.get_figwidth() * fig.get_dpi())

@@ -1,7 +1,6 @@
 import numpy as np
 
 import ecoglib.vis.plot_modules as pm
-import ecoglib.vis.traitsui_bridge as tb
 
 from traits.api import \
      HasTraits, Range, Float, on_trait_change, Instance, Button, Int, Any
@@ -251,6 +250,7 @@ try:
             self.time = t
 
         def default_traits_view(self):
+            import ecoglib.vis.traitsui_bridge as tb
             view = View(
                 VGroup(
                     Item(
@@ -262,7 +262,7 @@ try:
                         show_label=False, width=600, height=200, resizable=True
                         ),
                     HGroup(
-                        Item('time', label='Time Slice', style='custom'),
+                    Item('time', label='Time Slice', style='custom'),
                         Item('fps', label='FPS'),
                         ),
                     Item('count', label='Run Clock')
@@ -271,6 +271,7 @@ try:
                 title='Scatter Scroller'
 
                 )
+            return view
 
     class ClassCodedScatterScroller(ScatterScroller):
         ts_plot = Instance(pm.WindowedClassSegmentedPlot)

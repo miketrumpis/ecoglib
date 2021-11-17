@@ -13,7 +13,6 @@ from pyface.timer.api import Timer
 import pyface
 
 from . import plot_modules as pm
-from . import traitsui_bridge as tb
 
 from ecogdata.channel_map import ChannelMap
 import ecogdata.devices.units as units_tools
@@ -352,6 +351,7 @@ class DataScroller(HasTraits):
         self.array_ipw = ipw
 
     def default_traits_view(self):
+        from . import traitsui_bridge as tb
         # adapt the view at runtime depending on whether mayavi/tvtk is installed
         if use_mayavi:
             from mayavi.core.ui.api import SceneEditor
@@ -788,6 +788,7 @@ class ChannelScroller(DataScroller):
         self.zoom_plot.ylim = lim
 
     def default_traits_view(self):
+        from . import traitsui_bridge as tb
         view = View(
             HSplit(
                 Item(
