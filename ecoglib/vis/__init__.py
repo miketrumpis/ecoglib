@@ -46,7 +46,9 @@ class _plot_libraries:
     def jupyter_runtime(self):
         be = self.mpl.get_backend()
         # This likely can be simplified to "backend_inline" in mpl.get_backend()
-        if 'ipykernel.pylab.backend_inline' in be or 'matplotlib_inline.backend_inline' in be or 'ipympl' in be:
+        if be.lower() in ('ipympl', 'nbagg'):
+            return True
+        if 'ipykernel.pylab.backend_inline' in be or 'matplotlib_inline.backend_inline' in be:
             return True
         return False
 
