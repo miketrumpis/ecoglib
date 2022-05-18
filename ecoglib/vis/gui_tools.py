@@ -55,7 +55,7 @@ else:
 
 class SavesFigure(HasTraits):
     sfile = Str
-    spath = File(os.getcwd())
+    spath = Directory(os.path.abspath(os.curdir), exists=True)
     path_button = Button('fig dir')
     update = Button('Refresh')
 
