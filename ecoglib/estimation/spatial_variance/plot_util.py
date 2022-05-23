@@ -263,7 +263,8 @@ def plot_electrode_graph(graph: np.ndarray, chan_map: ChannelMap, scale: str='au
     lines = LineCollection(lines, colors=edge_colors, linewidths=edge_width)
     ax.add_collection(lines)
     if node is not None:
-        sct = ax.scatter(jj, ii, s=nsize, c=node, cmap='Blues', edgecolors='none', zorder=10)
+        sct = ax.scatter(jj, ii, s=nsize, c=node, cmap='Blues', edgecolors='none', zorder=10,
+                         vmin=0, vmax=1)
 
     if isinstance(chan_map, CoordinateChannelMap):  # np.all(ii.astype('l') == ii):
         row_lim = ii.min(), ii.max()
