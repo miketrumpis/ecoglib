@@ -234,7 +234,7 @@ def plot_electrode_graph(graph: np.ndarray, chan_map: ChannelMap, scale: str='au
         node = node_map
         cb_label = ''
     elif node_map == 'rank':
-        rank = np.nansum(np.abs(graph), axis=0) / n
+        rank = np.nansum(np.abs(graph), axis=0) / (n - 1)
         node = rank
         cb_label = 'Average graph rank'
     else:

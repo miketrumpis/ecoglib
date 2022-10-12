@@ -16,12 +16,8 @@ class _plot_libraries:
             import matplotlib.pyplot as plt
             self._plt = plt
         if self._sns is None:
-            import warnings
             import seaborn as sns
-            # Fix until MPL or seaborn gets straightened out
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore', self._mpl.cbook.MatplotlibDeprecationWarning)
-                sns.reset_orig()
+            sns.reset_orig()
             self._sns = sns
 
     @property
